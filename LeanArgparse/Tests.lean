@@ -1,6 +1,8 @@
 import LeanArgparse
 
 open Argparse
+open Argparse.OptionSpec
+open Argparse.FlagSpec
 
 namespace LeanArgparse.Tests
 
@@ -77,6 +79,51 @@ def commandParser : Parser CommandResult :=
 
 #guard (match ParserInfo.exec exampleInfo ["--help"] with
   | .showHelp => True
+  | _ => False)
+
+def repeatedArgs : Parser (List String) :=
+  Parser.many (rawArgument "ITEM")
+
+#guard (match ParserInfo.exec { progName := "items", parser := repeatedArgs } ["one", "two", "three"] with
+  | .success items => decide (items = ["one", "two", "three"])
+  | _ => False)
+
+#guard (match ParserInfo.exec { progName := "items", parser := repeatedArgs } [] with
+  | .success items => decide (items = [])
+  | _ => False)
+
+#guard (match ParserInfo.exec { progName := "items", parser := Parser.some (rawArgument "ITEM") } [] with
+  | .failure err => decide (err.error.kind = .missing)
+  | _ => False)
+
+def requiredFlag : Parser Bool :=
+  flag' <|
+    FlagSpec.build false true [
+      FlagSpec.long "loud",
+      FlagSpec.short 'L',
+      FlagSpec.help "Enable loud mode"
+    ]
+
+#guard (match ParserInfo.exec { progName := "flags", parser := requiredFlag } ["--loud"] with
+  | .success value => decide (value = true)
+  | _ => False)
+
+#guard (match ParserInfo.exec { progName := "flags", parser := requiredFlag } [] with
+  | .failure err => decide (err.error.kind = .missing)
+  | _ => False)
+
+def choiceParser : Parser String :=
+  Parser.choice [
+    strOption [OptionSpec.long "name", OptionSpec.help "Primary name"],
+    strOption [OptionSpec.long "alias", OptionSpec.help "Alias"]
+  ]
+
+#guard (match ParserInfo.exec { progName := "choice", parser := choiceParser } ["--alias", "Bob"] with
+  | .success value => decide (value = "Bob")
+  | _ => False)
+
+#guard (match ParserInfo.exec { progName := "choice", parser := choiceParser } [] with
+  | .failure err => decide (err.error.kind = .missing)
   | _ => False)
 
 end LeanArgparse.Tests

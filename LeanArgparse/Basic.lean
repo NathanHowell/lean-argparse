@@ -104,6 +104,9 @@ def remaining (s : ParseState) : List String :=
   | [] => s.front
   | tail => s.front ++ "--" :: tail
 
+def size (s : ParseState) : Nat :=
+  s.front.length + s.tail.length
+
 private def splitOnFirst (sep : Char) (xs : List Char) : List Char × Option (List Char) :=
   let rec loop (acc : List Char) : List Char → List Char × Option (List Char)
     | [] => (acc.reverse, none)
@@ -316,6 +319,32 @@ instance : SeqLeft Parser where
 instance : SeqRight Parser where
   seqRight := seqRightCore
 
+def failure {α} (msg : String := "empty parser") : Parser α :=
+  {
+    run := fun _ => .error {
+      kind := .missing,
+      message := msg
+    },
+    usage := Usage.empty
+  }
+
+def orElseCore {α} (p : Parser α) (q : Unit → Parser α) : Parser α :=
+  let q' := q ()
+  {
+    run := fun s =>
+      match p.run s with
+      | .ok result => .ok result
+      | .error err =>
+        if err.kind = .missing then
+          q'.run s
+        else
+          .error err,
+    usage := Usage.optional (Usage.append p.usage q'.usage)
+  }
+
+def orElse {α} (p q : Parser α) : Parser α :=
+  orElseCore p (fun _ => q)
+
 instance : Applicative Parser where
   pure := pure
   map := fun f p => map f p
@@ -323,10 +352,50 @@ instance : Applicative Parser where
   seqLeft := SeqLeft.seqLeft
   seqRight := SeqRight.seqRight
 
+instance : Alternative Parser where
+  failure := failure
+  orElse := fun p q => orElseCore p q
+
+def many {α} (p : Parser α) : Parser (List α) :=
+  {
+    run := fun s =>
+      let rec loop : Nat → ParseState → List α → Except ParseError (List α × ParseState)
+        | 0, state, acc => .ok (acc.reverse, state)
+        | Nat.succ fuel, state, acc =>
+          match p.run state with
+          | .ok (value, state') => loop fuel state' (value :: acc)
+          | .error err =>
+            if err.kind = .missing then
+              .ok (acc.reverse, state)
+            else
+              .error err
+      loop (ParseState.size s) s []
+    , usage := Usage.optional p.usage
+  }
+
+def some {α} (p : Parser α) : Parser (List α) := {
+  run := fun s => do
+    let (head, s') ← p.run s
+    let (tail, s'') ← (many p).run s'
+    return (head :: tail, s'')
+  , usage := Usage.append p.usage (many p).usage
+}
+
+def many1 {α} (p : Parser α) : Parser (List α) := some p
+
+def some1 {α} (p : Parser α) : Parser (List α) := some p
+
+def optionalOrElse {α} (p : Parser α) (backup : Unit → Parser α) : Parser α :=
+  orElseCore p backup
+
+def choice {α} : List (Parser α) → Parser α
+  | [] => failure "empty choice"
+  | p :: ps => ps.foldl (fun acc next => orElse acc next) p
+
 def optional {α} (p : Parser α) : Parser (Option α) := {
   run := fun s =>
     match p.run s with
-    | .ok (a, s') => .ok (some a, s')
+    | .ok (a, s') => .ok (Option.some a, s')
     | .error err =>
       if err.kind = .missing then
         .ok (none, s)
@@ -373,12 +442,59 @@ structure OptionSpec (α : Type u) where
   default? : Option α := none
   showDefault? : Option String := none
 
+namespace OptionSpec
+
+abbrev Mod (α : Type u) := OptionSpec α → OptionSpec α
+
+def base (reader : ValueReader α) : OptionSpec α := { reader := reader }
+
+def applyMods (mods : List (Mod α)) (spec : OptionSpec α) : OptionSpec α :=
+  mods.foldl (fun acc f => f acc) spec
+
+def build (reader : ValueReader α) (mods : List (Mod α)) : OptionSpec α :=
+  applyMods mods (base reader)
+
+def long (name : String) : Mod α := fun spec => { spec with long? := some name }
+
+def short (c : Char) : Mod α := fun spec => { spec with short? := some c }
+
+def setMetavar (name : String) : Mod α := fun spec => { spec with metavar := name }
+
+def help (text : String) : Mod α := fun spec => { spec with help? := some text }
+
+def default (value : α) : Mod α := fun spec => { spec with default? := some value }
+
+def showDefault (value : String) : Mod α := fun spec => { spec with showDefault? := some value }
+
+end OptionSpec
+
 structure FlagSpec (α : Type u) where
   long? : Option String := none
   short? : Option Char := none
   help? : Option String := none
   default : α
   active : α
+
+namespace FlagSpec
+
+abbrev Mod (α : Type u) := FlagSpec α → FlagSpec α
+
+def base (default active : α) : FlagSpec α :=
+  { default := default, active := active }
+
+def applyMods (mods : List (Mod α)) (spec : FlagSpec α) : FlagSpec α :=
+  mods.foldl (fun acc f => f acc) spec
+
+def build (default active : α) (mods : List (Mod α)) : FlagSpec α :=
+  applyMods mods (base default active)
+
+def long (name : String) : Mod α := fun spec => { spec with long? := some name }
+
+def short (c : Char) : Mod α := fun spec => { spec with short? := some c }
+
+def help (text : String) : Mod α := fun spec => { spec with help? := some text }
+
+end FlagSpec
 
 structure ArgumentSpec (α : Type u) where
   metavar : String
@@ -414,12 +530,12 @@ private def optionDoc (spec : OptionSpec α) : OptionDoc := {
   default? := spec.showDefault?
 }
 
-private def flagDoc (spec : FlagSpec α) : OptionDoc := {
+private def flagDoc (spec : FlagSpec α) (required : Bool := false) : OptionDoc := {
   long? := spec.long?,
   short? := spec.short?,
   metavar? := none,
   help? := spec.help?,
-  required := false,
+  required := required,
   default? := none
 }
 
@@ -471,6 +587,18 @@ def option {α} (spec : OptionSpec α) : Parser α :=
     , usage := Usage.mergeOption doc Usage.empty
   }
 
+def optionWith {α} (reader : ValueReader α) (mods : List (OptionSpec.Mod α)) : Parser α :=
+  option (OptionSpec.build reader mods)
+
+def strOption (mods : List (OptionSpec.Mod String)) : Parser String :=
+  optionWith ValueReader.id mods
+
+def natOption (mods : List (OptionSpec.Mod Nat)) : Parser Nat :=
+  optionWith ValueReader.nat mods
+
+def intOption (mods : List (OptionSpec.Mod Int)) : Parser Int :=
+  optionWith ValueReader.int mods
+
 def flag {α} (spec : FlagSpec α) : Parser α :=
   {
     run := fun s => do
@@ -487,14 +615,41 @@ def flag {α} (spec : FlagSpec α) : Parser α :=
     , usage := Usage.mergeOption (flagDoc spec) Usage.empty
   }
 
-def switch (long : String) (short? : Option Char := none) (help? : Option String := none) : Parser Bool :=
-  flag {
-    long? := some long,
-    short? := short?,
-    help?,
-    default := false,
-    active := true
+def flag' {α} (spec : FlagSpec α) : Parser α :=
+  let contextName :=
+    match spec.long?, spec.short? with
+    | some l, _ => s!"--{l}"
+    | none, some s => s!"-{String.mk [s]}"
+    | none, none => "<flag>"
+  {
+    run := fun s => do
+      let (found, s) ← match spec.long? with
+        | some long => ParseState.consumeLongFlag s long
+        | none => .ok (false, s)
+      if found then
+        return (spec.active, s)
+      else
+        let (shortFound, s) ← match spec.short? with
+          | some short => ParseState.consumeShortFlag s short
+          | none => .ok (false, s)
+        if shortFound then
+          return (spec.active, s)
+        else
+          .error {
+            kind := .missing,
+            message := s!"Missing required flag {contextName}",
+            context? := some contextName
+          }
+    , usage := Usage.mergeOption (flagDoc spec true) Usage.empty
   }
+
+def switch (long : String) (short? : Option Char := none) (help? : Option String := none) : Parser Bool :=
+  flag <|
+    FlagSpec.build false true (
+      FlagSpec.long long ::
+      (match short? with | some c => [FlagSpec.short c] | none => []) ++
+      (match help? with | some h => [FlagSpec.help h] | none => [])
+    )
 
 def argument {α} (spec : ArgumentSpec α) : Parser α :=
   {
@@ -583,6 +738,26 @@ structure ParserInfo (α : Type u) where
   footer? : Option String := none
 
 namespace ParserInfo
+
+abbrev InfoMod (α : Type u) := ParserInfo α → ParserInfo α
+
+def withProgName (name : String) (info : ParserInfo α) : ParserInfo α :=
+  { info with progName := name }
+
+def withHeader (text : String) (info : ParserInfo α) : ParserInfo α :=
+  { info with header? := some text }
+
+def withProgDesc (text : String) (info : ParserInfo α) : ParserInfo α :=
+  { info with progDesc? := some text }
+
+def withFooter (text : String) (info : ParserInfo α) : ParserInfo α :=
+  { info with footer? := some text }
+
+def applyMods (mods : List (InfoMod α)) (info : ParserInfo α) : ParserInfo α :=
+  mods.foldl (fun acc f => f acc) info
+
+def build (parser : Parser α) (mods : List (InfoMod α)) : ParserInfo α :=
+  applyMods mods { progName := "", parser }
 
 private def synopsisElement (o : OptionDoc) : String :=
   let name := renderOptionNames o.long? o.short?

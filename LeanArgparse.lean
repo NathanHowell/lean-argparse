@@ -7,12 +7,24 @@ namespace Argparse
 export LeanArgparse
   ( Parser ParseError ParseErrorKind ParserFailure ParserResult ParserInfo
     OptionSpec FlagSpec ArgumentSpec Subcommand SubcommandSpec ValueReader
-    option flag switch argument rawArgument subcommand )
+    option optionWith strOption natOption intOption flag flag' switch argument rawArgument subcommand )
 
-export LeanArgparse.Parser (optional withDefault)
+export LeanArgparse.Parser (optional withDefault failure orElse many many1 some some1 choice)
 
 export LeanArgparse.ParserInfo (exec renderHelp renderFailure)
 
 export LeanArgparse.ValueReader (map nat int)
+
+namespace OptionSpec
+  export LeanArgparse.OptionSpec (Mod base build applyMods long short setMetavar help default showDefault)
+end OptionSpec
+
+namespace FlagSpec
+  export LeanArgparse.FlagSpec (Mod base build applyMods long short help)
+end FlagSpec
+
+namespace ParserInfo
+  export LeanArgparse.ParserInfo (InfoMod withProgName withHeader withProgDesc withFooter applyMods build)
+end ParserInfo
 
 end Argparse
