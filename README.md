@@ -96,6 +96,12 @@ Usage: lean-argparse [--verbose] [--count COUNT] NAME
 
 Tests are located under `Tests/` and use `#guard` checks; compiling the test executable verifies the expectations without shipping test modules with the library.
 
+- Generate HTML documentation (after running `lake update doc-gen4` once inside `docbuild/`):
+  ```sh
+  cd docbuild
+  DOCGEN_SRC=file lake build LeanArgparse:docs
+  ```
+
 ## Shell Completions
 
 Use the renderer that matches your shell to produce a completion script:
