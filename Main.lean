@@ -24,26 +24,42 @@ def configParser : Parser Config :=
           1
     <*> Argparse.rawArgument "NAME" (help? := some "Name to greet.")
 
-def configInfo : ParserInfo Config := {
-  progName := "lean-argparse",
-  parser := configParser,
-  header? := some "Lean argparse example",
-  progDesc? := some "Demonstrates basic usage of the applicative argument parser."
-}
+inductive AppCommand where
+  | run (cfg : Config)
+  | completions (shell : Argparse.Completion.Shell)
+  deriving Repr
+
+def completionCommand : Parser AppCommand :=
+  AppCommand.completions <$> Argparse.Completion.defaultShellOption
+
+def runCommand : Parser AppCommand :=
+  AppCommand.run <$> configParser
+
+def appParser : Parser AppCommand :=
+  Argparse.choice [completionCommand, runCommand]
+
+def appInfo : ParserInfo AppCommand :=
+  Argparse.ParserInfo.build appParser [
+    Argparse.ParserInfo.withProgName "lean-argparse",
+    Argparse.ParserInfo.withHeader "Lean argparse example",
+    Argparse.ParserInfo.withProgDesc "Demonstrates basic usage of the applicative argument parser."
+  ]
 
 def runWith (cfg : Config) : IO Unit := do
   for _ in [0:cfg.count] do
     let line := if cfg.verbose then s!"Hello, {cfg.name}! (verbose)" else s!"Hello, {cfg.name}!"
     IO.println line
 
-def handleResult (info : ParserInfo Config) : ParserResult Config → IO Unit
-  | .success cfg => runWith cfg
+def handleResult (info : ParserInfo AppCommand) : ParserResult AppCommand → IO Unit
+  | .success (.run cfg) => runWith cfg
+  | .success (.completions shell) =>
+      IO.println (Argparse.ParserInfo.renderCompletionFor shell info)
   | .showHelp => IO.println (Argparse.renderHelp info)
   | .failure err => do
       IO.eprintln (Argparse.renderFailure info err)
       IO.Process.exit 1
 
 def main (args : List String) : IO Unit := do
-  let info := configInfo
+  let info := appInfo
   let result := Argparse.exec info args
   handleResult info result

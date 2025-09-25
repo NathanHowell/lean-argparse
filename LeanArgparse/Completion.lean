@@ -12,9 +12,24 @@ def zshModule : Module := Zsh.module
 
 def fishModule : Module := Fish.module
 
+namespace Shell
+
+def module : Shell → Module
+  | .bash => bashModule
+  | .zsh => zshModule
+  | .fish => fishModule
+
+def render (shell : Shell) (info : ParserInfo α) : String :=
+  Completion.renderWithModule (module shell) info
+
+end Shell
+
 def allModules : List Module := [bashModule, zshModule, fishModule]
 
 def allCompletionModules : List Module := allModules
+
+def renderForShell (info : ParserInfo α) (shell : Shell) : String :=
+  Shell.render shell info
 
 end Completion
 
@@ -30,6 +45,9 @@ def renderZshCompletion (info : ParserInfo α) : String :=
 
 def renderFishCompletion (info : ParserInfo α) : String :=
   Completion.renderWithModule Completion.fishModule info
+
+def renderCompletionFor (shell : Completion.Shell) (info : ParserInfo α) : String :=
+  Completion.renderForShell info shell
 
 def bashModule : Completion.Module := Completion.bashModule
 def zshModule : Completion.Module := Completion.zshModule

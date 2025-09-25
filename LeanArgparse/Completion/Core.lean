@@ -4,6 +4,7 @@ namespace LeanArgparse
 namespace Completion
 
 open Std LeanArgparse
+open LeanArgparse.OptionSpec
 
 structure OptionEntry where
   long? : Option String := none
@@ -118,6 +119,59 @@ private def buildDataCore (info : ParserInfo α) : Data :=
     options := buildOptions usage,
     commands := buildCommands usage
   }
+
+inductive Shell where
+  | bash
+  | zsh
+  | fish
+  deriving DecidableEq, Repr, Inhabited
+
+namespace Shell
+
+def normalize (name : String) : String :=
+  let lowered := name.data.map Char.toLower
+  String.mk lowered
+
+def table : List (String × Shell) :=
+  [ ("bash", .bash),
+    ("zsh", .zsh),
+    ("fish", .fish) ]
+
+def all : List Shell := table.map (·.snd)
+
+def names : List String := table.map (·.fst)
+
+def namesList : String := String.intercalate ", " names
+
+def name : Shell → String
+  | .bash => "bash"
+  | .zsh => "zsh"
+  | .fish => "fish"
+
+def ofString? (name : String) : Option Shell :=
+  let key := normalize name
+  (table.find? (fun entry => entry.fst = key)).map (·.snd)
+
+def reader : ValueReader Shell :=
+  ⟨fun raw =>
+    match ofString? raw with
+    | some shell => .ok shell
+    | none => .error s!"unknown completion shell '{raw}'. expected one of: {namesList}"⟩
+
+end Shell
+
+def defaultShellOptionSpec : OptionSpec Shell :=
+  OptionSpec.build Shell.reader [
+    long "completions",
+    setMetavar "SHELL",
+    help s!"Generate a completion script for one of: {Shell.namesList}"
+  ]
+
+def defaultShellOption : Parser Shell :=
+  option defaultShellOptionSpec
+
+def defaultOptionalShellOption : Parser (Option Shell) :=
+  Parser.optional defaultShellOption
 
 def renderWithModule (mod : Module) (info : ParserInfo α) : String :=
   mod.render (buildDataCore info)

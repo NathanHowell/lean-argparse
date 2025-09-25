@@ -25,10 +25,16 @@ namespace FlagSpec
   export LeanArgparse.FlagSpec (Mod base build applyMods long short help)
 end FlagSpec
 
+namespace Completion
+  export LeanArgparse.Completion
+    ( Shell defaultShellOptionSpec defaultShellOption defaultOptionalShellOption
+      renderForShell Shell.name Shell.names Shell.namesList Shell.all Shell.ofString? Shell.reader )
+end Completion
+
 namespace ParserInfo
   export LeanArgparse.ParserInfo (InfoMod withProgName withHeader withProgDesc withFooter applyMods build)
   export LeanArgparse.Completion (Module renderWithModule)
-  export LeanArgparse.ParserInfo (bashModule zshModule fishModule allCompletionModules)
+  export LeanArgparse.ParserInfo (bashModule zshModule fishModule allCompletionModules renderCompletionFor)
 end ParserInfo
 
 end Argparse

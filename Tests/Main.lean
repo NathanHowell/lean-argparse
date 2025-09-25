@@ -3,6 +3,7 @@ import LeanArgparse
 open Argparse
 open Argparse.OptionSpec
 open Argparse.FlagSpec
+open Argparse.Completion
 
 namespace LeanArgparseTests
 
@@ -143,6 +144,35 @@ def choiceParser : Parser String :=
 #guard (containsSubstring (Argparse.renderBashCompletion exampleInfo) "--count")
 #guard (containsSubstring (Argparse.renderZshCompletion exampleInfo) "_arguments")
 #guard (containsSubstring (Argparse.renderFishCompletion exampleInfo) "complete -c")
+
+def completionOnlyParser : Parser Shell :=
+  defaultShellOption
+
+def completionOnlyInfo : ParserInfo Shell := {
+  progName := "complete-demo",
+  parser := completionOnlyParser
+}
+
+#guard (match Argparse.exec completionOnlyInfo ["--completions", "bash"] with
+  | .success shell => decide (Shell.name shell = "bash")
+  | _ => False)
+
+#guard (match Argparse.exec completionOnlyInfo ["--completions", "FISH"] with
+  | .success shell => decide (Shell.name shell = "fish")
+  | _ => False)
+
+#guard (match Argparse.exec completionOnlyInfo ["--completions", "unknown"] with
+  | .failure err => decide (err.error.kind = .invalid)
+  | _ => False)
+
+def optionalCompletionParser : Parser (Option Shell) :=
+  defaultOptionalShellOption
+
+#guard (match Argparse.exec { progName := "opt-complete", parser := optionalCompletionParser } [] with
+  | .success none => True
+  | _ => False)
+
+#guard (containsSubstring (Argparse.ParserInfo.renderCompletionFor (Option.get! (Shell.ofString? "bash")) completionOnlyInfo) "--completions")
 
 end LeanArgparseTests
 
