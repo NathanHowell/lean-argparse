@@ -1,8 +1,8 @@
 import Std
-import LeanArgparse.Basic.Reader
-import LeanArgparse.Basic.Parser
+import Argparse.Basic.Reader
+import Argparse.Basic.Parser
 
-namespace LeanArgparse
+namespace Argparse
 
 open Std
 
@@ -85,4 +85,4 @@ structure SubcommandSpec (α : Type u) where
   help? : Option String := none
   commands : List (Subcommand α)
 
-end LeanArgparse
+end Argparse

@@ -1,9 +1,9 @@
 import Std
-import LeanArgparse.Basic.Error
-import LeanArgparse.Basic.Docs
-import LeanArgparse.Basic.ParseState
+import Argparse.Basic.Error
+import Argparse.Basic.Docs
+import Argparse.Basic.ParseState
 
-namespace LeanArgparse
+namespace Argparse
 
 open Std
 
@@ -162,4 +162,4 @@ def withDefault {α} (p : Parser α) (value : α) : Parser α :=
 
 end Parser
 
-end LeanArgparse
+end Argparse

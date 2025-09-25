@@ -1,9 +1,9 @@
-import LeanArgparse.Completion.Core
-import LeanArgparse.Completion.Bash
-import LeanArgparse.Completion.Zsh
-import LeanArgparse.Completion.Fish
+import Argparse.Completion.Core
+import Argparse.Completion.Bash
+import Argparse.Completion.Zsh
+import Argparse.Completion.Fish
 
-namespace LeanArgparse
+namespace Argparse
 namespace Completion
 
 def bashModule : Module := Bash.module
@@ -55,4 +55,4 @@ def fishModule : Completion.Module := Completion.fishModule
 def allCompletionModules : List Completion.Module := Completion.allCompletionModules
 
 end ParserInfo
-end LeanArgparse
+end Argparse

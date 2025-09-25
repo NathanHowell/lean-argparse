@@ -1,6 +1,6 @@
 import Std
 
-namespace LeanArgparse
+namespace Argparse
 
 open Std
 
@@ -19,4 +19,4 @@ structure ParseError where
   notes : List String := []
   deriving Repr
 
-end LeanArgparse
+end Argparse

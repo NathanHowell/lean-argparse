@@ -1,10 +1,10 @@
-import LeanArgparse.Completion.Core
+import Argparse.Completion.Core
 
-namespace LeanArgparse
+namespace Argparse
 namespace Completion
 namespace Bash
 
-open LeanArgparse Completion
+open Argparse Completion
 
 private def joinWords (ws : List String) : String := String.intercalate " " ws
 
@@ -61,4 +61,4 @@ def render (info : ParserInfo α) : String :=
 
 end Bash
 end Completion
-end LeanArgparse
+end Argparse

@@ -1,7 +1,7 @@
 import Std
-import LeanArgparse.Basic.Error
+import Argparse.Basic.Error
 
-namespace LeanArgparse
+namespace Argparse
 
 open Std
 
@@ -157,4 +157,4 @@ def takePositional? (s : ParseState) : Option (String × ParseState) :=
 
 end ParseState
 
-end LeanArgparse
+end Argparse

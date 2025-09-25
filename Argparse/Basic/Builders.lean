@@ -1,10 +1,10 @@
 import Std
-import LeanArgparse.Basic.Specs
-import LeanArgparse.Basic.Parser
-import LeanArgparse.Basic.ParseState
-import LeanArgparse.Basic.Docs
+import Argparse.Basic.Specs
+import Argparse.Basic.Parser
+import Argparse.Basic.ParseState
+import Argparse.Basic.Docs
 
-namespace LeanArgparse
+namespace Argparse
 
 open Std
 open Usage
@@ -206,4 +206,4 @@ def subcommand {α} (spec : SubcommandSpec α) : Parser α :=
     , usage
   }
 
-end LeanArgparse
+end Argparse

@@ -17,7 +17,7 @@
 The executable bundled with the project demonstrates a small CLI.
 
 ```lean
-import LeanArgparse
+import Argparse
 
 open Argparse
 
@@ -29,7 +29,7 @@ structure Config where
 def configParser : Parser Config :=
   pure Config.mk
     <*> switch "verbose" (short? := some 'v') (help? := some "Enable verbose output")
-    <*> withDefault
+    <*> Parser.withDefault
           (natOption [
             OptionSpec.long "count",
             OptionSpec.short 'n',
@@ -47,21 +47,21 @@ def info : ParserInfo Config :=
   ]
 
 def main (args : List String) : IO Unit :=
-  match Argparse.exec info args with
+  match Argparse.ParserInfo.exec info args with
   | .success cfg => IO.println s!"Hello, {cfg.name}! (count := {cfg.count}, verbose := {cfg.verbose})"
-  | .showHelp => IO.println (Argparse.renderHelp info)
+  | .showHelp => IO.println (Argparse.ParserInfo.renderHelp info)
   | .failure err => do
-      IO.eprintln (Argparse.renderFailure info err)
+      IO.eprintln (Argparse.ParserInfo.renderFailure info err)
       IO.Process.exit 1
 
 def bashCompletionScript : String :=
-  Argparse.renderBashCompletion info
+  Argparse.ParserInfo.renderBashCompletion info
 
 def zshCompletionScript : String :=
-  Argparse.renderZshCompletion info
+  Argparse.ParserInfo.renderZshCompletion info
 
 def fishCompletionScript : String :=
-  Argparse.renderFishCompletion info
+  Argparse.ParserInfo.renderFishCompletion info
 ```
 
 Running the compiled executable yields:
@@ -99,7 +99,7 @@ Tests are located under `Tests/` and use `#guard` checks; compiling the test exe
 - Generate HTML documentation (after running `lake update doc-gen4` once inside `docbuild/`):
   ```sh
   cd docbuild
-  DOCGEN_SRC=file lake build LeanArgparse:docs
+  DOCGEN_SRC=file lake build Argparse:docs
   ```
 
 ## Shell Completions
@@ -107,9 +107,9 @@ Tests are located under `Tests/` and use `#guard` checks; compiling the test exe
 Use the renderer that matches your shell to produce a completion script:
 
 ```lean
-#eval IO.println (Argparse.renderBashCompletion info)
-#eval IO.println (Argparse.renderZshCompletion info)
-#eval IO.println (Argparse.renderFishCompletion info)
+#eval IO.println (Argparse.ParserInfo.renderBashCompletion info)
+#eval IO.println (Argparse.ParserInfo.renderZshCompletion info)
+#eval IO.println (Argparse.ParserInfo.renderFishCompletion info)
 ```
 
 Redirect the output to a file and source it (or copy it into the appropriate completion directory) to enable tab completion for options and subcommands.

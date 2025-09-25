@@ -1,10 +1,10 @@
-import LeanArgparse.Basic
+import Argparse.Basic
 
-namespace LeanArgparse
+namespace Argparse
 namespace Completion
 
-open Std LeanArgparse
-open LeanArgparse.OptionSpec
+open Std Argparse
+open Argparse.OptionSpec
 
 structure OptionEntry where
   long? : Option String := none
@@ -183,4 +183,4 @@ abbrev optionLongFlag := optionLong
 abbrev optionShortFlag := optionShort
 
 end Completion
-end LeanArgparse
+end Argparse

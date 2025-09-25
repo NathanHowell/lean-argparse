@@ -1,10 +1,10 @@
-import LeanArgparse.Completion.Core
+import Argparse.Completion.Core
 
-namespace LeanArgparse
+namespace Argparse
 namespace Completion
 namespace Fish
 
-open LeanArgparse Completion
+open Argparse Completion
 
 private def renderOption (prog : String) (opt : OptionEntry) : String :=
   let base := s!"complete -c {prog}"
@@ -36,4 +36,4 @@ def render (info : ParserInfo α) : String :=
 
 end Fish
 end Completion
-end LeanArgparse
+end Argparse

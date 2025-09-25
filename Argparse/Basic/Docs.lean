@@ -1,6 +1,6 @@
 import Std
 
-namespace LeanArgparse
+namespace Argparse
 
 open Std
 
@@ -67,4 +67,4 @@ def mergeCommand (cmd : CommandDoc) (u : Usage) : Usage := {
 
 end Usage
 
-end LeanArgparse
+end Argparse

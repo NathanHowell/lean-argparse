@@ -1,10 +1,10 @@
-import LeanArgparse.Completion.Core
+import Argparse.Completion.Core
 
-namespace LeanArgparse
+namespace Argparse
 namespace Completion
 namespace Zsh
 
-open LeanArgparse Completion
+open Argparse Completion
 
 private def formatOption (opt : OptionEntry) (flag : String) : String :=
   let desc := opt.help?.map escapeSingleQuotesForShell |>.getD ""
@@ -49,4 +49,4 @@ def render (info : ParserInfo α) : String :=
 
 end Zsh
 end Completion
-end LeanArgparse
+end Argparse

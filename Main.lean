@@ -1,4 +1,4 @@
-import LeanArgparse
+import Argparse
 import Init.System.IO
 
 open Argparse
@@ -12,13 +12,13 @@ structure Config where
 def configParser : Parser Config :=
   pure Config.mk
     <*> Argparse.switch "verbose" (short? := some 'v') (help? := some "Enable verbose output.")
-    <*> Argparse.withDefault
+    <*> Parser.withDefault
           (Argparse.option {
             long? := some "count",
             short? := some 'n',
             metavar := "COUNT",
             help? := some "How many times to greet.",
-            reader := LeanArgparse.ValueReader.nat,
+            reader := Argparse.ValueReader.nat,
             showDefault? := some "1"
           })
           1
@@ -36,7 +36,7 @@ def runCommand : Parser AppCommand :=
   AppCommand.run <$> configParser
 
 def appParser : Parser AppCommand :=
-  Argparse.choice [completionCommand, runCommand]
+  Parser.choice [completionCommand, runCommand]
 
 def appInfo : ParserInfo AppCommand :=
   Argparse.ParserInfo.build appParser [
@@ -54,12 +54,12 @@ def handleResult (info : ParserInfo AppCommand) : ParserResult AppCommand → IO
   | .success (.run cfg) => runWith cfg
   | .success (.completions shell) =>
       IO.println (Argparse.ParserInfo.renderCompletionFor shell info)
-  | .showHelp => IO.println (Argparse.renderHelp info)
+  | .showHelp => IO.println (Argparse.ParserInfo.renderHelp info)
   | .failure err => do
-      IO.eprintln (Argparse.renderFailure info err)
+      IO.eprintln (Argparse.ParserInfo.renderFailure info err)
       IO.Process.exit 1
 
 def main (args : List String) : IO Unit := do
   let info := appInfo
-  let result := Argparse.exec info args
+  let result := Argparse.ParserInfo.exec info args
   handleResult info result

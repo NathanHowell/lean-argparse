@@ -1,9 +1,9 @@
 import Std
-import LeanArgparse.Basic.Parser
-import LeanArgparse.Basic.Docs
-import LeanArgparse.Basic.ParseState
+import Argparse.Basic.Parser
+import Argparse.Basic.Docs
+import Argparse.Basic.ParseState
 
-namespace LeanArgparse
+namespace Argparse
 
 open Std
 open Usage
@@ -157,4 +157,4 @@ def renderFailure (info : ParserInfo α) (failure : ParserFailure) : String :=
 
 end ParserInfo
 
-end LeanArgparse
+end Argparse

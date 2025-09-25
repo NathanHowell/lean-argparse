@@ -1,6 +1,6 @@
 import Std
 
-namespace LeanArgparse
+namespace Argparse
 
 open Std
 
@@ -28,4 +28,4 @@ def int : ValueReader Int := ⟨fun s =>
 
 end ValueReader
 
-end LeanArgparse
+end Argparse
