@@ -1,6 +1,7 @@
 -- This module serves as the root of the `LeanArgparse` library.
 -- Import modules here that should be built as part of the library.
 import LeanArgparse.Basic
+import LeanArgparse.Completion
 
 namespace Argparse
 
@@ -26,9 +27,7 @@ end FlagSpec
 
 namespace ParserInfo
   export LeanArgparse.ParserInfo (InfoMod withProgName withHeader withProgDesc withFooter applyMods build)
-  namespace Completion
-    export LeanArgparse.ParserInfo.Completion (Module renderWithModule)
-  end Completion
+  export LeanArgparse.Completion (Module renderWithModule)
   export LeanArgparse.ParserInfo (bashModule zshModule fishModule allCompletionModules)
 end ParserInfo
 
