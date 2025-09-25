@@ -783,6 +783,10 @@ structure OptionKey where
   takesValue : Bool
   deriving BEq, Hashable
 
+structure Module where
+  name : String
+  render : CompletionData → String
+
 private def fromDoc (doc : OptionDoc) : CompletionOption :=
   {
     long? := doc.long?,
@@ -867,8 +871,10 @@ private def optionFlags (opt : CompletionOption) : List String :=
     | none => []
   longs ++ shorts
 
-private def renderBashCore (info : ParserInfo α) : String :=
-  let d := buildData info
+def Module.renderInfo (self : Module) (info : ParserInfo α) : String :=
+  self.render (buildData info)
+
+private def renderBash (d : CompletionData) : String :=
   let ident := sanitizeIdentifier d.progName
   let functionName := s!"_{ident}_completion"
   let longOpts := d.options.filterMap optionLong
@@ -913,8 +919,7 @@ private def renderBashCore (info : ParserInfo α) : String :=
      s!"complete -F {functionName} {d.progName}"]
   String.intercalate "\n" lines
 
-private def renderZshCore (info : ParserInfo α) : String :=
-  let d := buildData info
+private def renderZsh (d : CompletionData) : String :=
   let optionEntries := d.options.foldr
     (fun opt acc =>
       let flags := optionFlags opt
@@ -946,8 +951,7 @@ private def renderZshCore (info : ParserInfo α) : String :=
        "esac"]
   String.intercalate "\n" (baseLines ++ commandLines)
 
-private def renderFishCore (info : ParserInfo α) : String :=
-  let d := buildData info
+private def renderFish (d : CompletionData) : String :=
   let optionLines := d.options.map fun opt =>
     let base := s!"complete -c {d.progName}"
     let base := match opt.long? with
@@ -966,18 +970,29 @@ private def renderFishCore (info : ParserInfo α) : String :=
     s!"complete -c {d.progName} -n '__fish_use_subcommand' -f -a '{escapeSingleQuotes name}'{descPart}"
   String.intercalate "\n" (optionLines ++ commandLines)
 
+def renderWithModule (mod : Module) (info : ParserInfo α) : String :=
+  mod.render (buildData info)
+
 end Completion
 
 open Completion
 
+def bashModule : Completion.Module := { name := "bash", render := renderBash }
+
+def zshModule : Completion.Module := { name := "zsh", render := renderZsh }
+
+def fishModule : Completion.Module := { name := "fish", render := renderFish }
+
+def allCompletionModules : List Completion.Module := [bashModule, zshModule, fishModule]
+
 def renderBashCompletion (info : ParserInfo α) : String :=
-  renderBashCore info
+  renderWithModule bashModule info
 
 def renderZshCompletion (info : ParserInfo α) : String :=
-  renderZshCore info
+  renderWithModule zshModule info
 
 def renderFishCompletion (info : ParserInfo α) : String :=
-  renderFishCore info
+  renderWithModule fishModule info
 
 private def synopsisElement (o : OptionDoc) : String :=
   let name := renderOptionNames o.long? o.short?

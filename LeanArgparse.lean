@@ -26,6 +26,10 @@ end FlagSpec
 
 namespace ParserInfo
   export LeanArgparse.ParserInfo (InfoMod withProgName withHeader withProgDesc withFooter applyMods build)
+  namespace Completion
+    export LeanArgparse.ParserInfo.Completion (Module renderWithModule)
+  end Completion
+  export LeanArgparse.ParserInfo (bashModule zshModule fishModule allCompletionModules)
 end ParserInfo
 
 end Argparse
