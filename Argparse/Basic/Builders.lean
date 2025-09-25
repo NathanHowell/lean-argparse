@@ -33,6 +33,7 @@ private def positionalDoc (spec : ArgumentSpec α) (required : Bool := true) : P
   required := required
 }
 
+/-- Build a parser for an option that consumes a value. -/
 def option {α} (spec : OptionSpec α) : Parser α :=
   let longName := spec.long?
   let shortName := spec.short?
@@ -75,18 +76,23 @@ def option {α} (spec : OptionSpec α) : Parser α :=
     , usage := Usage.mergeOption doc Usage.empty
   }
 
+/-- Construct an option parser from a reader and a list of modifiers. -/
 def optionWith {α} (reader : ValueReader α) (mods : List (OptionSpec.Mod α)) : Parser α :=
   option (OptionSpec.build reader mods)
 
+/-- Convenience wrapper for building a string option. -/
 def strOption (mods : List (OptionSpec.Mod String)) : Parser String :=
   optionWith ValueReader.id mods
 
+/-- Convenience wrapper for building a natural-number option. -/
 def natOption (mods : List (OptionSpec.Mod Nat)) : Parser Nat :=
   optionWith ValueReader.nat mods
 
+/-- Convenience wrapper for building an integer option. -/
 def intOption (mods : List (OptionSpec.Mod Int)) : Parser Int :=
   optionWith ValueReader.int mods
 
+/-- Build a flag parser that toggles between `default` and `active` values. -/
 def flag {α} (spec : FlagSpec α) : Parser α :=
   {
     run := fun s => do
@@ -103,6 +109,7 @@ def flag {α} (spec : FlagSpec α) : Parser α :=
     , usage := Usage.mergeOption (flagDoc spec) Usage.empty
   }
 
+/-- Build a flag parser that errors if the flag is absent. -/
 def flag' {α} (spec : FlagSpec α) : Parser α :=
   let contextName :=
     match spec.long?, spec.short? with
@@ -131,6 +138,7 @@ def flag' {α} (spec : FlagSpec α) : Parser α :=
     , usage := Usage.mergeOption (flagDoc spec true) Usage.empty
   }
 
+/-- Construct a boolean switch that defaults to `false` and flips to `true` when present. -/
 def switch (long : String) (short? : Option Char := none) (help? : Option String := none) : Parser Bool :=
   flag <|
     FlagSpec.build false true (
@@ -139,6 +147,7 @@ def switch (long : String) (short? : Option Char := none) (help? : Option String
       (match help? with | some h => [FlagSpec.help h] | none => [])
     )
 
+/-- Build a positional argument parser. -/
 def argument {α} (spec : ArgumentSpec α) : Parser α :=
   {
     run := fun s =>
@@ -161,6 +170,7 @@ def argument {α} (spec : ArgumentSpec α) : Parser α :=
     , usage := Usage.mergePositional (positionalDoc spec) Usage.empty
   }
 
+/-- A positional argument parser for raw strings. -/
 def rawArgument (metavar : String) (help? : Option String := none) : Parser String :=
   argument {
     metavar,
@@ -168,6 +178,7 @@ def rawArgument (metavar : String) (help? : Option String := none) : Parser Stri
     reader := ValueReader.id
   }
 
+/-- Build a parser that dispatches to sub-command parsers based on the next token. -/
 def subcommand {α} (spec : SubcommandSpec α) : Parser α :=
   let cmdNames := spec.commands.map (·.name)
   let usageCommands := spec.commands.map (fun c => {
