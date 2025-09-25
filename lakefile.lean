@@ -1,5 +1,5 @@
 import Lake
-open Lake DSL
+open Lake DSL System
 
 package «lean-argparse» where
   version := v!"0.1.0"
@@ -14,3 +14,8 @@ lean_exe «lean-argparse» where
 lean_exe «lean-argparse-tests» where
   root := `Tests.Main
   supportInterpreter := false
+
+@[lint_driver]
+lean_exe «lint-driver» where
+  root := `LintDriver
+  supportInterpreter := true
