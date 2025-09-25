@@ -140,11 +140,13 @@ private def renderData (d : Data) : String :=
   let footer := ["", "return ret"]
   String.intercalate "\n" (header ++ topArguments ++ caseSection ++ footer)
 
+/-- Descriptor for the zsh completion backend. -/
 def module : Module := {
   name := "zsh",
   render := renderData
 }
 
+/-- Render a zsh completion script for the given parser metadata. -/
 def render (info : ParserInfo α) : String :=
   renderWithModule module info
 
