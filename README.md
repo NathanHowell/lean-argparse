@@ -1,6 +1,6 @@
 # lean-argparse
 
-`lean-argparse` provides an applicative command line argument parser for Lean 4, inspired by Haskell's [`optparse-applicative`](https://hackage.haskell.org/package/optparse-applicative).
+`lean-argparse` provides an applicative command line argument parser for Lean 4, inspired by Haskell's [`optparse-applicative`](https://hackage.haskell.org/package/optparse-applicative). In addition to the core parser, the toolkit ships usage rendering, shell completion generators, man page output, and a lint driver for keeping documentation in sync.
 
 ## Highlights
 
@@ -11,7 +11,7 @@
 - Convenience value readers plus builder-style modifiers (`OptionSpec`, `FlagSpec`, `ParserInfo`)
 - Higher-level combinators such as `many`, `some`, `choice`, `flag'`, and ready-made option helpers (`strOption`, `natOption`, …)
 - Lightweight tests expressed via `#guard`
-- Built-in helpers for shell completions and man page generation
+- Built-in helpers for shell completions, man page generation, and a `lake lint` driver
 
 ## Example
 
@@ -97,6 +97,13 @@ Usage: lean-argparse [--verbose] [--count COUNT] NAME
 
 Tests are located under `Tests/` and use `#guard` checks; compiling the test executable verifies the expectations without shipping test modules with the library.
 
+- Run the project-wide lint driver:
+  ```sh
+  lake lint
+  ```
+
+The lint driver re-elaborates every module to ensure public declarations carry docstrings and standard linters stay satisfied.
+
 - Generate HTML documentation (after running `lake update doc-gen4` once inside `docbuild/`):
   ```sh
   cd docbuild
@@ -128,9 +135,6 @@ Generate a basic troff man page directly from your parser metadata:
 
 Pipe the output into `man -l` or write it to disk for installation alongside your executable.
 
-## License
-
-Apache-2.0
 - `many`, `some`, `choice`, and `many1` allow repeated or alternative argument parsing without leaving the applicative world.
 - Builder helpers (e.g. `OptionSpec.long`, `FlagSpec.long`, `ParserInfo.withProgDesc`) make it easy to mirror the ergonomic modifiers from `optparse-applicative`.
 - Convenience wrappers (`strOption`, `natOption`, `intOption`, `flag'`) remove most manual record instantiations.
