@@ -3,18 +3,18 @@ import Init.System.IO
 
 open Argparse
 
-structure GreetConfig where
+private structure GreetConfig where
   verbose : Bool
   count : Nat
   name : String
   deriving Repr
 
-structure RepeatConfig where
+private structure RepeatConfig where
   times : Nat
   message : String
   deriving Repr
 
-def greetParser : Parser GreetConfig :=
+private def greetParser : Parser GreetConfig :=
   pure GreetConfig.mk
     <*> Argparse.switch "verbose" (short? := some 'v') (help? := some "Enable verbose output.")
     <*> Parser.withDefault
@@ -29,7 +29,7 @@ def greetParser : Parser GreetConfig :=
           1
     <*> Argparse.rawArgument "NAME" (help? := some "Name to greet.")
 
-def repeatParser : Parser RepeatConfig :=
+private def repeatParser : Parser RepeatConfig :=
   pure RepeatConfig.mk
     <*> Parser.withDefault
           (Argparse.option {
@@ -43,16 +43,16 @@ def repeatParser : Parser RepeatConfig :=
           2
     <*> Argparse.rawArgument "MESSAGE" (help? := some "Message to repeat.")
 
-inductive AppCommand where
+private inductive AppCommand where
   | greet (cfg : GreetConfig)
   | repeat (cfg : RepeatConfig)
   | completions (shell : Argparse.Completion.Shell)
   deriving Repr
 
-def completionCommand : Parser AppCommand :=
+private def completionCommand : Parser AppCommand :=
   AppCommand.completions <$> Argparse.Completion.defaultShellOption
 
-def subcommandParser : Parser AppCommand :=
+private def subcommandParser : Parser AppCommand :=
   Argparse.subcommand {
     metavar := "COMMAND",
     help? := some "Action to perform.",
@@ -70,26 +70,26 @@ def subcommandParser : Parser AppCommand :=
     ]
   }
 
-def appParser : Parser AppCommand :=
+private def appParser : Parser AppCommand :=
   Parser.choice [completionCommand, subcommandParser]
 
-def appInfo : ParserInfo AppCommand :=
+private def appInfo : ParserInfo AppCommand :=
   Argparse.ParserInfo.build appParser [
     Argparse.ParserInfo.withProgName "lean-argparse",
     Argparse.ParserInfo.withHeader "Lean argparse example",
     Argparse.ParserInfo.withProgDesc "Demonstrates subcommands with the applicative argument parser."
   ]
 
-def greetWith (cfg : GreetConfig) : IO Unit := do
+private def greetWith (cfg : GreetConfig) : IO Unit := do
   for _ in [0:cfg.count] do
     let line := if cfg.verbose then s!"Hello, {cfg.name}! (verbose)" else s!"Hello, {cfg.name}!"
     IO.println line
 
-def repeatWith (cfg : RepeatConfig) : IO Unit := do
+private def repeatWith (cfg : RepeatConfig) : IO Unit := do
   for _ in [0:cfg.times] do
     IO.println cfg.message
 
-def handleResult (info : ParserInfo AppCommand) : ParserResult AppCommand → IO Unit
+private def handleResult (info : ParserInfo AppCommand) : ParserResult AppCommand → IO Unit
   | .success (.greet cfg) => greetWith cfg
   | .success (.repeat cfg) => repeatWith cfg
   | .success (.completions shell) =>
@@ -99,6 +99,7 @@ def handleResult (info : ParserInfo AppCommand) : ParserResult AppCommand → IO
       IO.eprintln (Argparse.ParserInfo.renderFailure info err)
       IO.Process.exit 1
 
+/-- Entry point for the example executable. -/
 def main (args : List String) : IO Unit := do
   let info := appInfo
   let result := Argparse.ParserInfo.exec info args

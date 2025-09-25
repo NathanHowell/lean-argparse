@@ -7,7 +7,7 @@ open Argparse.Completion
 
 namespace ArgparseTests
 
-def containsSubstring (haystack needle : String) : Bool :=
+private def containsSubstring (haystack needle : String) : Bool :=
   if needle.isEmpty then
     true
   else
@@ -21,13 +21,13 @@ def containsSubstring (haystack needle : String) : Bool :=
             loop rest
     loop haystack.data
 
-structure ExampleCfg where
+private structure ExampleCfg where
   verbose : Bool
   count : Nat
   name : String
   deriving Repr, DecidableEq
 
-def exampleParser : Parser ExampleCfg :=
+private def exampleParser : Parser ExampleCfg :=
   pure ExampleCfg.mk
     <*> switch "verbose" (short? := some 'v')
     <*> Parser.withDefault
@@ -41,7 +41,7 @@ def exampleParser : Parser ExampleCfg :=
           1
     <*> rawArgument "NAME"
 
-def exampleInfo : ParserInfo ExampleCfg := {
+private def exampleInfo : ParserInfo ExampleCfg := {
   progName := "example",
   parser := exampleParser
 }
@@ -58,12 +58,12 @@ def exampleInfo : ParserInfo ExampleCfg := {
   | .failure err => decide (err.error.kind = .missing)
   | _ => False)
 
-structure CommandResult where
+private structure CommandResult where
   tag : String
   target? : Option String
   deriving Repr, DecidableEq
 
-def commandParser : Parser CommandResult :=
+private def commandParser : Parser CommandResult :=
   subcommand {
     metavar := "CMD",
     commands := [
@@ -96,7 +96,7 @@ def commandParser : Parser CommandResult :=
   | .showHelp => True
   | _ => False)
 
-def repeatedArgs : Parser (List String) :=
+private def repeatedArgs : Parser (List String) :=
   Parser.many (rawArgument "ITEM")
 
 #guard (match Argparse.ParserInfo.exec { progName := "items", parser := repeatedArgs } ["one", "two", "three"] with
@@ -111,7 +111,7 @@ def repeatedArgs : Parser (List String) :=
   | .failure err => decide (err.error.kind = .missing)
   | _ => False)
 
-def requiredFlag : Parser Bool :=
+private def requiredFlag : Parser Bool :=
   flag' <|
     FlagSpec.build false true [
       FlagSpec.long "loud",
@@ -127,7 +127,7 @@ def requiredFlag : Parser Bool :=
   | .failure err => decide (err.error.kind = .missing)
   | _ => False)
 
-def choiceParser : Parser String :=
+private def choiceParser : Parser String :=
   Parser.choice [
     strOption [OptionSpec.long "name", OptionSpec.help "Primary name"],
     strOption [OptionSpec.long "alias", OptionSpec.help "Alias"]
@@ -146,10 +146,10 @@ def choiceParser : Parser String :=
 #guard (containsSubstring (Argparse.ParserInfo.renderFishCompletion exampleInfo) "complete -c")
 #guard (containsSubstring (Argparse.ParserInfo.renderManpage exampleInfo) ".SH OPTIONS")
 
-def completionOnlyParser : Parser Shell :=
+private def completionOnlyParser : Parser Shell :=
   defaultShellOption
 
-def completionOnlyInfo : ParserInfo Shell := {
+private def completionOnlyInfo : ParserInfo Shell := {
   progName := "complete-demo",
   parser := completionOnlyParser
 }
@@ -166,7 +166,7 @@ def completionOnlyInfo : ParserInfo Shell := {
   | .failure err => decide (err.error.kind = .invalid)
   | _ => False)
 
-def optionalCompletionParser : Parser (Option Shell) :=
+private def optionalCompletionParser : Parser (Option Shell) :=
   defaultOptionalShellOption
 
 #guard (match Argparse.ParserInfo.exec { progName := "opt-complete", parser := optionalCompletionParser } [] with
@@ -177,5 +177,6 @@ def optionalCompletionParser : Parser (Option Shell) :=
 
 end ArgparseTests
 
+/-- Trivial entry point for the test executable. -/
 def main : IO Unit :=
   pure ()
