@@ -12,6 +12,7 @@ export LeanArgparse
 export LeanArgparse.Parser (optional withDefault failure orElse many many1 some some1 choice)
 
 export LeanArgparse.ParserInfo (exec renderHelp renderFailure)
+export LeanArgparse.ParserInfo (renderBashCompletion renderZshCompletion renderFishCompletion)
 
 export LeanArgparse.ValueReader (map nat int)
 

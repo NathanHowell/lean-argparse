@@ -6,6 +6,20 @@ open Argparse.FlagSpec
 
 namespace LeanArgparseTests
 
+def containsSubstring (haystack needle : String) : Bool :=
+  if needle.isEmpty then
+    true
+  else
+    let target := needle.data
+    let rec loop : List Char → Bool
+      | [] => false
+      | chars@(_ :: rest) =>
+          if target.isPrefixOf chars then
+            true
+          else
+            loop rest
+    loop haystack.data
+
 structure ExampleCfg where
   verbose : Bool
   count : Nat
@@ -125,6 +139,10 @@ def choiceParser : Parser String :=
 #guard (match Argparse.exec { progName := "choice", parser := choiceParser } [] with
   | .failure err => decide (err.error.kind = .missing)
   | _ => False)
+
+#guard (containsSubstring (Argparse.renderBashCompletion exampleInfo) "--count")
+#guard (containsSubstring (Argparse.renderZshCompletion exampleInfo) "_arguments")
+#guard (containsSubstring (Argparse.renderFishCompletion exampleInfo) "complete -c")
 
 end LeanArgparseTests
 

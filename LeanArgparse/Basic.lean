@@ -759,6 +759,226 @@ def applyMods (mods : List (InfoMod α)) (info : ParserInfo α) : ParserInfo α 
 def build (parser : Parser α) (mods : List (InfoMod α)) : ParserInfo α :=
   applyMods mods { progName := "", parser }
 
+structure CompletionOption where
+  long? : Option String := none
+  short? : Option Char := none
+  metavar? : Option String := none
+  takesValue : Bool := false
+  help? : Option String := none
+  deriving Repr
+
+structure CompletionData where
+  progName : String
+  options : List CompletionOption := []
+  commands : List (String × Option String) := []
+  deriving Repr
+
+namespace Completion
+
+open Std
+
+structure OptionKey where
+  long? : Option String
+  short? : Option Char
+  takesValue : Bool
+  deriving BEq, Hashable
+
+private def fromDoc (doc : OptionDoc) : CompletionOption :=
+  {
+    long? := doc.long?,
+    short? := doc.short?,
+    metavar? := doc.metavar?,
+    takesValue := doc.metavar?.isSome,
+    help? := doc.help?
+  }
+
+private def usageOptions (u : Usage) : List CompletionOption :=
+  let docs := u.options
+  let initial : Array CompletionOption × HashSet OptionKey :=
+    (Array.mkEmpty docs.length, HashSet.emptyWithCapacity docs.length)
+  let (acc, _) := docs.foldl
+    (fun (acc, seen) doc =>
+      let opt := fromDoc doc
+      let key : OptionKey := {
+        long? := opt.long?,
+        short? := opt.short?,
+        takesValue := opt.takesValue
+      }
+      if seen.contains key then
+        (acc, seen)
+      else
+        (acc.push opt, seen.insert key))
+    initial
+  acc.toList
+
+private def usageCommands (u : Usage) : List (String × Option String) :=
+  let cmds := u.commands
+  let initial : Array (String × Option String) × HashSet String :=
+    (Array.mkEmpty cmds.length, HashSet.emptyWithCapacity cmds.length)
+  let (acc, _) := cmds.foldl
+    (fun (acc, seen) cmd =>
+      if seen.contains cmd.name then
+        (acc, seen)
+      else
+        (acc.push (cmd.name, cmd.description?), seen.insert cmd.name))
+    initial
+  acc.toList
+
+private def escapeSingleQuotes (s : String) : String :=
+  s.replace "'" "'\\''"
+
+private def sanitizeIdentifier (s : String) : String :=
+  let chars := s.data.map fun c => if c.isAlphanum || c = '_' then c else '_'
+  let result := String.mk chars
+  if result.isEmpty then "program" else result
+
+private def ensureHelpOption (opts : List CompletionOption) : List CompletionOption :=
+  if opts.any (fun opt => opt.long? = some "help" || opt.short? = some 'h') then
+    opts
+  else
+    opts ++ [{
+      long? := some "help",
+      short? := some 'h',
+      metavar? := none,
+      takesValue := false,
+      help? := some "Show this help message"
+    }]
+
+private def buildData (info : ParserInfo α) : CompletionData :=
+  let usage := info.parser.usage
+  {
+    progName := if info.progName.isEmpty then "program" else info.progName,
+    options := ensureHelpOption (usageOptions usage),
+    commands := usageCommands usage
+  }
+
+private def optionLong (opt : CompletionOption) : Option String :=
+  opt.long?.map fun n => s!"--{n}"
+
+private def optionShort (opt : CompletionOption) : Option String :=
+  opt.short?.map fun c => s!"-{String.mk [c]}"
+
+private def optionFlags (opt : CompletionOption) : List String :=
+  let longs := match optionLong opt with
+    | some flag => [flag]
+    | none => []
+  let shorts := match optionShort opt with
+    | some flag => [flag]
+    | none => []
+  longs ++ shorts
+
+private def renderBashCore (info : ParserInfo α) : String :=
+  let d := buildData info
+  let ident := sanitizeIdentifier d.progName
+  let functionName := s!"_{ident}_completion"
+  let longOpts := d.options.filterMap optionLong
+  let shortOpts := d.options.filterMap optionShort
+  let commands := d.commands.map Prod.fst
+  let valuedLong := d.options.filterMap (fun opt => if opt.takesValue then optionLong opt else none)
+  let valuedShort := d.options.filterMap (fun opt => if opt.takesValue then optionShort opt else none)
+  let joinWords (ws : List String) := String.intercalate " " ws
+  let longWords := joinWords longOpts
+  let shortWords := joinWords shortOpts
+  let commandWords := joinWords commands
+  let valuedWords := joinWords (valuedLong ++ valuedShort)
+  let combinedWords := joinWords ((longOpts ++ shortOpts ++ commands).eraseDups)
+  let startLine := functionName ++ "() {"
+  let lines : List String :=
+    [startLine,
+     "  local cur prev",
+     "  COMPREPLY=()",
+     "  cur=\"${COMP_WORDS[COMP_CWORD]}\"",
+     "  prev=\"${COMP_WORDS[COMP_CWORD-1]}\"",
+     s!"  local opts_long=\"{longWords}\"",
+     s!"  local opts_short=\"{shortWords}\"",
+     s!"  local commands=\"{commandWords}\"",
+     s!"  local all_words=\"{combinedWords}\"",
+     s!"  local value_opts=\"{valuedWords}\"",
+     "  for opt in $value_opts; do",
+     "    if [[ $prev == $opt ]]; then",
+     "      return 0",
+     "    fi",
+     "  done",
+     "  if [[ $cur == --* ]]; then",
+     "    COMPREPLY=( $(compgen -W \"$opts_long\" -- \"$cur\") )",
+     "    return 0",
+     "  fi",
+     "  if [[ $cur == -* ]]; then",
+     "    COMPREPLY=( $(compgen -W \"$opts_short\" -- \"$cur\") )",
+     "    return 0",
+     "  fi",
+     "  COMPREPLY=( $(compgen -W \"$all_words\" -- \"$cur\") )",
+     "  return 0",
+     "}",
+     s!"complete -F {functionName} {d.progName}"]
+  String.intercalate "\n" lines
+
+private def renderZshCore (info : ParserInfo α) : String :=
+  let d := buildData info
+  let optionEntries := d.options.foldr
+    (fun opt acc =>
+      let flags := optionFlags opt
+      let entries := flags.map fun flag =>
+        let desc := opt.help?.map escapeSingleQuotes |>.getD ""
+        let descPart := if desc.isEmpty then "" else s!"[{desc}]"
+        let metavar := opt.metavar?.map escapeSingleQuotes |>.getD "VALUE"
+        let argPart := if opt.takesValue then s!":{metavar}:" else ""
+        s!"'{flag}{descPart}{argPart}'"
+      entries ++ acc)
+    []
+  let argumentLine :=
+    String.intercalate " " (optionEntries ++ ["'*::arg:->args'"])
+  let baseLines : List String :=
+    [s!"#compdef {d.progName}",
+     "local context state state_descr line",
+     "typeset -A opt_args",
+     s!"_arguments -s {argumentLine}"]
+  let commandLines :=
+    if d.commands.isEmpty then []
+    else
+      let entries := d.commands.map fun (name, desc?) =>
+        let desc := desc?.map escapeSingleQuotes |>.getD ""
+        if desc.isEmpty then s!"{name}" else s!"{name}:{desc}"
+      ["case $state in",
+       "  args)",
+       s!"    _values 'commands' {String.intercalate " " entries}",
+       "  ;;",
+       "esac"]
+  String.intercalate "\n" (baseLines ++ commandLines)
+
+private def renderFishCore (info : ParserInfo α) : String :=
+  let d := buildData info
+  let optionLines := d.options.map fun opt =>
+    let base := s!"complete -c {d.progName}"
+    let base := match opt.long? with
+      | some long => s!"{base} -l {long}"
+      | none => base
+    let base := match opt.short? with
+      | some c => s!"{base} -s {c}"
+      | none => base
+    let base := if opt.takesValue then s!"{base} -r" else base
+    let base := match opt.help? with
+      | some desc => s!"{base} -d '{escapeSingleQuotes desc}'"
+      | none => base
+    base
+  let commandLines := d.commands.map fun (name, desc?) =>
+    let descPart := desc?.map escapeSingleQuotes |>.map (fun d => s!" -d '{d}'") |>.getD ""
+    s!"complete -c {d.progName} -n '__fish_use_subcommand' -f -a '{escapeSingleQuotes name}'{descPart}"
+  String.intercalate "\n" (optionLines ++ commandLines)
+
+end Completion
+
+open Completion
+
+def renderBashCompletion (info : ParserInfo α) : String :=
+  renderBashCore info
+
+def renderZshCompletion (info : ParserInfo α) : String :=
+  renderZshCore info
+
+def renderFishCompletion (info : ParserInfo α) : String :=
+  renderFishCore info
+
 private def synopsisElement (o : OptionDoc) : String :=
   let name := renderOptionNames o.long? o.short?
   let base :=

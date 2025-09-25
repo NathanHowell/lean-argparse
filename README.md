@@ -53,6 +53,15 @@ def main (args : List String) : IO Unit :=
   | .failure err => do
       IO.eprintln (Argparse.renderFailure info err)
       IO.Process.exit 1
+
+def bashCompletionScript : String :=
+  Argparse.renderBashCompletion info
+
+def zshCompletionScript : String :=
+  Argparse.renderZshCompletion info
+
+def fishCompletionScript : String :=
+  Argparse.renderFishCompletion info
 ```
 
 Running the compiled executable yields:
@@ -87,9 +96,22 @@ Usage: lean-argparse [--verbose] [--count COUNT] NAME
 
 Tests are located under `Tests/` and use `#guard` checks; compiling the test executable verifies the expectations without shipping test modules with the library.
 
+## Shell Completions
+
+Use the renderer that matches your shell to produce a completion script:
+
+```lean
+#eval IO.println (Argparse.renderBashCompletion info)
+#eval IO.println (Argparse.renderZshCompletion info)
+#eval IO.println (Argparse.renderFishCompletion info)
+```
+
+Redirect the output to a file and source it (or copy it into the appropriate completion directory) to enable tab completion for options and subcommands.
+
 ## License
 
 Apache-2.0
 - `many`, `some`, `choice`, and `many1` allow repeated or alternative argument parsing without leaving the applicative world.
 - Builder helpers (e.g. `OptionSpec.long`, `FlagSpec.long`, `ParserInfo.withProgDesc`) make it easy to mirror the ergonomic modifiers from `optparse-applicative`.
 - Convenience wrappers (`strOption`, `natOption`, `intOption`, `flag'`) remove most manual record instantiations.
+- Shell completion generators (`renderBashCompletion`, `renderZshCompletion`, `renderFishCompletion`) produce scripts for popular shells.
