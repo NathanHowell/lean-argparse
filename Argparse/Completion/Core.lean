@@ -19,6 +19,7 @@ structure CommandEntry where
   description? : Option String := none
   options : List OptionEntry := []
   subcommands : List CommandEntry := []
+  positionals : List PositionalDoc := []
   deriving Repr, Inhabited
 
 structure Data where
@@ -83,7 +84,8 @@ private partial def usageCommands (usage : Usage) : List CommandEntry :=
       name := cmd.name,
       description? := cmd.description?,
       options := ensureHelpOption (usageOptions cmd.usage),
-      subcommands := usageCommands cmd.usage
+      subcommands := usageCommands cmd.usage,
+      positionals := cmd.usage.positionals
     }
   let docs := usage.commands
   let init : Array CommandEntry × HashSet String :=
