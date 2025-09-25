@@ -67,99 +67,77 @@ private def isOptionLike (tok : String) : Bool :=
   | '-' :: c :: _ => c.isAlpha
   | _ => false
 
-def consumeLongFlag (s : ParseState) (name : String) : Except ParseError (Bool × ParseState) :=
-  let rec loop (processed : List String) : List String → Except ParseError (Bool × List String)
-    | [] => pure (false, processed.reverse)
+class TokenSpec (α : Type) where
+  parse : String → Option (α × Option String)
+  describe : α → String
+
+instance : TokenSpec String where
+  parse := parseLongToken
+  describe := fun name => s!"--{name}"
+
+instance : TokenSpec Char where
+  parse := parseShortToken
+  describe := fun name => s!"-{String.mk [name]}"
+
+private def consumeFromFront [DecidableEq α] [TokenSpec α]
+    (front : List String)
+    (name : α)
+    (handle : Option String → List String → Except ParseError (β × List String))
+    : Except ParseError (Option (β × List String)) :=
+  let rec loop (processed : List String) : List String → Except ParseError (Option (β × List String))
+    | [] => pure none
     | tok :: rest =>
-      match parseLongToken tok with
+      match TokenSpec.parse tok with
       | some (found, value?) =>
         if found = name then
-          match value? with
-          | some _ =>
-            throw <| ParseError.mk .invalid s!"Flag --{name} does not accept a value" (some s!"--{name}") []
-          | none =>
-            let newFront := processed.reverse ++ rest
-            pure (true, newFront)
+          match handle value? rest with
+          | .ok (result, remaining) =>
+            let newFront := processed.reverse ++ remaining
+            pure (some (result, newFront))
+          | .error err => .error err
         else
           loop (tok :: processed) rest
-      | none =>
-        loop (tok :: processed) rest
-  match loop [] s.front with
-  | .ok (found, front) => pure (found, s.withFront front)
-  | .error err => .error err
+      | none => loop (tok :: processed) rest
+  loop [] front
+
+private def consumeFlag [DecidableEq α] [TokenSpec α]
+    (s : ParseState) (name : α)
+    : Except ParseError (Bool × ParseState) := do
+  let flagName := TokenSpec.describe name
+  let handle : Option String → List String → Except ParseError (Unit × List String)
+    | some _, _ =>
+      throw <| ParseError.mk .invalid s!"Flag {flagName} does not accept a value" (some flagName) []
+    | none, rest => pure ((), rest)
+  match ← consumeFromFront s.front name handle with
+  | some ((), front) => pure (true, s.withFront front)
+  | none => pure (false, s)
+
+private def consumeValue [DecidableEq α] [TokenSpec α]
+    (s : ParseState) (name : α)
+    : Except ParseError (Option String × ParseState) := do
+  let optionName := TokenSpec.describe name
+  let handle : Option String → List String → Except ParseError (String × List String)
+    | some v, rest => pure (v, rest)
+    | none, rest =>
+      match rest with
+      | valueTok :: restTail => pure (valueTok, restTail)
+      | [] =>
+        throw <| ParseError.mk .missing s!"Option {optionName} expects a value" (some optionName) []
+  match ← consumeFromFront s.front name handle with
+  | some (value, front) => pure (some value, s.withFront front)
+  | none => pure (none, s)
+
+def consumeLongFlag (s : ParseState) (name : String) : Except ParseError (Bool × ParseState) :=
+  consumeFlag s name
 
 def consumeShortFlag (s : ParseState) (name : Char) : Except ParseError (Bool × ParseState) :=
-  let rec loop (processed : List String) : List String → Except ParseError (Bool × List String)
-    | [] => pure (false, processed.reverse)
-    | tok :: rest =>
-      match parseShortToken tok with
-      | some (found, value?) =>
-        if found = name then
-          match value? with
-          | some _ =>
-            throw <| ParseError.mk .invalid s!"Flag -{String.mk [name]} does not accept a value" (some s!"-{String.mk [name]}") []
-          | none =>
-            let newFront := processed.reverse ++ rest
-            pure (true, newFront)
-        else
-          loop (tok :: processed) rest
-      | none =>
-        loop (tok :: processed) rest
-  match loop [] s.front with
-  | .ok (found, front) => pure (found, s.withFront front)
-  | .error err => .error err
+  consumeFlag s name
 
 def consumeLongValue (s : ParseState) (name : String) : Except ParseError (Option String × ParseState) :=
-  let rec loop (processed : List String) : List String → Except ParseError (Option (String × List String))
-    | [] => pure none
-    | tok :: rest =>
-      match parseLongToken tok with
-      | some (found, value?) =>
-        if found = name then
-          match value? with
-          | some v =>
-            let newFront := processed.reverse ++ rest
-            pure (some (v, newFront))
-          | none =>
-            match rest with
-            | valueTok :: restTail =>
-              let newFront := processed.reverse ++ restTail
-              pure (some (valueTok, newFront))
-            | [] =>
-              throw <| ParseError.mk .missing s!"Option --{name} expects a value" (some s!"--{name}") []
-        else
-          loop (tok :: processed) rest
-      | none => loop (tok :: processed) rest
-  match loop [] s.front with
-  | .ok none => pure (none, s)
-  | .ok (some (value, front)) => pure (some value, s.withFront front)
-  | .error err => .error err
+  consumeValue s name
 
 def consumeShortValue (s : ParseState) (name : Char) : Except ParseError (Option String × ParseState) :=
-  let rec loop (processed : List String) : List String → Except ParseError (Option (String × List String))
-    | [] => pure none
-    | tok :: rest =>
-      match parseShortToken tok with
-      | some (found, value?) =>
-        if found = name then
-          match value? with
-          | some v =>
-            let newFront := processed.reverse ++ rest
-            pure (some (v, newFront))
-          | none =>
-            match rest with
-            | valueTok :: restTail =>
-              let newFront := processed.reverse ++ restTail
-              pure (some (valueTok, newFront))
-            | [] =>
-              throw <| ParseError.mk .missing s!"Option -{String.mk [name]} expects a value" (some s!"-{String.mk [name]}") []
-        else
-          loop (tok :: processed) rest
-      | none => loop (tok :: processed) rest
-  match loop [] s.front with
-  | .ok none => pure (none, s)
-  | .ok (some (value, front)) => pure (some value, s.withFront front)
-  | .error err => .error err
+  consumeValue s name
 
 def takePositional? (s : ParseState) : Option (String × ParseState) :=
   let rec loop (before : List String) : List String → Option (String × List String)
