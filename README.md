@@ -80,12 +80,12 @@ Usage: lean-argparse [--verbose] [--count COUNT] NAME
   lake build
   ```
 
-- Verify the lightweight unit tests:
+- Run the lightweight unit tests:
   ```sh
-  lake build LeanArgparse.Tests
+  lake test
   ```
 
-The tests live in `LeanArgparse/Tests.lean` and exercise the public combinators via `#guard` checks.
+Tests are located under `Tests/` and use `#guard` checks; compiling the test executable verifies the expectations without shipping test modules with the library.
 
 ## License
 

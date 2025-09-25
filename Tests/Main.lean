@@ -4,7 +4,7 @@ open Argparse
 open Argparse.OptionSpec
 open Argparse.FlagSpec
 
-namespace LeanArgparse.Tests
+namespace LeanArgparseTests
 
 structure ExampleCfg where
   verbose : Bool
@@ -15,12 +15,12 @@ structure ExampleCfg where
 def exampleParser : Parser ExampleCfg :=
   pure ExampleCfg.mk
     <*> switch "verbose" (short? := some 'v')
-    <*> Parser.withDefault
+    <*> Argparse.withDefault
           (option {
             long? := some "count",
             short? := some 'n',
             metavar := "COUNT",
-            reader := ValueReader.nat,
+            reader := LeanArgparse.ValueReader.nat,
             help? := some "Number of repetitions"
           })
           1
@@ -31,15 +31,15 @@ def exampleInfo : ParserInfo ExampleCfg := {
   parser := exampleParser
 }
 
-#guard (match ParserInfo.exec exampleInfo ["Alice"] with
+#guard (match Argparse.exec exampleInfo ["Alice"] with
   | .success cfg => decide (cfg = { verbose := false, count := 1, name := "Alice" })
   | _ => False)
 
-#guard (match ParserInfo.exec exampleInfo ["--verbose", "--count", "3", "Bob"] with
+#guard (match Argparse.exec exampleInfo ["--verbose", "--count", "3", "Bob"] with
   | .success cfg => decide (cfg = { verbose := true, count := 3, name := "Bob" })
   | _ => False)
 
-#guard (match ParserInfo.exec exampleInfo ["--count", "5"] with
+#guard (match Argparse.exec exampleInfo ["--count", "5"] with
   | .failure err => decide (err.error.kind = .missing)
   | _ => False)
 
@@ -65,34 +65,34 @@ def commandParser : Parser CommandResult :=
     ]
   }
 
-#guard (match ParserInfo.exec { progName := "cmd", parser := commandParser } ["hello"] with
+#guard (match Argparse.exec { progName := "cmd", parser := commandParser } ["hello"] with
   | .success cfg => decide (cfg = { tag := "hello", target? := none })
   | _ => False)
 
-#guard (match ParserInfo.exec { progName := "cmd", parser := commandParser } ["run", "tests"] with
+#guard (match Argparse.exec { progName := "cmd", parser := commandParser } ["run", "tests"] with
   | .success cfg => decide (cfg = { tag := "run", target? := some "tests" })
   | _ => False)
 
-#guard (match ParserInfo.exec { progName := "cmd", parser := commandParser } ["unknown"] with
+#guard (match Argparse.exec { progName := "cmd", parser := commandParser } ["unknown"] with
   | .failure err => decide (err.error.kind = .invalid)
   | _ => False)
 
-#guard (match ParserInfo.exec exampleInfo ["--help"] with
+#guard (match Argparse.exec exampleInfo ["--help"] with
   | .showHelp => True
   | _ => False)
 
 def repeatedArgs : Parser (List String) :=
-  Parser.many (rawArgument "ITEM")
+  Argparse.many (rawArgument "ITEM")
 
-#guard (match ParserInfo.exec { progName := "items", parser := repeatedArgs } ["one", "two", "three"] with
+#guard (match Argparse.exec { progName := "items", parser := repeatedArgs } ["one", "two", "three"] with
   | .success items => decide (items = ["one", "two", "three"])
   | _ => False)
 
-#guard (match ParserInfo.exec { progName := "items", parser := repeatedArgs } [] with
+#guard (match Argparse.exec { progName := "items", parser := repeatedArgs } [] with
   | .success items => decide (items = [])
   | _ => False)
 
-#guard (match ParserInfo.exec { progName := "items", parser := Parser.some (rawArgument "ITEM") } [] with
+#guard (match Argparse.exec { progName := "items", parser := Argparse.some (rawArgument "ITEM") } [] with
   | .failure err => decide (err.error.kind = .missing)
   | _ => False)
 
@@ -104,26 +104,29 @@ def requiredFlag : Parser Bool :=
       FlagSpec.help "Enable loud mode"
     ]
 
-#guard (match ParserInfo.exec { progName := "flags", parser := requiredFlag } ["--loud"] with
+#guard (match Argparse.exec { progName := "flags", parser := requiredFlag } ["--loud"] with
   | .success value => decide (value = true)
   | _ => False)
 
-#guard (match ParserInfo.exec { progName := "flags", parser := requiredFlag } [] with
+#guard (match Argparse.exec { progName := "flags", parser := requiredFlag } [] with
   | .failure err => decide (err.error.kind = .missing)
   | _ => False)
 
 def choiceParser : Parser String :=
-  Parser.choice [
+  Argparse.choice [
     strOption [OptionSpec.long "name", OptionSpec.help "Primary name"],
     strOption [OptionSpec.long "alias", OptionSpec.help "Alias"]
   ]
 
-#guard (match ParserInfo.exec { progName := "choice", parser := choiceParser } ["--alias", "Bob"] with
+#guard (match Argparse.exec { progName := "choice", parser := choiceParser } ["--alias", "Bob"] with
   | .success value => decide (value = "Bob")
   | _ => False)
 
-#guard (match ParserInfo.exec { progName := "choice", parser := choiceParser } [] with
+#guard (match Argparse.exec { progName := "choice", parser := choiceParser } [] with
   | .failure err => decide (err.error.kind = .missing)
   | _ => False)
 
-end LeanArgparse.Tests
+end LeanArgparseTests
+
+def main : IO Unit :=
+  pure ()
