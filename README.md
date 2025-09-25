@@ -11,6 +11,7 @@
 - Convenience value readers plus builder-style modifiers (`OptionSpec`, `FlagSpec`, `ParserInfo`)
 - Higher-level combinators such as `many`, `some`, `choice`, `flag'`, and ready-made option helpers (`strOption`, `natOption`, …)
 - Lightweight tests expressed via `#guard`
+- Built-in helpers for shell completions and man page generation
 
 ## Example
 
@@ -113,6 +114,19 @@ Use the renderer that matches your shell to produce a completion script:
 ```
 
 Redirect the output to a file and source it (or copy it into the appropriate completion directory) to enable tab completion for options and subcommands.
+
+## Man Pages
+
+Generate a basic troff man page directly from your parser metadata:
+
+```lean
+#eval IO.println (Argparse.ParserInfo.renderManpage info)
+
+-- With simple metadata overrides:
+#eval IO.println (Argparse.ParserInfo.renderManpage info { sectionName := "1", manual? := some "Lean Tools" })
+```
+
+Pipe the output into `man -l` or write it to disk for installation alongside your executable.
 
 ## License
 

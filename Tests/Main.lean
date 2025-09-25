@@ -144,6 +144,7 @@ def choiceParser : Parser String :=
 #guard (containsSubstring (Argparse.ParserInfo.renderBashCompletion exampleInfo) "--count")
 #guard (containsSubstring (Argparse.ParserInfo.renderZshCompletion exampleInfo) "_arguments")
 #guard (containsSubstring (Argparse.ParserInfo.renderFishCompletion exampleInfo) "complete -c")
+#guard (containsSubstring (Argparse.ParserInfo.renderManpage exampleInfo) ".SH OPTIONS")
 
 def completionOnlyParser : Parser Shell :=
   defaultShellOption

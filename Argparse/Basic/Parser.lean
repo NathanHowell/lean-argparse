@@ -16,19 +16,19 @@ namespace Parser
 
 open Usage
 
-def map {α β} (f : α → β) (p : Parser α) : Parser β := {
+private def map {α β} (f : α → β) (p : Parser α) : Parser β := {
   run := fun s => do
     let (a, s') ← p.run s
     return (f a, s'),
   usage := p.usage
 }
 
-def pure {α} (x : α) : Parser α := {
+private def pure {α} (x : α) : Parser α := {
   run := fun s => .ok (x, s),
   usage := Usage.empty
 }
 
-def seqCore {α β} (pf : Parser (α → β)) (pa : Unit → Parser α) : Parser β :=
+private def seqCore {α β} (pf : Parser (α → β)) (pa : Unit → Parser α) : Parser β :=
   let pa' := pa ()
   {
     run := fun s => do
@@ -38,7 +38,7 @@ def seqCore {α β} (pf : Parser (α → β)) (pa : Unit → Parser α) : Parser
     usage := Usage.append pf.usage pa'.usage
   }
 
-def seqLeftCore {α β} (pa : Parser α) (pb : Unit → Parser β) : Parser α :=
+private def seqLeftCore {α β} (pa : Parser α) (pb : Unit → Parser β) : Parser α :=
   let pb' := pb ()
   {
     run := fun s => do
@@ -48,7 +48,7 @@ def seqLeftCore {α β} (pa : Parser α) (pb : Unit → Parser β) : Parser α :
     usage := Usage.append pa.usage pb'.usage
   }
 
-def seqRightCore {α β} (pa : Parser α) (pb : Unit → Parser β) : Parser β :=
+private def seqRightCore {α β} (pa : Parser α) (pb : Unit → Parser β) : Parser β :=
   let pb' := pb ()
   {
     run := fun s => do
@@ -72,7 +72,7 @@ instance : SeqLeft Parser where
 instance : SeqRight Parser where
   seqRight := seqRightCore
 
-def failure {α} (msg : String := "empty parser") : Parser α :=
+private def failure {α} (msg : String := "empty parser") : Parser α :=
   {
     run := fun _ => .error {
       kind := .missing,
@@ -81,7 +81,7 @@ def failure {α} (msg : String := "empty parser") : Parser α :=
     usage := Usage.empty
   }
 
-def orElseCore {α} (p : Parser α) (q : Unit → Parser α) : Parser α :=
+private def orElseCore {α} (p : Parser α) (q : Unit → Parser α) : Parser α :=
   let q' := q ()
   {
     run := fun s =>
@@ -95,7 +95,7 @@ def orElseCore {α} (p : Parser α) (q : Unit → Parser α) : Parser α :=
     usage := Usage.optional (Usage.append p.usage q'.usage)
   }
 
-def orElse {α} (p q : Parser α) : Parser α :=
+private def orElse {α} (p q : Parser α) : Parser α :=
   orElseCore p (fun _ => q)
 
 instance : Applicative Parser where
