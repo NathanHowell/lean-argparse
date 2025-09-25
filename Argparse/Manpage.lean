@@ -6,10 +6,15 @@ namespace Manpage
 
 open Std
 
+/-- Configuration controlling manpage rendering. -/
 structure Config where
+  /-- Section name (e.g. `1` or `3`). -/
   sectionName : String := "1"
+  /-- Optional publication date to display in the header. -/
   date? : Option String := none
+  /-- Optional source string in the header. -/
   source? : Option String := none
+  /-- Optional manual name in the header. -/
   manual? : Option String := none
 
 private def escape (s : String) : String :=

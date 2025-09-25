@@ -56,11 +56,13 @@ private def renderData (d : Data) : String :=
     optionLines ++ subcommands
   String.intercalate "\n" (optionLines ++ commandLines ++ nestedLines)
 
+/-- Descriptor for the fish completion backend. -/
 def module : Module := {
   name := "fish",
   render := renderData
 }
 
+/-- Render a fish completion script for the supplied parser metadata. -/
 def render (info : ParserInfo α) : String :=
   renderWithModule module info
 

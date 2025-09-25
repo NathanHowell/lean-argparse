@@ -7,26 +7,33 @@ open Std
 
 /-- Parser state separates pre and post `--` segments. -/
 structure ParseState where
+  /-- Arguments that precede a `--` separator. -/
   front : List String
+  /-- Arguments that follow a `--` separator. -/
   tail : List String
   deriving Repr
 
 namespace ParseState
 
+/-- Construct parser state from raw argument list. -/
 def ofList (args : List String) : ParseState :=
   match args.span (· ≠ "--") with
   | (front, []) => { front := front, tail := [] }
   | (front, _ :: tail) => { front := front, tail := tail }
 
+/-- Replace the pre-separator portion of the state. -/
 def withFront (s : ParseState) (front : List String) : ParseState := { s with front }
 
+/-- Replace the post-separator portion of the state. -/
 def withTail (s : ParseState) (tail : List String) : ParseState := { s with tail }
 
+/-- Reconstruct the remaining command-line arguments. -/
 def remaining (s : ParseState) : List String :=
   match s.tail with
   | [] => s.front
   | tail => s.front ++ "--" :: tail
 
+/-- Total number of remaining tokens. -/
 def size (s : ParseState) : Nat :=
   s.front.length + s.tail.length
 
@@ -67,8 +74,11 @@ private def isOptionLike (tok : String) : Bool :=
   | '-' :: c :: _ => c.isAlpha
   | _ => false
 
+/-- Adaptor describing how to interpret a token as a flag/option identifier. -/
 class TokenSpec (α : Type) where
+  /-- Attempt to parse a token into the logical identifier and optional value. -/
   parse : String → Option (α × Option String)
+  /-- Pretty-print the identifier for diagnostic output. -/
   describe : α → String
 
 instance : TokenSpec String where
@@ -127,18 +137,23 @@ private def consumeValue [DecidableEq α] [TokenSpec α]
   | some (value, front) => pure (some value, s.withFront front)
   | none => pure (none, s)
 
+/-- Attempt to consume a long flag and report whether it was present. -/
 def consumeLongFlag (s : ParseState) (name : String) : Except ParseError (Bool × ParseState) :=
   consumeFlag s name
 
+/-- Attempt to consume a short flag and report whether it was present. -/
 def consumeShortFlag (s : ParseState) (name : Char) : Except ParseError (Bool × ParseState) :=
   consumeFlag s name
 
+/-- Attempt to consume the value associated with a long option. -/
 def consumeLongValue (s : ParseState) (name : String) : Except ParseError (Option String × ParseState) :=
   consumeValue s name
 
+/-- Attempt to consume the value associated with a short option. -/
 def consumeShortValue (s : ParseState) (name : Char) : Except ParseError (Option String × ParseState) :=
   consumeValue s name
 
+/-- Remove the next positional argument, if any. -/
 def takePositional? (s : ParseState) : Option (String × ParseState) :=
   let rec loop (before : List String) : List String → Option (String × List String)
     | [] => none

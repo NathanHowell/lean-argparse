@@ -34,11 +34,17 @@ private def valuedFlags (opts : List OptionEntry) : List String :=
         acc)
     []
 
+/-- Precomputed metadata for a completion context. -/
 structure ContextData where
+  /-- Lookup key that identifies the current completion context. -/
   key : String
+  /-- Child subcommands and the keys they map to. -/
   children : List (String × String)
+  /-- Long-form flags available in this context. -/
   long : List String
+  /-- Short-form flags available in this context. -/
   short : List String
+  /-- Flags that expect a value immediately after them. -/
   valued : List String
   deriving Inhabited
 
@@ -156,11 +162,13 @@ private def renderData (d : Data) : String :=
   let lines := headerLines ++ assocLines ++ loopLines ++ [s!"complete -F {functionName} {d.progName}"]
   String.intercalate "\n" lines
 
+/-- Descriptor for the bash completion backend. -/
 def module : Module := {
   name := "bash",
   render := renderData
 }
 
+/-- Render a bash completion script for the supplied parser metadata. -/
 def render (info : ParserInfo α) : String :=
   renderWithModule module info
 

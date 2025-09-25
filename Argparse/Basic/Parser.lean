@@ -9,7 +9,9 @@ open Std
 
 /-- Core parser type with usage metadata. -/
 structure Parser (α : Type u) where
+  /-- Run the parser against the given state, returning a value and residual state. -/
   run : ParseState → Except ParseError (α × ParseState)
+  /-- Usage metadata describing the parser's arguments. -/
   usage : Usage
 
 namespace Parser
@@ -109,6 +111,7 @@ instance : Alternative Parser where
   failure := failure
   orElse := fun p q => orElseCore p q
 
+/-- Parse zero or more repetitions of `p`. -/
 def many {α} (p : Parser α) : Parser (List α) :=
   {
     run := fun s =>
@@ -126,6 +129,7 @@ def many {α} (p : Parser α) : Parser (List α) :=
     , usage := Usage.optional p.usage
   }
 
+/-- Parse one or more repetitions of `p`. -/
 def some {α} (p : Parser α) : Parser (List α) := {
   run := fun s => do
     let (head, s') ← p.run s
@@ -134,17 +138,22 @@ def some {α} (p : Parser α) : Parser (List α) := {
   , usage := Usage.append p.usage (many p).usage
 }
 
+/-- Alias for `some` to match naming conventions. -/
 def many1 {α} (p : Parser α) : Parser (List α) := some p
 
+/-- Alias for `some`. -/
 def some1 {α} (p : Parser α) : Parser (List α) := some p
 
+/-- Try `p`, falling back to the lazy `backup` parser when `p` is missing. -/
 def optionalOrElse {α} (p : Parser α) (backup : Unit → Parser α) : Parser α :=
   orElseCore p backup
 
+/-- Run a list of parsers until one succeeds. -/
 def choice {α} : List (Parser α) → Parser α
   | [] => failure "empty choice"
   | p :: ps => ps.foldl (fun acc next => orElse acc next) p
 
+/-- Run `p`, returning `none` when the parser reports a missing value. -/
 def optional {α} (p : Parser α) : Parser (Option α) := {
   run := fun s =>
     match p.run s with
@@ -157,6 +166,7 @@ def optional {α} (p : Parser α) : Parser (Option α) := {
   usage := Usage.optional p.usage
 }
 
+/-- Run `p`, supplying `value` when the parser reports a missing value. -/
 def withDefault {α} (p : Parser α) (value : α) : Parser α :=
   map (fun opt => opt.getD value) (optional p)
 

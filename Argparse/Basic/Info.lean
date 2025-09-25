@@ -8,44 +8,65 @@ namespace Argparse
 open Std
 open Usage
 
+/-- Result returned when parsing fails. -/
 structure ParserFailure where
+  /-- The underlying structured parse error. -/
   error : ParseError
+  /-- Usage information to display alongside the error. -/
   usage : Usage
+  /-- Unconsumed arguments at the point of failure. -/
   leftovers : List String := []
   deriving Repr
 
+/-- Outcome of invoking a parser. -/
 inductive ParserResult (α : Type u)
+  /-- Parsing succeeded and produced a value. -/
   | success (value : α)
+  /-- Parsing was cancelled in order to display help text. -/
   | showHelp
+  /-- Parsing failed with diagnostic information. -/
   | failure (err : ParserFailure)
   deriving Repr
 
+/-- Metadata bundled with a parser for rendering help, errors, and completions. -/
 structure ParserInfo (α : Type u) where
+  /-- Program name displayed in usage text. -/
   progName : String
+  /-- The parser to evaluate. -/
   parser : Parser α
+  /-- Optional header shown above usage information. -/
   header? : Option String := none
+  /-- Optional description describing the program. -/
   progDesc? : Option String := none
+  /-- Optional footer appended to help output. -/
   footer? : Option String := none
 
 namespace ParserInfo
 
+/-- A transformation applied to a `ParserInfo`. -/
 abbrev InfoMod (α : Type u) := ParserInfo α → ParserInfo α
 
+/-- Override the stored program name. -/
 def withProgName (name : String) (info : ParserInfo α) : ParserInfo α :=
   { info with progName := name }
 
+/-- Attach a header line to help output. -/
 def withHeader (text : String) (info : ParserInfo α) : ParserInfo α :=
   { info with header? := some text }
 
+/-- Attach a descriptive paragraph to help output. -/
 def withProgDesc (text : String) (info : ParserInfo α) : ParserInfo α :=
   { info with progDesc? := some text }
 
+/-- Attach a footer to help output. -/
 def withFooter (text : String) (info : ParserInfo α) : ParserInfo α :=
   { info with footer? := some text }
 
+/-- Apply a sequence of metadata modifiers. -/
 def applyMods (mods : List (InfoMod α)) (info : ParserInfo α) : ParserInfo α :=
   mods.foldl (fun acc f => f acc) info
 
+/-- Construct a `ParserInfo` from a parser and modifiers. -/
 def build (parser : Parser α) (mods : List (InfoMod α)) : ParserInfo α :=
   applyMods mods { progName := "", parser }
 
@@ -137,6 +158,7 @@ private def renderCommandDetails (info : ParserInfo α) (commands : List Command
   if details.isEmpty then []
   else ["Command Details:"] ++ details
 
+/-- Render a help message for the given parser metadata. -/
 def renderHelp (info : ParserInfo α) (includeHelpOption : Bool := true) : String :=
   let usage := info.parser.usage
   let usageLine :=
@@ -165,6 +187,7 @@ def renderHelp (info : ParserInfo α) (includeHelpOption : Bool := true) : Strin
 private def containsHelp (args : List String) : Bool :=
   args.any fun arg => arg = "--help" || arg = "-h"
 
+/-- Evaluate a parser against the provided command-line arguments. -/
 def exec (info : ParserInfo α) (argv : List String) : ParserResult α :=
   if containsHelp argv then
     ParserResult.showHelp
@@ -186,6 +209,7 @@ def exec (info : ParserInfo α) (argv : List String) : ParserResult α :=
         }
         ParserResult.failure { error := err, usage := info.parser.usage, leftovers }
 
+/-- Format a parse failure along with usage information. -/
 def renderFailure (info : ParserInfo α) (failure : ParserFailure) : String :=
   let ctx := failure.error.context?.map (fun c => s!"[{c}] ") |>.getD ""
   let primary := s!"{ctx}{failure.error.message}"
