@@ -47,9 +47,21 @@ private def synopsis (info : ParserInfo α) : String :=
   let positionalParts := usage.positionals.map positionalElement
   String.intercalate " " (optionParts ++ positionalParts)
 
+private def synopsisWithPrefix (pref : String) (usage : Usage) : String :=
+  let optionTail := usage.options.map synopsisElement |>.filter (· ≠ "")
+  let positionalTail := usage.positionals.map positionalElement
+  let tail := optionTail ++ positionalTail
+  if tail.isEmpty then pref
+  else
+    let joined := String.intercalate " " tail
+    s!"{pref} {joined}"
+
 private def bold (s : String) : String := s!"\\fB{s}\\fR"
 
 private def sectionBlock (title : String) : List String := [s!".SH {title}"]
+
+private def concatMap {α β} (xs : List α) (f : α → List β) : List β :=
+  xs.foldr (fun x acc => f x ++ acc) []
 
 private def renderOptions (usage : Usage) : List String :=
   let entries := usage.options.map fun opt =>
@@ -71,6 +83,43 @@ private def renderCommands (usage : Usage) : List String :=
     let descLine := cmd.description?.map fun d => s!"- {d}"
     [".TP", bold cmd.name] ++ descLine.toList
   if entries.isEmpty then [] else sectionBlock "COMMANDS" ++ entries.foldr (· ++ ·) []
+
+private def renderCommandOptions (usage : Usage) : List String :=
+  concatMap usage.options fun opt =>
+    let heading := if formatOptionHeading opt = "" then "[option]" else formatOptionHeading opt
+    let defaultLines := opt.default?.map (fun d => s!"(default: {d})") |>.toList
+    let helpLines := opt.help?.toList
+    [".TP", bold heading] ++ helpLines ++ defaultLines
+
+private def renderCommandArguments (usage : Usage) : List String :=
+  concatMap usage.positionals fun arg =>
+    let heading := if arg.metavar.isEmpty then "ARG" else arg.metavar
+    let helpLines := arg.help?.toList
+    [".TP", bold heading] ++ helpLines
+
+private def renderCommandSummary (usage : Usage) : List String :=
+  concatMap usage.commands fun cmd =>
+    let descLine := cmd.description?.map fun d => s!"- {d}"
+    [".TP", bold cmd.name] ++ descLine.toList
+
+private partial def renderCommandDetails (info : ParserInfo α) (commands : List CommandDoc) (topLevel : Bool := true) : List String :=
+  if commands.isEmpty then []
+  else
+    let rec renderDetail (cmd : CommandDoc) : List String :=
+      let heading := [s!".SS {escape cmd.name}"]
+      let desc := cmd.description?.map escape |>.toList
+      let prog := if info.progName.isEmpty then cmd.name else s!"{info.progName} {cmd.name}"
+      let synopsisLine := synopsisWithPrefix (bold (escape prog)) cmd.usage
+      let options := renderCommandOptions cmd.usage
+      let args := renderCommandArguments cmd.usage
+      let subs := renderCommandSummary cmd.usage
+      let nested := renderCommandDetails info cmd.usage.commands false
+      heading ++ desc ++ [synopsisLine] ++
+        (if options.isEmpty then [] else [".PP", bold "Options"] ++ options) ++
+        (if args.isEmpty then [] else [".PP", bold "Arguments"] ++ args) ++
+        (if subs.isEmpty then [] else [".PP", bold "Commands"] ++ subs) ++ nested
+    let body := commands.map renderDetail |>.foldr (· ++ ·) []
+    (if topLevel then sectionBlock "COMMAND DETAILS" else []) ++ body
 
 private def renderFooter (info : ParserInfo α) : List String :=
   match info.footer? with
@@ -112,6 +161,7 @@ def render (info : ParserInfo α) (cfg : Config := {}) : String :=
     renderOptions usage ++
     renderArguments usage ++
     renderCommands usage ++
+    renderCommandDetails info usage.commands ++
     renderFooter info
   String.intercalate "\n" parts
 

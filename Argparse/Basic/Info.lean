@@ -84,6 +84,11 @@ private def formatOptionHeading (o : OptionDoc) : String :=
 
 private def spaces (n : Nat) : String := String.mk (List.replicate n ' ')
 
+private def indentLines (lines : List String) (indent : Nat) : List String :=
+  let pad := spaces indent
+  lines.map fun line =>
+    if line.isEmpty then line else pad ++ line
+
 private def renderSection (title : String) (rows : List (String × Option String)) : List String :=
   if rows.isEmpty then []
   else
@@ -96,6 +101,41 @@ private def renderSection (title : String) (rows : List (String × Option String
       | none => s!"  {name}{padding}"
     )
     (title :: formatted)
+
+private def synopsisWithPrefix (pref : String) (u : Usage) : String :=
+  let synopsisStr := synopsis u
+  if synopsisStr.isEmpty then pref else s!"{pref} {synopsisStr}"
+
+private def renderCommandSummary (commands : List CommandDoc) : List (String × Option String) :=
+  commands.map fun cmd => (cmd.name, cmd.description?)
+
+private partial def renderCommandDetailsAux (info : ParserInfo α) (indent : Nat) : List CommandDoc → List String
+  | [] => []
+  | cmd :: rest =>
+    let header := indentLines [s!"Command: {cmd.name}"] indent
+    let desc := indentLines (cmd.description?.toList) (indent + 2)
+    let usagePrefix :=
+      let prog := if info.progName.isEmpty then cmd.name else s!"{info.progName} {cmd.name}"
+      synopsisWithPrefix (s!"Usage: {prog}") cmd.usage
+    let usage := indentLines [usagePrefix] (indent + 2)
+    let optionRows := cmd.usage.options.map fun opt => (formatOptionHeading opt, opt.help?)
+    let positionalRows := cmd.usage.positionals.map fun pos => (pos.metavar, pos.help?)
+    let commandRows := renderCommandSummary cmd.usage.commands
+    let optionsSection := indentLines (renderSection "Options:" optionRows) (indent + 2)
+    let argumentsSection := indentLines (renderSection "Arguments:" positionalRows) (indent + 2)
+    let commandsSection := indentLines (renderSection "Commands:" commandRows) (indent + 2)
+    let nested := renderCommandDetailsAux info (indent + 4) cmd.usage.commands
+    let current :=
+      let segments := [header, desc, usage, optionsSection, argumentsSection, commandsSection]
+      List.intercalate [""] segments ++ (if nested.isEmpty then [] else [""] ++ nested)
+    match renderCommandDetailsAux info indent rest with
+    | [] => current
+    | tail => current ++ [""] ++ tail
+
+private def renderCommandDetails (info : ParserInfo α) (commands : List CommandDoc) : List String :=
+  let details := renderCommandDetailsAux info 2 commands
+  if details.isEmpty then []
+  else ["Command Details:"] ++ details
 
 def renderHelp (info : ParserInfo α) (includeHelpOption : Bool := true) : String :=
   let usage := info.parser.usage
@@ -118,8 +158,9 @@ def renderHelp (info : ParserInfo α) (includeHelpOption : Bool := true) : Strin
     else
       let rows := usage.commands.map fun cmd => (cmd.name, cmd.description?)
       renderSection "Commands:" rows
+  let commandDetails := renderCommandDetails info usage.commands
   String.intercalate "\n" <|
-    header ++ [usageLine] ++ desc ++ optionsDocs ++ argsDocs ++ commandsDocs ++ info.footer?.toList
+    header ++ [usageLine] ++ desc ++ optionsDocs ++ argsDocs ++ commandsDocs ++ commandDetails ++ info.footer?.toList
 
 private def containsHelp (args : List String) : Bool :=
   args.any fun arg => arg = "--help" || arg = "-h"

@@ -12,12 +12,19 @@ structure OptionEntry where
   metavar? : Option String := none
   takesValue : Bool := false
   help? : Option String := none
-  deriving Repr
+  deriving Repr, Inhabited
+
+structure CommandEntry where
+  name : String
+  description? : Option String := none
+  options : List OptionEntry := []
+  subcommands : List CommandEntry := []
+  deriving Repr, Inhabited
 
 structure Data where
   progName : String
   options : List OptionEntry := []
-  commands : List (String × Option String) := []
+  commands : List CommandEntry := []
   deriving Repr
 
 structure Module where
@@ -58,27 +65,6 @@ private def usageOptions (usage : Usage) : List OptionEntry :=
     init
   acc.toList
 
-private def usageCommands (usage : Usage) : List (String × Option String) :=
-  let cmds := usage.commands
-  let init : Array (String × Option String) × HashSet String :=
-    (Array.mkEmpty cmds.length, HashSet.emptyWithCapacity cmds.length)
-  let (acc, _) := cmds.foldl
-    (fun (acc, seen) cmd =>
-      if seen.contains cmd.name then
-        (acc, seen)
-      else
-        (acc.push (cmd.name, cmd.description?), seen.insert cmd.name))
-    init
-  acc.toList
-
-private def escapeSingleQuotes (s : String) : String :=
-  s.replace "'" "'\\''"
-
-private def sanitizeIdentifier (s : String) : String :=
-  let chars := s.data.map fun c => if c.isAlphanum || c = '_' then c else '_'
-  let result := String.mk chars
-  if result.isEmpty then "program" else result
-
 private def ensureHelpOption (opts : List OptionEntry) : List OptionEntry :=
   if opts.any (fun opt => opt.long? = some "help" || opt.short? = some 'h') then
     opts
@@ -91,11 +77,36 @@ private def ensureHelpOption (opts : List OptionEntry) : List OptionEntry :=
       help? := some "Show this help message"
     }]
 
+private partial def usageCommands (usage : Usage) : List CommandEntry :=
+  let rec buildEntry (cmd : CommandDoc) : CommandEntry :=
+    {
+      name := cmd.name,
+      description? := cmd.description?,
+      options := ensureHelpOption (usageOptions cmd.usage),
+      subcommands := usageCommands cmd.usage
+    }
+  let docs := usage.commands
+  let init : Array CommandEntry × HashSet String :=
+    (Array.mkEmpty docs.length, HashSet.emptyWithCapacity docs.length)
+  let (acc, _) := docs.foldl
+    (fun (acc, seen) doc =>
+      if seen.contains doc.name then
+        (acc, seen)
+      else
+        (acc.push (buildEntry doc), seen.insert doc.name))
+    init
+  acc.toList
+
+private def escapeSingleQuotes (s : String) : String :=
+  s.replace "'" "'\\''"
+
+private def sanitizeIdentifier (s : String) : String :=
+  let chars := s.data.map fun c => if c.isAlphanum || c = '_' then c else '_'
+  let result := String.mk chars
+  if result.isEmpty then "program" else result
+
 private def buildOptions (usage : Usage) : List OptionEntry :=
   ensureHelpOption (usageOptions usage)
-
-private def buildCommands (usage : Usage) : List (String × Option String) :=
-  usageCommands usage
 
 private def optionLong (opt : OptionEntry) : Option String :=
   opt.long?.map fun n => s!"--{n}"
@@ -117,7 +128,7 @@ private def buildDataCore (info : ParserInfo α) : Data :=
   {
     progName := if info.progName.isEmpty then "program" else info.progName,
     options := buildOptions usage,
-    commands := buildCommands usage
+    commands := usageCommands usage
   }
 
 inductive Shell where
