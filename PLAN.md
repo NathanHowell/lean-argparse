@@ -18,6 +18,7 @@
 - Ported the remaining applicative combinators (`optional`, `choice`, `withDefault`, lazy `orElse`) onto `Interpreter`, providing `Functor`/`Applicative`/`Alternative` instances that mirror the legacy parser API.
 - Expanded native tests to exercise the new combinators in conjunction with `many`/`some`, ensuring missing/invalid error propagation remains structural.
 - Added property-style test generators that permute long flag/option placements (including `--` sentinels) to validate `consume*` helpers and `many`/`some` progress invariants.
+- Began formalisation work with lemmas relating `ArgStream.remaining` length to its structural components and proving `Interpreter.positional` can only emit `.missing` errors.
 
 ## Phase 1 – Foundations
 1. **Introduce `ArgStream`**

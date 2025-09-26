@@ -154,6 +154,18 @@ def positional (doc : PositionalDoc) : Interpreter String :=
                 subject? := some doc.metavar
               } }
 
+theorem positional_error_missing (doc : PositionalDoc) (stream : ArgStream) (err : Error) :
+    (positional doc).eval stream = .error err → err.code = .missing := by
+  intro h
+  dsimp [positional] at h
+  cases hNext : ArgStream.next? stream with
+  | some =>
+      exact False.elim (by simpa [hNext] using h)
+  | none =>
+      simp [hNext] at h
+      cases h
+      rfl
+
 /-- Boolean flag that reports presence of the given token. -/
 def flag {α : Type} [DecidableEq α] [Token.TokenSpec α]
     (doc : OptionDoc) (name : α) : Interpreter Bool :=

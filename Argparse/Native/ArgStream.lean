@@ -74,6 +74,30 @@ def ofList : List String → ArgStream
   | "--" :: rest => .tail rest
   | tok :: rest => .step tok (ofList rest)
 
+@[simp] theorem ofList_cons (tok : String) (rest : List String) :
+    ofList (tok :: rest) =
+      if tok = "--" then ArgStream.tail rest else ArgStream.step tok (ofList rest) := by
+  by_cases h : tok = "--"
+  · subst h; simp [ofList]
+  · simp [ofList, h]
+
+theorem remaining_length (stream : ArgStream) :
+    (remaining stream).length =
+      (toList stream).length +
+        (if tailList stream = [] then 0 else (tailList stream).length + 1) := by
+  induction stream with
+  | tail tailTokens =>
+      cases tailTokens with
+      | nil => simp
+      | cons tok rest =>
+          simp [remaining, tailList, toList, Nat.add_comm, Nat.add_left_comm]
+  | step tok rest _ =>
+      cases hTail : tailList rest with
+      | nil =>
+          simp [remaining, hTail, toList_step, Nat.add_comm]
+      | cons head tailTokens =>
+          simp [remaining, hTail, toList_step, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc]
+
 /-- Rebuild an `ArgStream` from explicit front and tail sections. -/
 def ofFrontTail (front tailTokens : List String) : ArgStream :=
   front.foldr (fun tok acc => ArgStream.step tok acc) (ArgStream.tail tailTokens)
