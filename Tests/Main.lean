@@ -7,6 +7,7 @@ open Argparse.Completion
 open Argparse.Native
 open Argparse.Native.Interpreter
 open Argparse.Native.Consumer
+open Argparse.Native.Token
 
 namespace ArgparseTests
 
@@ -118,9 +119,197 @@ private def nativeExample : Interpreter ExampleCfg :=
 private def runNativeExample (args : List String) :=
   Interpreter.eval nativeExample (ArgStream.ofList args)
 
+/-- Split raw CLI tokens into the `ArgStream` front section and post-`--` tail. -/
+private def splitArgs : List String → List String × List String
+  | [] => ([], [])
+  | "--" :: rest => ([], rest)
+  | tok :: rest =>
+      let (front, tail) := splitArgs rest
+      (tok :: front, tail)
+
+/-- Reassemble CLI tokens from explicit front/tail segments. -/
+private def assembleArgs (front tail : List String) : List String :=
+  if tail = [] then
+    front
+  else
+    front ++ "--" :: tail
+
+/-- Drop the first `--` sentinel from a token list (if present). -/
+private def dropSentinel : List String → List String
+  | [] => []
+  | tok :: rest =>
+      if tok = "--" then
+        rest
+      else
+        tok :: dropSentinel rest
+
+/-- Insert `x` at position `idx` within `xs`. Assumes `idx ≤ xs.length`. -/
+private def insertAt (xs : List α) : Nat → α → List α
+  | 0, x => x :: xs
+  | Nat.succ idx, x =>
+      match xs with
+      | [] => [x]
+      | y :: ys => y :: insertAt ys idx x
+
+/-- Produce all lists formed by inserting `x` at every position in `xs`. -/
+private def insertEverywhere (x : α) (xs : List α) : List (List α) :=
+  (List.range (xs.length + 1)).map (fun idx => insertAt xs idx x)
+
+/-- `List`-style `bind` specialised for finite enumeration. -/
+private def concatMap (xs : List α) (f : α → List β) : List β :=
+  xs.foldr (fun x acc => f x ++ acc) []
+
+/-- Enumerate all sequences of length `len` drawn from `alphabet` (with repetition). -/
+private def sequences (alphabet : List α) : Nat → List (List α)
+  | 0 => [[]]
+  | Nat.succ n =>
+      concatMap (sequences alphabet n) fun seq => alphabet.map (fun tok => seq ++ [tok])
+
+/-- Remove the first occurrence of the long flag `--name` from the front tokens. -/
+private def removeLongFlag (name : String) : List String → Bool × List String
+  | [] => (false, [])
+  | tok :: rest =>
+      match parseLong? tok with
+      | Option.some (found, Option.none) =>
+          if found = name then
+            (true, rest)
+          else
+            let (present, remainder) := removeLongFlag name rest
+            (present, tok :: remainder)
+      | _ =>
+          let (present, remainder) := removeLongFlag name rest
+          (present, tok :: remainder)
+
+/-- Does the front section contain `--name=<value>`? -/
+private def hasInlineLongValue (name : String) : List String → Bool
+  | [] => false
+  | tok :: rest =>
+      match parseLong? tok with
+      | Option.some (found, Option.some _) =>
+          if found = name then true else hasInlineLongValue name rest
+      | _ => hasInlineLongValue name rest
+
+/-- Expected outcome for consuming `--name` with a value from the front/tail. -/
+private def expectedLongValue (name : String) (tokens : List String)
+    : Except Error (Option String × List String) :=
+  let (front, tail) := splitArgs tokens
+  let rec go (processed : List String) : List String → Except Error (Option String × List String)
+    | [] =>
+        let newFront := processed.reverse
+        .ok (Option.none, assembleArgs newFront tail)
+    | tok :: rest =>
+        match parseLong? tok with
+        | Option.some (found, value?) =>
+            if found = name then
+              match value? with
+              | Option.some value =>
+                  let newFront := processed.reverse ++ rest
+                  .ok (Option.some value, assembleArgs newFront tail)
+              | Option.none =>
+                  match rest with
+                  | next :: restTail =>
+                      let newFront := processed.reverse ++ restTail
+                      .ok (Option.some next, assembleArgs newFront tail)
+                  | [] =>
+                      match tail with
+                      | next :: tailRest =>
+                          let newFront := processed.reverse
+                          .ok (Option.some next, assembleArgs newFront tailRest)
+                      | [] =>
+                          .error {
+                            code := .missing
+                            , subject? := some s!"--{name}"
+                          }
+            else
+              go (tok :: processed) rest
+        | Option.none =>
+            go (tok :: processed) rest
+  go [] front
+
+/-- Base tokens used to synthesise randomised flag/value scenarios. -/
+private def frontAlphabet : List String := ["foo", "bar", "--other", "-q"]
+
+private def tailAlphabet : List String := ["tail", "extra", "--verbose", "--count", "value"]
+
+private def lengthChoices : List Nat := [0, 1, 2]
+
+private def frontScenarios : List (List String) :=
+  concatMap lengthChoices fun len => sequences frontAlphabet len
+
+private def tailScenarios : List (List String) :=
+  concatMap lengthChoices fun len => sequences tailAlphabet len
+
+private def synthesizeScenarios (primary inline : String) : List (List String) :=
+  concatMap frontScenarios fun base =>
+    let withPrimary := insertEverywhere primary base
+    let withInline := insertEverywhere inline base
+    base :: (withPrimary ++ withInline)
+
+private def flagInputs : List (List String) :=
+  concatMap (synthesizeScenarios "--verbose" "--verbose=value") fun front =>
+    tailScenarios.map fun tail => assembleArgs front tail
+
+private def optionInputs : List (List String) :=
+  concatMap (synthesizeScenarios "--count" "--count=13") fun front =>
+    tailScenarios.map fun tail => assembleArgs front tail
+
+private def positionalInputs : List (List String) :=
+  concatMap frontScenarios fun front =>
+    tailScenarios.map fun tail => assembleArgs front tail
 #guard (match Interpreter.eval (Interpreter.many (Interpreter.positional { metavar := "ITEM", help? := none, required := false }))
     (ArgStream.ofList ["one", "two"]) with
   | .ok values rest => decide (values = ["one", "two"] ∧ ArgStream.remaining rest = [])
+  | _ => False)
+
+#guard (flagInputs.all fun tokens =>
+  let stream := ArgStream.ofList tokens
+  let (front, tail) := splitArgs tokens
+  let inline := hasInlineLongValue "verbose" front
+  match Consumer.consumeLongFlag "verbose" stream with
+  | .error err => decide (inline ∧ err.code = ErrorCode.invalid)
+  | .ok (present, restStream) =>
+      if inline then
+        False
+      else
+        let (expectedPresent, newFront) := removeLongFlag "verbose" front
+        let expectedTokens := assembleArgs newFront tail
+        decide (present = expectedPresent ∧ ArgStream.remaining restStream = expectedTokens))
+
+#guard (optionInputs.all fun tokens =>
+  let expected := expectedLongValue "count" tokens
+  let actual := Consumer.consumeLongValue "count" (ArgStream.ofList tokens)
+  match expected, actual with
+  | .ok (expectedValue, expectedTokens), .ok (value, restStream) =>
+      decide (value = expectedValue ∧ ArgStream.remaining restStream = expectedTokens)
+  | .error expectedErr, .error actualErr => decide (actualErr.code = expectedErr.code)
+  | _, _ => False)
+
+private def propertyItemDoc : PositionalDoc :=
+  { metavar := "ITEM", help? := none, required := false }
+
+#guard (positionalInputs.all fun tokens =>
+  match Interpreter.eval (Interpreter.many (Interpreter.positional propertyItemDoc))
+      (ArgStream.ofList tokens) with
+  | .ok values rest => decide (values = dropSentinel tokens ∧ ArgStream.remaining rest = [])
+  | _ => False)
+
+private def nonEmptyPositionalInputs :=
+  positionalInputs.filter fun tokens => dropSentinel tokens ≠ []
+
+private def emptyPositionalInputs :=
+  positionalInputs.filter fun tokens => dropSentinel tokens = []
+
+#guard (nonEmptyPositionalInputs.all fun tokens =>
+  match Interpreter.eval (Interpreter.some (Interpreter.positional propertyItemDoc))
+      (ArgStream.ofList tokens) with
+  | .ok values rest =>
+      decide (values = dropSentinel tokens ∧ ArgStream.remaining rest = [])
+  | _ => False)
+
+#guard (emptyPositionalInputs.all fun tokens =>
+  match Interpreter.eval (Interpreter.some (Interpreter.positional propertyItemDoc))
+      (ArgStream.ofList tokens) with
+  | .error err => decide (err.code = ErrorCode.missing)
   | _ => False)
 
 #guard (match Interpreter.eval (Interpreter.many (Interpreter.positional { metavar := "ITEM", help? := none, required := false }))
