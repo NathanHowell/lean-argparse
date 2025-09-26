@@ -74,6 +74,10 @@ def ofList : List String → ArgStream
   | "--" :: rest => .tail rest
   | tok :: rest => .step tok (ofList rest)
 
+/-- Rebuild an `ArgStream` from explicit front and tail sections. -/
+def ofFrontTail (front tailTokens : List String) : ArgStream :=
+  front.foldr (fun tok acc => ArgStream.step tok acc) (ArgStream.tail tailTokens)
+
 private def foldFront (front tailTokens : List String) : ArgStream :=
   front.foldr (fun tok acc => ArgStream.step tok acc) (ArgStream.tail tailTokens)
 
@@ -104,6 +108,20 @@ def ofParseState (state : ParseState) : ArgStream :=
 @[simp] theorem tailList_ofParseState (state : ParseState) :
     tailList (ofParseState state) = state.tail :=
   tailList_foldFront _ _
+
+@[simp] theorem toList_ofFrontTail (front tailTokens : List String) :
+    toList (ofFrontTail front tailTokens) = front := by
+  unfold ofFrontTail
+  induction front with
+  | nil => simp
+  | cons tok rest ih => simp [List.foldr, ih]
+
+@[simp] theorem tailList_ofFrontTail (front tailTokens : List String) :
+    tailList (ofFrontTail front tailTokens) = tailTokens := by
+  unfold ofFrontTail
+  induction front with
+  | nil => simp
+  | cons _ rest ih => simp [List.foldr, ih]
 
 @[simp] theorem remaining_ofParseState (state : ParseState) :
     remaining (ofParseState state) = ParseState.remaining state := by

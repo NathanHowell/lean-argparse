@@ -10,6 +10,7 @@
 - Added `Argparse.Native.Grammar` with a pure interpreter skeleton that evaluates primitive positional arguments via `ArgStream` while maintaining usage metadata and structured error codes.
 - Ported the token parsing adapters (`TokenSpec`) into `Argparse.Native.Token`, preserving the long/short option analysis and diagnostics used by `ParseState`.
 - Introduced `Argparse.Native.Consumer.takePositional?` to structurally recover the next positional token while keeping option-like front tokens intact.
+- Added `Argparse.Native.Consumer.consume{Flag,Value}` helpers that reuse `TokenSpec` on `ArgStream`, enabling flag/option removal without mutating `ParseState`.
 
 ## Phase 1 – Foundations
 1. **Introduce `ArgStream`**
