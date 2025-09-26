@@ -35,6 +35,12 @@ def remaining (stream : ArgStream) : List String :=
     | [] => toList stream
     | tailTokens => toList stream ++ "--" :: tailTokens
 
+/- Return the next token (front or tail) if one is available. -/
+def next? : ArgStream → Option (String × ArgStream)
+  | .step tok rest => some (tok, rest)
+  | .tail [] => none
+  | .tail (tok :: tailTokens) => some (tok, ArgStream.tail tailTokens)
+
 @[simp] theorem tailList_step (tok : String) (rest : ArgStream) :
     tailList (.step tok rest) = tailList rest := rfl
 

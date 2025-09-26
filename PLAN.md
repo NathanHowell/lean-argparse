@@ -7,6 +7,7 @@
 
 ## Progress
 - Implemented `Argparse.Native.ArgStream` as the structural representation of front tokens with proofs that `remaining` matches `ParseState` semantics.
+- Added `Argparse.Native.Grammar` with a pure interpreter skeleton that evaluates primitive positional arguments via `ArgStream` while maintaining usage metadata and structured error codes.
 
 ## Phase 1 – Foundations
 1. **Introduce `ArgStream`**

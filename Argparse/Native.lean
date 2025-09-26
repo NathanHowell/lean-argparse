@@ -1,4 +1,5 @@
 import Argparse.Native.ArgStream
+import Argparse.Native.Grammar
 
 namespace Argparse
 
