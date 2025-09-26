@@ -3,3 +3,4 @@
 import Argparse.Basic
 import Argparse.Completion
 import Argparse.Manpage
+import Argparse.Native

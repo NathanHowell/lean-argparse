@@ -5,6 +5,9 @@
 - Provide structures that enable proofs of correctness, termination, and documentation coherence.
 - Maintain ergonomic API for downstream users, with clear migration guidance.
 
+## Progress
+- Implemented `Argparse.Native.ArgStream` as the structural representation of front tokens with proofs that `remaining` matches `ParseState` semantics.
+
 ## Phase 1 – Foundations
 1. **Introduce `ArgStream`**
    - Replace `ParseState` with an inductive stream (`front` tokens processed structurally, tail captured explicitly) that encodes the `--` sentinel split; show that option-like tokens stay in the structural `front` until the separator appears, preserving today’s positional behaviour.
