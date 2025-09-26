@@ -15,6 +15,8 @@
 - Added a native example in `Tests/Main.lean` that mirrors the existing CLI parser, validating the new interpreter pipeline end-to-end.
 - Added regression tests covering native flag/value consumers and short/long token handling.
 - Implemented `Interpreter.many`/`Interpreter.some` using structural recursion over `ArgStream`, with tests covering empty and non-empty inputs.
+- Ported the remaining applicative combinators (`optional`, `choice`, `withDefault`, lazy `orElse`) onto `Interpreter`, providing `Functor`/`Applicative`/`Alternative` instances that mirror the legacy parser API.
+- Expanded native tests to exercise the new combinators in conjunction with `many`/`some`, ensuring missing/invalid error propagation remains structural.
 
 ## Phase 1 – Foundations
 1. **Introduce `ArgStream`**
@@ -59,6 +61,6 @@
 - Explore integrating with `Std`’s parser combinator ecosystem if/when one lands, to avoid duplication.
 
 ## Next Steps
-1. Port remaining combinators (`optional`, `choice`, applicative helpers) onto `Interpreter`, eliminating `ParseState` dependencies in the core API.
-2. Extend the native test suite with property-style checks (randomised flag/value permutations) to validate `consume*`, `many`, and `some` invariants.
-3. Begin formal proofs for `remaining`/length relationships and error soundness, preparing the ground for Phase 2 goals.
+1. Extend the native test suite with property-style checks (randomised flag/value permutations) to validate `consume*`, `many`, and `some` invariants.
+2. Begin formal proofs for `remaining`/length relationships and error soundness, preparing the ground for Phase 2 goals.
+3. Rework the native CLI sample to lean on the new applicative/alternative helpers (`<*>`, `<|>`, `withDefault`) and document the migration pattern for downstream adopters.

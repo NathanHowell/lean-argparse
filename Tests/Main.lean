@@ -133,6 +133,52 @@ private def runNativeExample (args : List String) :=
   | .error err => decide (err.code = .missing)
   | _ => False)
 
+#guard (match Interpreter.eval
+    (Interpreter.optional (Interpreter.some (Interpreter.positional { metavar := "ITEM", help? := none, required := false })))
+    (ArgStream.ofList ["one", "two"]) with
+  | .ok (Option.some values) rest => decide (values = ["one", "two"] ∧ ArgStream.remaining rest = [])
+  | _ => False)
+
+#guard (match Interpreter.eval
+    (Interpreter.optional (Interpreter.some (Interpreter.positional { metavar := "ITEM", help? := none, required := false })))
+    (ArgStream.ofList []) with
+  | .ok Option.none rest => decide (ArgStream.remaining rest = [])
+  | _ => False)
+
+#guard (match Interpreter.eval
+    (Interpreter.optional (Interpreter.fail (α := String) { code := .invalid, detail? := Option.some "boom" }))
+    (ArgStream.ofList []) with
+  | .error err => decide (err.code = ErrorCode.invalid)
+  | _ => False)
+
+#guard (match Interpreter.eval
+    (Interpreter.choice
+      [ Interpreter.some (Interpreter.positional { metavar := "ITEM", help? := none, required := false })
+      , Interpreter.many (Interpreter.positional { metavar := "ITEM", help? := none, required := false }) ])
+    (ArgStream.ofList ["alpha", "beta"]) with
+  | .ok values rest => decide (values = ["alpha", "beta"] ∧ ArgStream.remaining rest = [])
+  | _ => False)
+
+#guard (match Interpreter.eval
+    (Interpreter.choice
+      [ Interpreter.some (Interpreter.positional { metavar := "ITEM", help? := none, required := false })
+      , Interpreter.many (Interpreter.positional { metavar := "ITEM", help? := none, required := false }) ])
+    (ArgStream.ofList []) with
+  | .ok values rest => decide (values = [] ∧ ArgStream.remaining rest = [])
+  | _ => False)
+
+#guard (match Interpreter.eval
+    (Interpreter.withDefault (Interpreter.some (Interpreter.positional { metavar := "ITEM", help? := none, required := false })) ["default"]) 
+    (ArgStream.ofList []) with
+  | .ok values rest => decide (values = ["default"] ∧ ArgStream.remaining rest = [])
+  | _ => False)
+
+#guard (match Interpreter.eval
+    (Interpreter.withDefault (Interpreter.some (Interpreter.positional { metavar := "ITEM", help? := none, required := false })) ["default"]) 
+    (ArgStream.ofList ["uno"]) with
+  | .ok values rest => decide (values = ["uno"] ∧ ArgStream.remaining rest = [])
+  | _ => False)
+
 #guard (match Consumer.consumeLongFlag "verbose" (ArgStream.ofList ["--verbose"]) with
   | .ok (present, rest) => decide (present && ArgStream.remaining rest = [])
   | _ => False)

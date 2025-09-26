@@ -95,13 +95,51 @@ def map {α β : Type} (i : Interpreter α) (f : α → β) : Interpreter β :=
   { grammar := Grammar.map i.grammar f
     , eval := fun stream => Result.map f (i.eval stream) }
 
-/-- Sequential application of interpreters. -/
-def seq {α β : Type} (ifn : Interpreter (α → β)) (ival : Interpreter α) : Interpreter β :=
-  { grammar := Grammar.seq ifn.grammar ival.grammar
+/-- Sequential application of interpreters with thunked right branch. -/
+def seq {α β : Type} (ifn : Interpreter (α → β)) (ival : Unit → Interpreter α) : Interpreter β :=
+  let ival' := ival ()
+  { grammar := Grammar.seq ifn.grammar ival'.grammar
     , eval := fun stream =>
         match ifn.eval stream with
-        | .ok fn stream' => Result.map fn (ival.eval stream')
+        | .ok fn stream' => Result.map fn (ival'.eval stream')
         | .error err => .error err }
+
+/-- Strict helper for `seq`. -/
+def seqApply {α β : Type} (ifn : Interpreter (α → β)) (ival : Interpreter α) : Interpreter β :=
+  seq ifn (fun _ => ival)
+
+/-- Left-biased sequencing returning the first result. -/
+def seqLeft {α β : Type} (ia : Interpreter α) (ib : Unit → Interpreter β) : Interpreter α :=
+  let ib' := ib ()
+  { grammar := {
+      usage := Usage.append ia.grammar.usage ib'.grammar.usage
+    }
+    , eval := fun stream =>
+        match ia.eval stream with
+        | .ok a stream' =>
+            match ib'.eval stream' with
+            | .ok _ stream'' => .ok a stream''
+            | .error err => .error err
+        | .error err => .error err }
+
+/-- Strict helper for `seqLeft`. -/
+def seqLeftApply {α β : Type} (ia : Interpreter α) (ib : Interpreter β) : Interpreter α :=
+  seqLeft ia (fun _ => ib)
+
+/-- Right-biased sequencing returning the second result. -/
+def seqRight {α β : Type} (ia : Interpreter α) (ib : Unit → Interpreter β) : Interpreter β :=
+  let ib' := ib ()
+  { grammar := {
+      usage := Usage.append ia.grammar.usage ib'.grammar.usage
+    }
+    , eval := fun stream =>
+        match ia.eval stream with
+        | .ok _ stream' => ib'.eval stream'
+        | .error err => .error err }
+
+/-- Strict helper for `seqRight`. -/
+def seqRightApply {α β : Type} (ia : Interpreter α) (ib : Interpreter β) : Interpreter β :=
+  seqRight ia (fun _ => ib)
 
 /-- Consume a positional argument using the structural stream. -/
 def positional (doc : PositionalDoc) : Interpreter String :=
@@ -193,6 +231,88 @@ def some {α : Type} (p : Interpreter α) : Interpreter (List α) :=
           | .error err => .error err
       | .error err => .error err
   }
+
+/-- Parser that always fails with a structural `missing` error. -/
+def failure {α : Type} (message? : Option String := none) : Interpreter α :=
+  fail {
+    code := .missing
+    , detail? := message?
+  }
+
+/-- Try `p`, falling back to a lazily constructed alternative when `p` is missing. -/
+def orElseCore {α : Type} (p : Interpreter α) (q : Unit → Interpreter α) : Interpreter α :=
+  let q' := q ()
+  {
+    grammar := {
+      usage := Usage.optional (Usage.append p.grammar.usage q'.grammar.usage)
+    }
+    , eval := fun stream =>
+        match p.eval stream with
+        | .ok value stream' => .ok value stream'
+        | .error err =>
+            if err.code = .missing then
+              q'.eval stream
+            else
+              .error err
+  }
+
+/-- Non-lazy alternative between two interpreters. -/
+def orElse {α : Type} (p q : Interpreter α) : Interpreter α :=
+  orElseCore p (fun _ => q)
+
+/-- Run a list of interpreters until one succeeds. -/
+def choice {α : Type} : List (Interpreter α) → Interpreter α
+  | [] => failure (message? := Option.some "empty choice")
+  | p :: ps => ps.foldl (fun acc next => orElse acc next) p
+
+/-- Produce an optional result, returning `none` on missing errors. -/
+def optional {α : Type} (p : Interpreter α) : Interpreter (Option α) :=
+  {
+    grammar := {
+      usage := Usage.optional p.grammar.usage
+    }
+    , eval := fun stream =>
+        match p.eval stream with
+        | .ok value stream' => .ok (Option.some value) stream'
+        | .error err =>
+            if err.code = .missing then
+              .ok Option.none stream
+            else
+              .error err
+  }
+
+/-- Supply a default when a parser reports a missing error. -/
+def optionalOrElse {α : Type} (p : Interpreter α) (backup : Unit → Interpreter α) : Interpreter α :=
+  orElseCore p backup
+
+/-- Supply a constant default when a parser reports a missing error. -/
+def withDefault {α : Type} (p : Interpreter α) (value : α) : Interpreter α :=
+  map (optional p) (fun opt : Option α => opt.getD value)
+
+instance : Functor Interpreter where
+  map f p := map p f
+
+instance : Pure Interpreter := ⟨pure⟩
+
+instance : Seq Interpreter where
+  seq pf pa := seq pf pa
+
+instance : SeqLeft Interpreter where
+  seqLeft := seqLeft
+
+instance : SeqRight Interpreter where
+  seqRight := seqRight
+
+instance : Applicative Interpreter where
+  pure := pure
+  map f p := map p f
+  seq := Seq.seq
+  seqLeft := SeqLeft.seqLeft
+  seqRight := SeqRight.seqRight
+
+instance : Alternative Interpreter where
+  failure := failure
+  orElse := fun p q => orElseCore p q
 
 end Interpreter
 
