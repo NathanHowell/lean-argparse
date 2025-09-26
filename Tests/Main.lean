@@ -4,6 +4,8 @@ open Argparse
 open Argparse.OptionSpec
 open Argparse.FlagSpec
 open Argparse.Completion
+open Argparse.Native
+open Argparse.Native.Interpreter
 
 namespace ArgparseTests
 
@@ -46,6 +48,75 @@ private def exampleInfo : ParserInfo ExampleCfg := {
   parser := exampleParser
 }
 
+private def verboseDoc : OptionDoc :=
+  { long? := some "verbose", short? := some 'v', help? := some "Enable verbose output", required := false }
+
+private def countDoc : OptionDoc :=
+  { long? := some "count", short? := some 'n', metavar? := some "COUNT", help? := some "Number of repetitions", required := false }
+
+private def nameDoc : PositionalDoc :=
+  { metavar := "NAME", help? := none, required := true }
+
+private def flagLongShort (longName : String) (shortName : Char) (doc : OptionDoc) : Interpreter Bool :=
+  {
+    grammar := Grammar.flag doc,
+    eval := fun stream =>
+      match Consumer.consumeFlag longName stream with
+      | .ok (longPresent, stream') =>
+        match Consumer.consumeFlag shortName stream' with
+        | .ok (shortPresent, stream'') => .ok (longPresent || shortPresent) stream''
+        | .error err => .error err
+      | .error err => .error err
+  }
+
+private def optionLongShortNat (longName : String) (shortName : Char) (doc : OptionDoc) (default : Nat) : Interpreter Nat :=
+  {
+    grammar := { usage := (Grammar.option doc).usage },
+    eval := fun stream =>
+      match Consumer.consumeValue longName stream with
+      | .ok (longValue?, stream') =>
+        match Consumer.consumeValue shortName stream' with
+        | .ok (shortValue?, stream'') =>
+          let value? := shortValue?.orElse fun _ => longValue?
+          match value? with
+          | none => .ok default stream''
+          | some raw =>
+            match raw.toNat? with
+            | some n => .ok n stream''
+            | none => .error {
+                code := .invalid,
+                subject? := some s!"--{longName}",
+                detail? := some s!"Expected a natural number for {longName}, got '{raw}'"
+              }
+        | .error err => .error err
+      | .error err => .error err
+  }
+
+private def nativeExample : Interpreter ExampleCfg :=
+  let verbose := flagLongShort "verbose" 'v' verboseDoc
+  let count := optionLongShortNat "count" 'n' countDoc 1
+  let name := Interpreter.positional nameDoc
+  {
+    grammar := {
+      usage := Argparse.Usage.append verbose.grammar.usage
+        (Argparse.Usage.append count.grammar.usage name.grammar.usage)
+    },
+    eval := fun stream =>
+      match verbose.eval stream with
+      | .ok verboseVal stream1 =>
+        match count.eval stream1 with
+        | .ok countVal stream2 =>
+          match name.eval stream2 with
+          | .ok nameVal stream3 =>
+              .ok { verbose := verboseVal, count := countVal, name := nameVal } stream3
+          | .error err => .error err
+        | .error err => .error err
+      | .error err => .error err
+  }
+
+private def runNativeExample (args : List String) :=
+  Interpreter.eval nativeExample (ArgStream.ofList args)
+
 #guard (match Argparse.ParserInfo.exec exampleInfo ["Alice"] with
   | .success cfg => decide (cfg = { verbose := false, count := 1, name := "Alice" })
   | _ => False)
@@ -56,6 +127,26 @@ private def exampleInfo : ParserInfo ExampleCfg := {
 
 #guard (match Argparse.ParserInfo.exec exampleInfo ["--count", "5"] with
   | .failure err => decide (err.error.kind = .missing)
+  | _ => False)
+
+#guard (match runNativeExample ["Alice"] with
+  | .ok cfg rest =>
+      decide (cfg = { verbose := false, count := 1, name := "Alice" }
+        ∧ ArgStream.remaining rest = [])
+  | _ => False)
+
+#guard (match runNativeExample ["--verbose", "-n", "3", "Bob"] with
+  | .ok cfg rest =>
+      decide (cfg = { verbose := true, count := 3, name := "Bob" }
+        ∧ ArgStream.remaining rest = [])
+  | _ => False)
+
+#guard (match runNativeExample ["--count", "five", "Bob"] with
+  | .error err => decide (err.code = .invalid)
+  | _ => False)
+
+#guard (match runNativeExample ["--count", "5"] with
+  | .error err => decide (err.code = .missing)
   | _ => False)
 
 private structure CommandResult where
