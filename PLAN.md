@@ -13,6 +13,7 @@
 - Added `Argparse.Native.Consumer.consume{Flag,Value}` helpers that reuse `TokenSpec` on `ArgStream`, enabling flag/option removal without mutating `ParseState`.
 - Extended `Argparse.Native.Interpreter` with flag/option primitives wired to the new consumers, plus convenience constructors for short/long variants and usage metadata.
 - Added a native example in `Tests/Main.lean` that mirrors the existing CLI parser, validating the new interpreter pipeline end-to-end.
+- Added regression tests covering native flag/value consumers and short/long token handling.
 
 ## Phase 1 – Foundations
 1. **Introduce `ArgStream`**

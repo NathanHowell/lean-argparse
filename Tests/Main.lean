@@ -6,6 +6,7 @@ open Argparse.FlagSpec
 open Argparse.Completion
 open Argparse.Native
 open Argparse.Native.Interpreter
+open Argparse.Native.Consumer
 
 namespace ArgparseTests
 
@@ -116,6 +117,26 @@ private def nativeExample : Interpreter ExampleCfg :=
 
 private def runNativeExample (args : List String) :=
   Interpreter.eval nativeExample (ArgStream.ofList args)
+
+#guard (match Consumer.consumeLongFlag "verbose" (ArgStream.ofList ["--verbose"]) with
+  | .ok (present, rest) => decide (present && ArgStream.remaining rest = [])
+  | _ => False)
+
+#guard (match Consumer.consumeShortFlag 'v' (ArgStream.ofList ["-v"]) with
+  | .ok (present, rest) => decide (present && ArgStream.remaining rest = [])
+  | _ => False)
+
+#guard (match Consumer.consumeLongValue "count" (ArgStream.ofList ["--count", "5"]) with
+  | .ok (value?, rest) => decide (value? = some "5" && ArgStream.remaining rest = [])
+  | _ => False)
+
+#guard (match Consumer.consumeShortValue 'n' (ArgStream.ofList ["-n5"]) with
+  | .ok (value?, rest) => decide (value? = some "5" && ArgStream.remaining rest = [])
+  | _ => False)
+
+#guard (match Consumer.consumeLongValue "count" (ArgStream.ofList ["--count"]) with
+  | .error err => decide (err.code = .missing)
+  | _ => False)
 
 #guard (match Argparse.ParserInfo.exec exampleInfo ["Alice"] with
   | .success cfg => decide (cfg = { verbose := false, count := 1, name := "Alice" })
