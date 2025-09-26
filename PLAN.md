@@ -14,6 +14,7 @@
 - Extended `Argparse.Native.Interpreter` with flag/option primitives wired to the new consumers, plus convenience constructors for short/long variants and usage metadata.
 - Added a native example in `Tests/Main.lean` that mirrors the existing CLI parser, validating the new interpreter pipeline end-to-end.
 - Added regression tests covering native flag/value consumers and short/long token handling.
+- Implemented `Interpreter.many`/`Interpreter.some` using structural recursion over `ArgStream`, with tests covering empty and non-empty inputs.
 
 ## Phase 1 – Foundations
 1. **Introduce `ArgStream`**

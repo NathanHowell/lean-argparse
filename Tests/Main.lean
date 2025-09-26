@@ -80,11 +80,11 @@ private def optionLongShortNat (longName : String) (shortName : Char) (doc : Opt
         | .ok (shortValue?, stream'') =>
           let value? := shortValue?.orElse fun _ => longValue?
           match value? with
-          | none => .ok default stream''
-          | some raw =>
+          | Option.none => .ok default stream''
+          | Option.some raw =>
             match raw.toNat? with
-            | some n => .ok n stream''
-            | none => .error {
+            | Option.some n => .ok n stream''
+            | Option.none => .error {
                 code := .invalid,
                 subject? := some s!"--{longName}",
                 detail? := some s!"Expected a natural number for {longName}, got '{raw}'"
@@ -117,6 +117,21 @@ private def nativeExample : Interpreter ExampleCfg :=
 
 private def runNativeExample (args : List String) :=
   Interpreter.eval nativeExample (ArgStream.ofList args)
+
+#guard (match Interpreter.eval (Interpreter.many (Interpreter.positional { metavar := "ITEM", help? := none, required := false }))
+    (ArgStream.ofList ["one", "two"]) with
+  | .ok values rest => decide (values = ["one", "two"] ∧ ArgStream.remaining rest = [])
+  | _ => False)
+
+#guard (match Interpreter.eval (Interpreter.many (Interpreter.positional { metavar := "ITEM", help? := none, required := false }))
+    (ArgStream.ofList []) with
+  | .ok values rest => decide (values = [] ∧ ArgStream.remaining rest = [])
+  | _ => False)
+
+#guard (match Interpreter.eval (Interpreter.some (Interpreter.positional { metavar := "ITEM", help? := none, required := false }))
+    (ArgStream.ofList []) with
+  | .error err => decide (err.code = .missing)
+  | _ => False)
 
 #guard (match Consumer.consumeLongFlag "verbose" (ArgStream.ofList ["--verbose"]) with
   | .ok (present, rest) => decide (present && ArgStream.remaining rest = [])

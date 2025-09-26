@@ -66,6 +66,16 @@ structure Interpreter (α : Type) where
 
 namespace Interpreter
 
+/-- Remaining tokens count, used as a structural measure. -/
+private def remainingSize (stream : ArgStream) : Nat :=
+  (ArgStream.remaining stream).length
+
+/-- Error emitted when a combinator fails to make progress. -/
+private def progressError : Error :=
+  { code := .invalid
+    , subject? := none
+    , detail? := some "Interpreter combinator failed to consume input" }
+
 /-- Access the usage metadata for an interpreter. -/
 def usage {α : Type} (i : Interpreter α) : Usage :=
   i.grammar.usage
@@ -143,6 +153,46 @@ def longOption (name : String)
 def shortOption (name : Char)
     (doc : OptionDoc := { short? := some name, required := false }) : Interpreter (Option String) :=
   option doc name
+
+/-- Zero-or-more repetition combinator. -/
+def many {α : Type} (p : Interpreter α) : Interpreter (List α) :=
+  {
+    grammar := {
+      usage := Usage.optional p.grammar.usage
+    },
+    eval := fun stream =>
+      let fuel := remainingSize stream
+      let rec loop : Nat → List α → ArgStream → Result (List α)
+        | 0, acc, stream => .ok acc.reverse stream
+        | Nat.succ fuel, acc, stream =>
+            match p.eval stream with
+            | .ok value stream' =>
+                if remainingSize stream' < remainingSize stream then
+                  loop fuel (value :: acc) stream'
+                else
+                  .error progressError
+            | .error err =>
+                if err.code = .missing then
+                  .ok acc.reverse stream
+                else
+                  .error err
+      loop fuel [] stream
+  }
+
+/-- One-or-more repetition combinator. -/
+def some {α : Type} (p : Interpreter α) : Interpreter (List α) :=
+  {
+    grammar := {
+      usage := Usage.append p.grammar.usage (Usage.optional p.grammar.usage)
+    },
+    eval := fun stream =>
+      match p.eval stream with
+      | .ok head stream' =>
+          match (many p).eval stream' with
+          | .ok tail stream'' => .ok (head :: tail) stream''
+          | .error err => .error err
+      | .error err => .error err
+  }
 
 end Interpreter
 
