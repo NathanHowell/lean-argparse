@@ -159,13 +159,33 @@ theorem positional_error_missing (doc : PositionalDoc) (stream : ArgStream) (err
   intro h
   dsimp [positional] at h
   cases hNext : ArgStream.next? stream with
-  | some =>
-      exact False.elim (by simpa [hNext] using h)
+  | some result =>
+      cases result
+      simp [hNext] at h
   | none =>
       simp [hNext] at h
       cases h
       rfl
 
+/-- Successful positional lookups strictly reduce the `remaining` size. -/
+theorem positional_ok_progress (doc : PositionalDoc)
+    {stream rest : ArgStream} {tok : String} :
+    (positional doc).eval stream = .ok tok rest →
+      (ArgStream.remaining rest).length < (ArgStream.remaining stream).length := by
+  intro h
+  dsimp [positional] at h
+  cases hNext : ArgStream.next? stream with
+  | none =>
+      simp [hNext] at h
+  | some result =>
+      cases result with
+      | mk tok' rest' =>
+          simp [hNext] at h
+          rcases h with ⟨hTok, hRest⟩
+          have hSome : ArgStream.next? stream = some (tok', rest') := hNext
+          have hLt := ArgStream.next?_remaining_length_lt (stream := stream)
+              (tok := tok') (rest := rest') hSome
+          exact hRest ▸ hLt
 /-- Boolean flag that reports presence of the given token. -/
 def flag {α : Type} [DecidableEq α] [Token.TokenSpec α]
     (doc : OptionDoc) (name : α) : Interpreter Bool :=

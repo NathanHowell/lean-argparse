@@ -68,6 +68,16 @@ def next? : ArgStream → Option (String × ArgStream)
       | tailTokens => (tok :: toList rest) ++ "--" :: tailTokens := by
   simp [remaining]
 
+@[simp] theorem remaining_step_length (tok : String) (rest : ArgStream) :
+    (remaining (.step tok rest)).length =
+      Nat.succ ((remaining rest).length) := by
+  cases hTail : tailList rest with
+  | nil =>
+      simp [remaining, hTail]
+  | cons head tailTokens =>
+      simp [remaining, hTail, List.length_append, List.length_cons,
+        Nat.add_comm, Nat.add_left_comm, Nat.add_assoc]
+
 /-- Build an `ArgStream` from a raw list of CLI tokens. -/
 def ofList : List String → ArgStream
   | [] => .tail []
@@ -80,6 +90,42 @@ def ofList : List String → ArgStream
   by_cases h : tok = "--"
   · subst h; simp [ofList]
   · simp [ofList, h]
+
+theorem next?_remaining_length_lt {stream : ArgStream} {tok : String} {rest : ArgStream} :
+    ArgStream.next? stream = some (tok, rest) →
+      (remaining rest).length < (remaining stream).length := by
+  intro h
+  cases stream with
+  | tail tailTokens =>
+      cases tailTokens with
+      | nil =>
+          simp [ArgStream.next?] at h
+      | cons head tailTokens =>
+          simp [ArgStream.next?] at h
+          rcases h with ⟨hTok, hRest⟩
+          subst hTok
+          subst hRest
+          by_cases hTail : tailTokens = []
+          · subst hTail
+            simp [remaining, toList, tailList]
+          · have hRestLen :
+                (remaining (ArgStream.tail tailTokens)).length = tailTokens.length + 1 := by
+                simp [remaining, toList, tailList]
+            have hStreamLen :
+                (remaining (ArgStream.tail (head :: tailTokens))).length = tailTokens.length + 2 := by
+                simp [remaining, toList, tailList]
+            have hNat : tailTokens.length + 1 < tailTokens.length + 2 :=
+              Nat.lt_succ_self (tailTokens.length + 1)
+            exact hRestLen.symm ▸ hStreamLen.symm ▸ hNat
+      
+  | step head restStream =>
+      simp [ArgStream.next?] at h
+      rcases h with ⟨hTok, hRest⟩
+      subst hTok
+      subst hRest
+      have hLen := remaining_step_length (tok := head) (rest := restStream)
+      have hNat := Nat.lt_succ_self ((remaining restStream).length)
+      exact hLen.symm ▸ hNat
 
 theorem remaining_length (stream : ArgStream) :
     (remaining stream).length =

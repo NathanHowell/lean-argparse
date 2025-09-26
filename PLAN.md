@@ -19,6 +19,7 @@
 - Expanded native tests to exercise the new combinators in conjunction with `many`/`some`, ensuring missing/invalid error propagation remains structural.
 - Added property-style test generators that permute long flag/option placements (including `--` sentinels) to validate `consume*` helpers and `many`/`some` progress invariants.
 - Began formalisation work with lemmas relating `ArgStream.remaining` length to its structural components and proving `Interpreter.positional` can only emit `.missing` errors.
+- Strengthened the proof toolbox with `ArgStream.next?` progress and `Interpreter.positional_ok_progress`, streamlining the existing missing-error lemma to be purely `simp`-driven.
 
 ## Phase 1 – Foundations
 1. **Introduce `ArgStream`**
@@ -63,6 +64,6 @@
 - Explore integrating with `Std`’s parser combinator ecosystem if/when one lands, to avoid duplication.
 
 ## Next Steps
-1. Begin formal proofs for `remaining`/length relationships and error soundness, preparing the ground for Phase 2 goals.
+1. Extend the new progress/error lemmas across higher-level combinators (`takePositional?`, flag/option consumers) to finish the groundwork for Phase 2 proofs.
 2. Rework the native CLI sample to lean on the new applicative/alternative helpers (`<*>`, `<|>`, `withDefault`) and document the migration pattern for downstream adopters.
 3. Extend property coverage to short-option combinators and mixed flag/value permutations, ensuring the generator utilities cover both token specs.
