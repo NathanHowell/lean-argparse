@@ -1,5 +1,6 @@
 import Argparse.Native.ArgStream
 import Argparse.Native.Grammar
+import Argparse.Native.Token
 
 namespace Argparse
 
