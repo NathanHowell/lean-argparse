@@ -1,3 +1,4 @@
+import Argparse.Native.Error
 import Argparse.Native.ArgStream
 import Argparse.Native.Grammar
 import Argparse.Native.Token

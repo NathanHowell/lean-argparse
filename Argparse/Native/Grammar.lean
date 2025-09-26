@@ -1,25 +1,13 @@
 import Std
 import Argparse.Basic.Docs
+import Argparse.Native.Error
 import Argparse.Native.ArgStream
+import Argparse.Native.Consumer
 
 namespace Argparse
 namespace Native
 
 open Usage
-
-/-- Classifies the kind of parser failure encountered by the native interpreter. -/
-inductive ErrorCode where
-  | missing
-  | invalid
-  | unexpected
-  deriving DecidableEq, Repr
-
-/-- Proof-oriented error payload separate from human rendering. -/
-structure Error where
-  code : ErrorCode
-  subject? : Option String := none
-  detail? : Option String := none
-  deriving DecidableEq, Repr
 
 /-- Result type returned by the native interpreter. -/
 inductive Result (α : Type) where
@@ -60,6 +48,14 @@ def seq {α β : Type} (gf : Grammar (α → β)) (ga : Grammar α) : Grammar β
 /-- Primitive positional argument metadata. -/
 def positional (doc : PositionalDoc) : Grammar String :=
   { usage := Usage.mergePositional doc Usage.empty }
+
+/-- Flag metadata contributes the provided option doc. -/
+def flag (doc : OptionDoc) : Grammar Bool :=
+  { usage := Usage.mergeOption doc Usage.empty }
+
+/-- Option metadata contributes the provided option doc. -/
+def option (doc : OptionDoc) : Grammar (Option String) :=
+  { usage := Usage.mergeOption doc Usage.empty }
 
 end Grammar
 
@@ -109,6 +105,44 @@ def positional (doc : PositionalDoc) : Interpreter String :=
                 code := .missing,
                 subject? := some doc.metavar
               } }
+
+/-- Boolean flag that reports presence of the given token. -/
+def flag {α : Type} [DecidableEq α] [Token.TokenSpec α]
+    (doc : OptionDoc) (name : α) : Interpreter Bool :=
+  { grammar := Grammar.flag doc
+    , eval := fun stream =>
+        match Consumer.consumeFlag name stream with
+        | .ok (present, stream') => .ok present stream'
+        | .error err => .error err }
+
+/-- Option parser returning the associated value when present. -/
+def option {α : Type} [DecidableEq α] [Token.TokenSpec α]
+    (doc : OptionDoc) (name : α) : Interpreter (Option String) :=
+  { grammar := Grammar.option doc
+    , eval := fun stream =>
+        match Consumer.consumeValue name stream with
+        | .ok (value?, stream') => .ok value? stream'
+        | .error err => .error err }
+
+/-- Long flag convenience helper. -/
+def longFlag (name : String)
+    (doc : OptionDoc := { long? := some name, required := false }) : Interpreter Bool :=
+  flag doc name
+
+/-- Short flag convenience helper. -/
+def shortFlag (name : Char)
+    (doc : OptionDoc := { short? := some name, required := false }) : Interpreter Bool :=
+  flag doc name
+
+/-- Long option convenience helper. -/
+def longOption (name : String)
+    (doc : OptionDoc := { long? := some name, required := false }) : Interpreter (Option String) :=
+  option doc name
+
+/-- Short option convenience helper. -/
+def shortOption (name : Char)
+    (doc : OptionDoc := { short? := some name, required := false }) : Interpreter (Option String) :=
+  option doc name
 
 end Interpreter
 
