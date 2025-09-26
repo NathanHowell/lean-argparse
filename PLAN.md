@@ -7,19 +7,23 @@
 
 ## Phase 1 – Foundations
 1. **Introduce `ArgStream`**
-   - Replace `ParseState` with an inductive stream (`front` tokens processed structurally, tail captured explicitly) and prove basic lemmas (`step` progress, `remaining` shape, length invariants).
-   - Define companion functions `ofList`, `toList`, `remaining`, and show they form inverses where applicable.
+   - Replace `ParseState` with an inductive stream (`front` tokens processed structurally, tail captured explicitly) that encodes the `--` sentinel split; show that option-like tokens stay in the structural `front` until the separator appears, preserving today’s positional behaviour.
+   - Define companion functions `ofList`, `toList`, `remaining`, and show they form inverses where applicable, including a proof that `remaining` reconstitutes the exact CLI sequence produced by `ParseState`.
 2. **Pure Interpreter Skeleton**
    - Split parser description from evaluator: `Grammar α` (metadata only) and `Interpreter.eval : Grammar α → ArgStream → Result α`.
    - Model `Result` with indexed error codes to ease proofs (`Missing`, `Invalid`, `Unexpected`), separating human-readable rendering from proof-level reasoning.
 3. **Lean Typeclass Alignment**
    - Re-express parser combinators as `StateT ArgStream (Except ErrorCode)` to inherit `Monad`, `Alternative`, and applicative laws from Lean’s core.
    - Provide wrappers so existing user code (`Parser.withDefault`, `switch`, etc.) continues to type-check.
+4. **Token Semantics & Errors**
+   - Port the `TokenSpec` machinery (long vs. short flags, inline value parsing, descriptive names) onto the new `ArgStream`, keeping diagnostic text stable.
+   - Specify lemmas linking token recognition to stream constructors so later proofs can reason about `consume*` helpers without re-opening string parsing details.
 
 ## Phase 2 – Proof-Oriented API
 1. **Structural Recursion & Termination**
    - Rewrite repetition combinators (`many`, `some`, `many1`) using structural recursion on `ArgStream`, eliminating manual fuel arguments.
-   - Prove termination and bounds lemmas (`many` consumes no more tokens than available, `some` fails exactly when `many` produces `[]`).
+   - Recast flag/option consumers (`consumeFromFront`, `consumeValue`, `takePositional?`) atop the structural stream, replacing while-loop fuel with proofs of progress and exclusivity between option-like and positional tokens.
+   - Prove termination and bounds lemmas (`many` consumes no more tokens than available, `some` fails exactly when `many` produces `[]`), along with preservation of the `remaining` invariant for the consumer helpers.
 2. **Error Soundness Proofs**
    - Establish that `Interpreter.eval` returns `Unexpected` iff `ArgStream` is non-empty, and `Missing` only when the grammar marks an entry as required.
    - Demonstrate equivalence between runtime leftovers and `ArgStream`’s structural remainder.
