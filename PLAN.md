@@ -59,6 +59,6 @@
 - Explore integrating with `Std`’s parser combinator ecosystem if/when one lands, to avoid duplication.
 
 ## Next Steps
-1. Spike `ArgStream` and the pure interpreter in a scratch namespace to validate design choices.
-2. Draft proofs for `remaining`/length relationships to exercise the new state representation.
-3. Circulate proposal with maintainers for feedback before large-scale migration.
+1. Port remaining combinators (`optional`, `choice`, applicative helpers) onto `Interpreter`, eliminating `ParseState` dependencies in the core API.
+2. Extend the native test suite with property-style checks (randomised flag/value permutations) to validate `consume*`, `many`, and `some` invariants.
+3. Begin formal proofs for `remaining`/length relationships and error soundness, preparing the ground for Phase 2 goals.
