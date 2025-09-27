@@ -13,6 +13,7 @@
 - Primitives now hydrate `Assigned` field slots (new in `Argparse/Native/Partial.lean`), giving each handler an explicit notion of "unset" versus "last value wins" while keeping completion logic local to the finalisation pass.
 - New directive: audit the native stack for ad-hoc functor/applicative helpers and replace them with Lean’s type class instances (e.g. provide `Functor`/`Applicative`/`Monad` instances for the new `Assigned` partial fields and remove bespoke combinators where type classes suffice).
 - ✅ `Assigned` now carries Lean-standard `Functor`, `Applicative`, and `Monad` instances so downstream code can lean on established combinators instead of bespoke helpers.
+- Standing rule: future abstractions must default to Lean’s standard type classes (Functor, Applicative, Monad, etc.) instead of hand-rolled combinators; when we implement instances the supporting definitions should remain `private` or namespace-scoped helpers whenever possible to reduce API surface.
 
 ## Architectural Direction (Cursor + Field Updaters)
 - **TokenCursor Core**: keep the classified argv pass yielding `TokenCursor := { options : Array ParsedOption, positionals : Array String }`, measuring progress via array sizes so helper lemmas stay arithmetic and array-native.
