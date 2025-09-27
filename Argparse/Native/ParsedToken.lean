@@ -7,7 +7,7 @@ namespace Native
 inductive ParsedName where
   | long (name : String)
   | short (name : Char)
-  deriving DecidableEq, Repr
+  deriving DecidableEq, BEq, Repr
 
 namespace ParsedName
 
