@@ -10,6 +10,7 @@
 - Normalised argv-to-token pass (`ParsedToken`) still splits argv into option tokens and positional strings after the first positional/`--`, feeding the new cursor-based interpreter.
 - Interpreter primitives now run entirely through the field-updater bundle: `HandlerBundle.apply/run` fold classified options before positionals, while `PartialSpec` finalises the partial state.
 - Lean tests were pared back to focus on the public interpreter API—flag/option/positional success paths, last-value-wins semantics, and optional/default helpers—dropping the legacy `TokenCursor.consume*` assertions that no longer reflect the design.
+- Primitives now hydrate `Assigned` field slots (new in `Argparse/Native/Partial.lean`), giving each handler an explicit notion of "unset" versus "last value wins" while keeping completion logic local to the finalisation pass.
 
 ## Architectural Direction (Cursor + Field Updaters)
 - **TokenCursor Core**: keep the classified argv pass yielding `TokenCursor := { options : Array ParsedOption, positionals : Array String }`, measuring progress via array sizes so helper lemmas stay arithmetic and array-native.
@@ -26,6 +27,7 @@
 - ✅ Split classification output into option/positional arrays, rewrote `TokenCursor` to operate on those arrays directly, and refreshed tests/documentation to match the simplified semantics.
 - ✅ Integrated the handler bundle with the interpreter: `HandlerBundle.run` plus `PartialSpec` now power all native primitives, giving an explicit folding surface for upcoming proofs.
 - ✅ Retired low-level cursor consumer tests and replaced them with interpreter-level guards that exercise flag, option, positional, optional, and default behaviours under last-value-wins semantics.
+- ✅ Introduced the `Assigned` partial-field helper and ported flag/option/positional primitives to it, so required-versus-default distinction lives in one reusable abstraction.
 
 ## Workstreams
 1. **Cursor & Partial Foundations**
@@ -42,6 +44,5 @@
    - Document the new architecture and remaining gaps so downstream users can migrate confidently.
 
 ## Immediate Next Steps
-1. Shape richer partial-state abstractions (e.g., field bookkeeping helpers) and capture any negative prototypes while extending the handler bundle beyond trivial states.
-2. Reintroduce progress proofs in the updater setting and thread them through applicative combinators, documenting any stalled approaches.
-3. Extend property tests and docs to explain the updater-based architecture, including repeated-option and sentinel permutations, while recording successes and setbacks.
+1. Reintroduce progress proofs in the updater setting and thread them through applicative combinators, documenting any stalled approaches.
+2. Extend property tests and docs to explain the updater-based architecture, including repeated-option and sentinel permutations, while recording successes and setbacks.

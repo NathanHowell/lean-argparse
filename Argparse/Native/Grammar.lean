@@ -3,6 +3,7 @@ import Argparse.Basic.Docs
 import Argparse.Native.Error
 import Argparse.Native.FieldUpdater
 import Argparse.Native.Token
+import Argparse.Native.Partial
 import Argparse.Native.TokenCursor
 
 namespace Argparse
@@ -147,60 +148,64 @@ def seqApply {α β : Type} (ifn : Interpreter (α → β)) (ival : Interpreter 
 
 /-- Primitive positional argument. -/
 def positional (doc : PositionalDoc) : Interpreter String :=
-  let handler : PositionalHandler (Option String) :=
-    { apply := fun arg _ => Except.ok (some (some arg)) }
+  let handler : PositionalHandler (Assigned String) :=
+    { apply := fun arg _ => Except.ok (some (Assigned.value arg)) }
   { grammar := Grammar.positional doc
-    , state := Option String
+    , state := Assigned String
     , bundle := { optionHandlers := [], positionalHandlers := [handler] }
     , spec :=
-        { init := none
+        { init := Assigned.unset
           , complete := fun state =>
-              match state with
-              | some value => Except.ok value
-              | none =>
-                  Except.error {
-                    code := .missing
-                    , subject? := some doc.metavar
-                  } } }
+              Assigned.require
+                { code := .missing
+                  , subject? := some doc.metavar }
+                state } }
 
 /-- Boolean flag that reports presence of the given token. -/
 def flag {α : Type} [TokenSpec α] [TokenCursor.ToParsedName α]
     (doc : OptionDoc) (name : α) : Interpreter Bool :=
   let target := TokenCursor.ToParsedName.toParsedName name
   let subject := describe name
-  let handler : OptionHandler Bool :=
+  let handler : OptionHandler (Assigned Bool) :=
     OptionHandler.const fun opt _ positionals =>
       if opt.name = target then
         if opt.inlineValue?.isSome then
           Except.error (invalidInlineValue subject)
         else
-          Except.ok (some (true, positionals))
+          Except.ok (some (Assigned.value true, positionals))
       else
         Except.ok none
   { grammar := Grammar.flag doc
-    , state := Bool
+    , state := Assigned Bool
     , bundle := { optionHandlers := [handler], positionalHandlers := [] }
-    , spec := { init := false, complete := fun present => Except.ok present } }
+    , spec :=
+        { init := Assigned.value false
+          , complete := fun state =>
+              Except.ok (Assigned.getD state false) } }
 
 /-- Option parser returning the associated value when present. -/
 def option {α : Type} [TokenSpec α] [TokenCursor.ToParsedName α]
     (doc : OptionDoc) (name : α) : Interpreter (Option String) :=
   let target := TokenCursor.ToParsedName.toParsedName name
-  let handler : OptionHandler (Option String) :=
+  let handler : OptionHandler (Assigned String) :=
     OptionHandler.const fun opt _ positionals =>
       if opt.name = target then
         match opt.inlineValue? with
-        | some value => Except.ok (some (some value, positionals))
+        | some value => Except.ok (some (Assigned.value value, positionals))
         | none =>
             match popFront positionals with
-            | some (value, rest) => Except.ok (some (some value, rest))
+            | some (value, rest) =>
+                Except.ok (some (Assigned.value value, rest))
             | none => Except.error (missingValueError name)
       else
         Except.ok none
   { grammar := Grammar.option doc
-    , state := Option String
+    , state := Assigned String
     , bundle := { optionHandlers := [handler], positionalHandlers := [] }
-    , spec := { init := none, complete := fun state => Except.ok state } }
+    , spec :=
+        { init := Assigned.unset
+          , complete := fun state =>
+              Except.ok (Assigned.toOption state) } }
 
 /-- Produce an optional result, returning `none` on missing errors. -/
 def optional {α : Type} (p : Interpreter α) : Interpreter (Option α) :=

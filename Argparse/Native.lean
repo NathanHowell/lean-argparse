@@ -5,6 +5,7 @@ import Argparse.Native.Token
 import Argparse.Native.ParsedToken
 import Argparse.Native.TokenCursor
 import Argparse.Native.FieldUpdater
+import Argparse.Native.Partial
 
 namespace Argparse
 
