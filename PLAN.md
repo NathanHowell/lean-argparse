@@ -9,14 +9,14 @@
 ## Current Snapshot
 
 - ✅ Typeclass audit resolved:
-  - `Grammar` now exposes `Functor`/`Applicative`/`Alternative` instances so downstream code can lean on `<$>`/`<*>` rather than bespoke helpers.
+  - `Grammar` now exposes `Functor`/`Applicative`/`Alternative` instances so downstream code can lean on `<$>`/`<*>` rather than bespoke helpers (lawfulness proofs still pending below).
   - Native `Result` is an `Except Error` alias, inheriting the standard `Monad`/`Applicative` stack and eliminating the custom wrapper.
   - `Assigned` gained `LawfulMonad` (and therefore `LawfulApplicative`/`LawfulFunctor`) proofs, unlocking Lean’s simplification lemmas for the partial-field helpers.
 - Normalised argv-to-token pass (`ParsedToken`) still splits argv into option tokens and positional strings after the first positional/`--`, feeding the new cursor-based interpreter.
 - Interpreter primitives now run entirely through the field-updater bundle: `HandlerBundle.apply/run` fold classified options before positionals, while `PartialSpec` finalises the partial state.
 - Lean tests were pared back to focus on the public interpreter API—flag/option/positional success paths, last-value-wins semantics, and optional/default helpers—dropping the legacy `TokenCursor.consume*` assertions that no longer reflect the design.
 - Primitives now hydrate `Assigned` field slots (new in `Argparse/Native/Partial.lean`), giving each handler an explicit notion of "unset" versus "last value wins" while keeping completion logic local to the finalisation pass.
-- New directive: audit the native stack for ad-hoc functor/applicative helpers and replace them with Lean’s type class instances (e.g. provide `Functor`/`Applicative`/`Monad` instances for the new `Assigned` partial fields and remove bespoke combinators where type classes suffice).
+- New directive: audit the native stack for ad-hoc functor/applicative helpers and replace them with Lean’s type class instances (e.g. provide `Functor`/`Applicative`/`Monad` instances for the new `Assigned` partial fields and remove bespoke combinators where type classes suffice); continue logging negative results when attempts stall.
 - ✅ `Assigned` now carries Lean-standard `Functor`, `Applicative`, and `Monad` instances so downstream code can lean on established combinators instead of bespoke helpers.
 - Standing rule: future abstractions must default to Lean’s standard type classes (Functor, Applicative, Monad, etc.) instead of hand-rolled combinators; when we implement instances the supporting definitions should remain `private` or namespace-scoped helpers whenever possible to reduce API surface.
 
@@ -54,7 +54,7 @@
 
 ## Immediate Next Steps
 
-1. Provide lawful functor/applicative proofs for `Grammar` so metadata reasoning can reuse Lean’s rewriting lemmas.
-2. Investigate an `Alternative` instance for `Interpreter` (or document why it remains absent) once a canonical failure payload is decided.
-1. Reintroduce progress proofs in the updater setting and thread them through applicative combinators, documenting any stalled approaches.
-2. Extend property tests and docs to explain the updater-based architecture, including repeated-option and sentinel permutations, while recording successes and setbacks.
+1. Supply lawful `Functor`/`Applicative` (and, if viable, `Alternative`) proofs for `Grammar` so the interpreter can reuse Lean’s rewriting lemmas without bespoke simplifiers.
+2. Decide whether `Interpreter` should expose an `Alternative` instance—or document why not—once its canonical failure payload is settled.
+3. Reintroduce updater progress/length proofs and lift them through the applicative combinators, recording any stalled approaches.
+4. Extend property tests and docs to explain the updater-based architecture, covering repeated options, sentinel permutations, and partial-state completion results while logging both successful and negative findings.
