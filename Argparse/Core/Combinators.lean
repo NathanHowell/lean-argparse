@@ -72,6 +72,11 @@ structure PosStep (α) where
   state : State
   consumed : Nat
 
+structure CollectResult (α) where
+  values : List α
+  state  : State
+  consumed : Nat
+
 private def stringTake (s : String) (n : Nat) : String :=
   String.mk (s.data.take n)
 
@@ -251,14 +256,26 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
   | .ok step => .ok (step.value?, step.state)
   | .error err => .error err
 
+@[specialize] def collectOptionStepsAux
+    {α} [FromArg α] (spec : OptSpec α) :
+    List α → Nat → State → Except Error (CollectResult α)
+  | acc, consumed, curr =>
+      match takeOptionStep? spec curr with
+      | .error err => .error err
+      | .ok step =>
+          let consumed' := consumed + step.consumed
+          match step.value? with
+          | some value => collectOptionStepsAux spec (value :: acc) consumed' step.state
+          | none => .ok { values := acc.reverse, state := step.state, consumed := consumed' }
+
+@[inline] def collectOptionSteps
+    {α} [FromArg α] (spec : OptSpec α) (st : State) : Except Error (CollectResult α) :=
+  collectOptionStepsAux spec [] 0 st
+
 @[inline] def collectOptionValues
-    {α} [FromArg α] (spec : OptSpec α) (st : State) : Except Error (List α × State) :=
-  let rec loop (acc : List α) (curr : State) : Except Error (List α × State) :=
-    match takeOptionValue? spec curr with
-    | .error err => .error err
-    | .ok (some value, nextState) => loop (value :: acc) nextState
-    | .ok (none, nextState) => .ok (acc.reverse, nextState)
-  loop [] st
+    {α} [FromArg α] (spec : OptSpec α) (st : State) : Except Error (List α × State) := do
+  let result ← collectOptionSteps spec st
+  return (result.values, result.state)
 
 /-- Parser for options supporting `.one`/`.many`/`.some` arities. -/
 def option {α} [FromArg α] (spec : OptSpec α) :
@@ -309,14 +326,26 @@ def option {α} [FromArg α] (spec : OptSpec α) :
   | .ok step => .ok (step.value?, step.state)
   | .error err => .error err
 
+@[specialize] def collectPositionalStepsAux
+    {α} [FromArg α] (spec : PosSpec α) :
+    List α → Nat → State → Except Error (CollectResult α)
+  | acc, consumed, curr =>
+      match takePositionalStep? spec curr with
+      | .error err => .error err
+      | .ok step =>
+          let consumed' := consumed + step.consumed
+          match step.value? with
+          | some value => collectPositionalStepsAux spec (value :: acc) consumed' step.state
+          | none => .ok { values := acc.reverse, state := step.state, consumed := consumed' }
+
+@[inline] def collectPositionalSteps
+    {α} [FromArg α] (spec : PosSpec α) (st : State) : Except Error (CollectResult α) :=
+  collectPositionalStepsAux spec [] 0 st
+
 @[inline] def collectPositionalValues
-    {α} [FromArg α] (spec : PosSpec α) (st : State) : Except Error (List α × State) :=
-  let rec loop (acc : List α) (curr : State) : Except Error (List α × State) :=
-    match takePositionalValue? spec curr with
-    | .error err => .error err
-    | .ok (some value, nextState) => loop (value :: acc) nextState
-    | .ok (none, nextState) => .ok (acc.reverse, nextState)
-  loop [] st
+    {α} [FromArg α] (spec : PosSpec α) (st : State) : Except Error (List α × State) := do
+  let result ← collectPositionalSteps spec st
+  return (result.values, result.state)
 
 /-- Parser for positional arguments supporting arities. -/
 def positional {α} [FromArg α] (spec : PosSpec α) :
