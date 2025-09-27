@@ -54,6 +54,7 @@
 - 2025-09-27: Stubbed help/man/completion renderers consuming describer output.
 - 2025-09-27: Registered placeholder theorems across `Argparse/Proofs` modules.
 - 2025-09-27: Exposed CLI helpers delegating to the doc renderers in `Argparse.CLI.Print`.
+- 2025-09-27: Added minimal `Argparse.Examples` specs for xargs-style and git-style demos.
 - _Please append future successes and failures here with short rationales._
 
 ## Immediate Next Steps
@@ -70,5 +71,6 @@
 11. ✅ **Doc renderers placeholder** (2025-09-27): Stubbed help/man/completion renderers to consume describer output.
 12. ✅ **Proof scaffolding** (2025-09-27): Added placeholder theorems across `Argparse/Proofs/*` referencing the new core modules.
 13. ✅ **CLI placeholder** (2025-09-27): Stubbed `Argparse/CLI/Print.lean` to expose minimal help/man/completion entry points.
-14. **Examples placeholder**: Populate `Argparse/Examples/Xargs0.lean` and `.GitLike` with minimal scaffolds referencing the new spec.
-15. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
+14. ✅ **Examples placeholder** (2025-09-27): Populated `Argparse/Examples/Xargs0.lean` and `.GitLike` with minimal scaffolds referencing the new spec.
+15. **Tests placeholder**: Stub `Argparse/Tests/Unit.lean` and `.Golden` to exercise the new helpers.
+16. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
