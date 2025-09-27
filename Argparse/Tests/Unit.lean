@@ -38,6 +38,17 @@ private def verboseSpec : FlagSpec :=
   | .ok val st => val = false ∧ st.pre = ["--quiet"]
   | _ => False)
 
+private def verboseShortSpec : FlagSpec :=
+  { short? := some { c := 'v', ok := by decide }, meta := { name := "-v" } }
+
+#guard (match flag verboseShortSpec (mkState ["-v"] []) with
+  | .ok val st => val = true ∧ st.pre = []
+  | _ => False)
+
+#guard (match flag verboseShortSpec (mkState ["-vx"] []) with
+  | .ok val st => val = true ∧ st.pre = ["-x"]
+  | _ => False)
+
 private def countSpec : OptSpec Nat :=
   { long? := some "count", meta := { name := "count" } }
 

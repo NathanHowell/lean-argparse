@@ -57,20 +57,68 @@ private def invalidValueError (token msg : String) (expect : Expect) : Error :=
   { kind := .custom, context := [token], expect := [expect] }
 
 /-- Determine whether the token matches the flag specification. -/
-private def matchFlagToken (spec : FlagSpec) (token : String) : Bool :=
-  let shortMatch := spec.short?.map (fun s => token = shortLexeme s) |>.getD False
-  let longMatch := spec.long?.map (fun name => token = longLexeme name) |>.getD False
-  shortMatch || longMatch
+inductive FlagMatch
+  | none
+  | short
+  | shortBundled (rest : String)
+  | long
+
+private def matchFlagToken (spec : FlagSpec) (token : String) : FlagMatch :=
+  match spec.long? with
+  | some name =>
+      if token = longLexeme name then
+        FlagMatch.long
+      else
+        match spec.short? with
+        | some short =>
+            let prefix := shortLexeme short
+            if token = prefix then
+              FlagMatch.short
+            else if token.startsWith prefix then
+              let rest := token.drop prefix.length
+              if rest.isEmpty then
+                FlagMatch.short
+              else if token.startsWith "--" then
+                FlagMatch.none
+              else
+                FlagMatch.shortBundled rest
+            else
+              FlagMatch.none
+        | none => FlagMatch.none
+  | none =>
+      match spec.short? with
+      | some short =>
+          let prefix := shortLexeme short
+          if token = prefix then
+            FlagMatch.short
+          else if token.startsWith prefix then
+            let rest := token.drop prefix.length
+            if rest.isEmpty then
+              FlagMatch.short
+            else if token.startsWith "--" then
+              FlagMatch.none
+            else
+              FlagMatch.shortBundled rest
+          else
+            FlagMatch.none
+      | none => FlagMatch.none
 
 /-- Parser for boolean flags; returns `true` when the next token matches. -/
 def flag (spec : FlagSpec) : Parser Bool := fun st =>
   match st.pre with
   | token :: rest =>
-      if matchFlagToken spec token then
-        let st' : State := { st with pre := rest, cursor := st.cursor + 1 }
-        .ok true st'
-      else
-        .ok false st
+      match matchFlagToken spec token with
+      | .none => .ok false st
+      | .short =>
+          let st' : State := { st with pre := rest, cursor := st.cursor + 1 }
+          .ok true st'
+      | .long =>
+          let st' : State := { st with pre := rest, cursor := st.cursor + 1 }
+          .ok true st'
+      | .shortBundled tail =>
+          let remainder := "-" ++ tail
+          let st' : State := { st with pre := remainder :: rest, cursor := st.cursor + 1 }
+          .ok true st'
   | [] => .ok false st
 
 /-- Attempt to pull an option value when the current token matches the long form. -/
