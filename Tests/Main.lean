@@ -32,7 +32,7 @@ private structure ExampleCfg where
   deriving Repr, DecidableEq
 
 private def exampleParser : Parser ExampleCfg :=
-  pure ExampleCfg.mk
+  (pure ExampleCfg.mk : Parser (Bool → Nat → String → ExampleCfg))
     <*> switch "verbose" (short? := some 'v')
     <*> Parser.withDefault
           (option {
@@ -71,50 +71,67 @@ private def flagLongShort (longName : String) (shortName : Char) (doc : OptionDo
       | .error err => .error err
   }
 
-private def optionLongShortNat (longName : String) (shortName : Char) (doc : OptionDoc) (default : Nat) : Interpreter Nat :=
-  {
-    grammar := { usage := (Grammar.option doc).usage },
-    eval := fun stream =>
-      match Consumer.consumeValue longName stream with
-      | .ok (longValue?, stream') =>
-        match Consumer.consumeValue shortName stream' with
-        | .ok (shortValue?, stream'') =>
-          let value? := shortValue?.orElse fun _ => longValue?
-          match value? with
-          | Option.none => .ok default stream''
-          | Option.some raw =>
-            match raw.toNat? with
-            | Option.some n => .ok n stream''
-            | Option.none => .error {
-                code := .invalid,
-                subject? := some s!"--{longName}",
-                detail? := some s!"Expected a natural number for {longName}, got '{raw}'"
-              }
-        | .error err => .error err
-      | .error err => .error err
-  }
+private def optionSubject (doc : OptionDoc) : Option String :=
+  match doc.long?, doc.short? with
+  | Option.some longName, _ => Option.some s!"--{longName}"
+  | Option.none, Option.some shortName => Option.some s!"-{String.mk [shortName]}"
+  | Option.none, Option.none => doc.metavar?
 
-private def nativeExample : Interpreter ExampleCfg :=
-  let verbose := flagLongShort "verbose" 'v' verboseDoc
-  let count := optionLongShortNat "count" 'n' countDoc 1
-  let name := Interpreter.positional nameDoc
-  {
-    grammar := {
-      usage := Argparse.Usage.append verbose.grammar.usage
-        (Argparse.Usage.append count.grammar.usage name.grammar.usage)
-    },
-    eval := fun stream =>
-      match verbose.eval stream with
-      | .ok verboseVal stream1 =>
-        match count.eval stream1 with
-        | .ok countVal stream2 =>
-          match name.eval stream2 with
-          | .ok nameVal stream3 =>
-              .ok { verbose := verboseVal, count := countVal, name := nameVal } stream3
+private def optionLongShortNat (longName : String) (shortName : Char) (doc : OptionDoc) : Interpreter Nat :=
+  let attempt
+      (usage : Argparse.Usage)
+      (first second : ArgStream → Except Error (Option String × ArgStream))
+      (combine : Option String → Option String → Option String)
+      : Interpreter Nat :=
+    {
+      grammar := { usage := usage },
+      eval := fun stream =>
+        match first stream with
+        | .ok (firstValue?, stream') =>
+          match second stream' with
+          | .ok (secondValue?, stream'') =>
+            let value? := combine firstValue? secondValue?
+            match value? with
+            | Option.some raw =>
+              match raw.toNat? with
+              | Option.some n => .ok n stream''
+              | Option.none => .error {
+                  code := .invalid,
+                  subject? := some s!"--{longName}",
+                  detail? := some s!"Expected a natural number for {longName}, got '{raw}'"
+                }
+            | Option.none =>
+                .error {
+                  code := .missing,
+                  subject? := optionSubject doc
+                }
           | .error err => .error err
         | .error err => .error err
-      | .error err => .error err
-  }
+    }
+  let longThenShort :=
+    attempt (Grammar.option doc).usage
+      (Consumer.consumeValue longName)
+      (Consumer.consumeValue shortName)
+      (fun longValue? shortValue? => shortValue?.orElse fun _ => longValue?)
+  let shortThenLong :=
+    attempt Argparse.Usage.empty
+      (Consumer.consumeValue shortName)
+      (Consumer.consumeValue longName)
+      (fun shortValue? longValue? => shortValue?.orElse fun _ => longValue?)
+  longThenShort <|> shortThenLong
+
+/--
+Demonstrates how downstream parsers can migrate onto the native interpreter by
+combining primitive parsers with the `Applicative`/`Alternative` helpers.
+-/
+private def nativeExample : Interpreter ExampleCfg :=
+  let verbose := flagLongShort "verbose" 'v' verboseDoc
+  let count := Interpreter.withDefault (optionLongShortNat "count" 'n' countDoc) 1
+  let name := Interpreter.positional nameDoc
+  Interpreter.pure ExampleCfg.mk
+    <*> verbose
+    <*> count
+    <*> name
 
 private def runNativeExample (args : List String) :=
   Interpreter.eval nativeExample (ArgStream.ofList args)
@@ -432,12 +449,13 @@ private def commandParser : Parser CommandResult :=
       {
         name := "hello",
         description? := some "Say hello",
-        parser := pure { tag := "hello", target? := none }
+        parser := (pure { tag := "hello", target? := none } : Parser CommandResult)
       },
       {
         name := "run",
         description? := some "Run against a target",
-        parser := pure (fun target => { tag := "run", target? := some target }) <*> rawArgument "TARGET"
+        parser := (pure (fun target => { tag := "run", target? := some target })
+          : Parser (String → CommandResult)) <*> rawArgument "TARGET"
       }
     ]
   }
