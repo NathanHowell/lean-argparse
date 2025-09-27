@@ -23,6 +23,7 @@
 ## Activity Log (Negative Results Included)
 - ❌ Attempted to prove progress for `consumeFlagList`/`consumeOptionList` by threading explicit removal counters through the recursion. Outcome: unwieldy inductions and failing tests; reverted and recorded for posterity.
 - ✅ Maintained the parsed-token classifier from earlier work; it still serves as the normalisation front-end for the upcoming cursor interpreter.
+- ✅ Added the initial `TokenCursor` scaffold with array-backed storage, cursor helpers, and build coverage so the iterator rewrite has a concrete foundation.
 
 ## Workstreams
 1. **Cursor Foundation**
@@ -40,6 +41,6 @@
    - Track any remaining gaps (shell completion, usage rendering) for later phases.
 
 ## Immediate Next Steps
-1. Prototype `TokenCursor` and port primitives to run on it, deleting the existing `TokenStream` interpreter where necessary.
+1. Port positional/flag/value primitives onto `TokenCursor`, removing the legacy `TokenStream` entry points in the process.
 2. Prove the associated cursor progress lemmas so incremental progress properties are restored quickly.
 3. Refresh tests and docs in tandem with the new cursor-based interpreter, ensuring the activity log records both successes and setbacks.
