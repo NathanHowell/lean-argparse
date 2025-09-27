@@ -6,7 +6,7 @@ open Argparse.FlagSpec
 open Argparse.Completion
 open Argparse.Native
 open Argparse.Native.Token
-open Argparse.Native.TokenStream
+open Argparse.Native.TokenCursor
 open Argparse.Native.Interpreter
 
 namespace ArgparseTests
@@ -27,33 +27,33 @@ namespace ArgparseTests
 #guard
   let tokens := Argparse.Native.classify ["-n", "FILE"]
   let expected := Argparse.Native.classify ["-n"]
-  match TokenStream.takePositional? (TokenStream.ofList tokens) with
+  match TokenCursor.takePositional? (TokenCursor.ofList tokens) with
   | Option.some (value, rest) => value = "FILE" ∧ rest.toList = expected
   | Option.none => False
 
 #guard
   let tokens := Argparse.Native.classify ["--verbose", "-x", "FILE"]
   let expected := Argparse.Native.classify ["-x", "FILE"]
-  match TokenStream.consumeFlag "verbose" (TokenStream.ofList tokens) with
+  match TokenCursor.consumeFlag "verbose" (TokenCursor.ofList tokens) with
   | .ok (present, rest) => present && rest.toList = expected
   | _ => False
 
 #guard
   let tokens := Argparse.Native.classify ["--verbose=1"]
-  match TokenStream.consumeFlag "verbose" (TokenStream.ofList tokens) with
+  match TokenCursor.consumeFlag "verbose" (TokenCursor.ofList tokens) with
   | .error err => err.code = ErrorCode.invalid
   | _ => False
 
 #guard
   let tokens := Argparse.Native.classify ["--count=1", "--count", "3", "FILE"]
   let expected := Argparse.Native.classify ["FILE"]
-  match TokenStream.consumeValue "count" (TokenStream.ofList tokens) with
+  match TokenCursor.consumeValue "count" (TokenCursor.ofList tokens) with
   | .ok (Option.some value, rest) => value = "3" ∧ rest.toList = expected
   | _ => False
 
 #guard
   let tokens := Argparse.Native.classify ["--count", "--other"]
-  match TokenStream.consumeValue "count" (TokenStream.ofList tokens) with
+  match TokenCursor.consumeValue "count" (TokenCursor.ofList tokens) with
   | .error err => err.code = ErrorCode.missing
   | _ => False
 
@@ -96,9 +96,9 @@ private def flagLongShort (longName : String) (shortName : Char) (doc : OptionDo
   {
     grammar := Grammar.flag doc,
     eval := fun stream =>
-      match TokenStream.consumeFlag longName stream with
+      match TokenCursor.consumeFlag longName stream with
       | .ok (longPresent, stream') =>
-        match TokenStream.consumeFlag shortName stream' with
+        match TokenCursor.consumeFlag shortName stream' with
         | .ok (shortPresent, stream'') => .ok (longPresent || shortPresent) stream''
         | .error err => .error err
       | .error err => .error err
@@ -108,9 +108,9 @@ private def optionLongShortNat (longName : String) (shortName : Char) (doc : Opt
   {
     grammar := { usage := (Grammar.option doc).usage },
     eval := fun stream =>
-      match TokenStream.consumeValue longName stream with
+      match TokenCursor.consumeValue longName stream with
       | .ok (longValue?, stream') =>
-        match TokenStream.consumeValue shortName stream' with
+        match TokenCursor.consumeValue shortName stream' with
         | .ok (shortValue?, stream'') =>
             let value? := shortValue?.orElse fun _ => longValue?
             match value? with
@@ -144,8 +144,8 @@ private def nativeExample : Interpreter ExampleCfg :=
     <*> count
     <*> name
 
-private def tokensOf (args : List String) : TokenStream :=
-  TokenStream.ofList (Argparse.Native.classify args)
+private def tokensOf (args : List String) : TokenCursor :=
+  TokenCursor.ofList (Argparse.Native.classify args)
 
 private def evalNative {α} (parser : Interpreter α) (args : List String) : Result α :=
   Interpreter.eval parser (tokensOf args)

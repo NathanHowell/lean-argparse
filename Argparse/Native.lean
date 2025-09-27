@@ -3,7 +3,6 @@ import Argparse.Native.ArgStream
 import Argparse.Native.Grammar
 import Argparse.Native.Token
 import Argparse.Native.ParsedToken
-import Argparse.Native.TokenStream
 import Argparse.Native.TokenCursor
 
 namespace Argparse

@@ -2,17 +2,17 @@ import Std
 import Argparse.Basic.Docs
 import Argparse.Native.Error
 import Argparse.Native.Token
-import Argparse.Native.TokenStream
+import Argparse.Native.TokenCursor
 
 namespace Argparse
 namespace Native
 
 open Token
-open TokenStream
+open TokenCursor
 
 /-- Result type returned by the native interpreter. -/
 inductive Result (α : Type) where
-  | ok (value : α) (rest : TokenStream)
+  | ok (value : α) (rest : TokenCursor)
   | error (info : Error)
   deriving Repr
 
@@ -60,16 +60,16 @@ def option (doc : OptionDoc) : Grammar (Option String) :=
 
 end Grammar
 
-/-- Interpreter pairs metadata with an evaluator on `TokenStream`. -/
+/-- Interpreter pairs metadata with an evaluator on `TokenCursor`. -/
 structure Interpreter (α : Type) where
   grammar : Grammar α
-  eval : TokenStream → Result α
+  eval : TokenCursor → Result α
 
 namespace Interpreter
 
 /-- Remaining tokens count, used as a structural measure. -/
-def remainingSize (stream : TokenStream) : Nat :=
-  stream.length
+def remainingSize (cursor : TokenCursor) : Nat :=
+  cursor.remaining
 
 /-- Error emitted when a combinator fails to make progress. -/
 def progressError : Error :=
@@ -145,8 +145,8 @@ def seqRightApply {α β : Type} (ia : Interpreter α) (ib : Interpreter β) : I
 /-- Consume a positional argument using the classified token stream. -/
 def positional (doc : PositionalDoc) : Interpreter String :=
   { grammar := Grammar.positional doc
-    , eval := fun stream =>
-        match TokenStream.takePositional? stream with
+    , eval := fun cursor =>
+        match TokenCursor.takePositional? cursor with
         | Option.some (tok, rest) => .ok tok rest
         | Option.none =>
             .error {
@@ -155,20 +155,20 @@ def positional (doc : PositionalDoc) : Interpreter String :=
             } }
 
 /-- Boolean flag that reports presence of the given token. -/
-def flag {α : Type} [TokenSpec α] [TokenStream.ToParsedName α]
+def flag {α : Type} [TokenSpec α] [TokenCursor.ToParsedName α]
     (doc : OptionDoc) (name : α) : Interpreter Bool :=
   { grammar := Grammar.flag doc
-    , eval := fun stream =>
-        match TokenStream.consumeFlag name stream with
+    , eval := fun cursor =>
+        match TokenCursor.consumeFlag name cursor with
         | .ok (present, stream') => .ok present stream'
         | .error err => .error err }
 
 /-- Option parser returning the associated value when present. -/
-def option {α : Type} [TokenSpec α] [TokenStream.ToParsedName α]
+def option {α : Type} [TokenSpec α] [TokenCursor.ToParsedName α]
     (doc : OptionDoc) (name : α) : Interpreter (Option String) :=
   { grammar := Grammar.option doc
-    , eval := fun stream =>
-        match TokenStream.consumeValue name stream with
+    , eval := fun cursor =>
+        match TokenCursor.consumeValue name cursor with
         | .ok (value?, stream') => .ok value? stream'
         | .error err => .error err }
 
@@ -255,23 +255,23 @@ def many {α : Type} (p : Interpreter α) : Interpreter (List α) :=
     grammar := {
       usage := Usage.optional p.grammar.usage
     },
-    eval := fun stream =>
-      let fuel := remainingSize stream
-      let rec loop : Nat → List α → TokenStream → Result (List α)
-        | 0, acc, stream => .ok acc.reverse stream
-        | Nat.succ fuel, acc, stream =>
-            match p.eval stream with
-            | .ok value stream' =>
-                if remainingSize stream' < remainingSize stream then
-                  loop fuel (value :: acc) stream'
+    eval := fun cursor =>
+      let fuel := remainingSize cursor
+      let rec loop : Nat → List α → TokenCursor → Result (List α)
+        | 0, acc, cursor => .ok acc.reverse cursor
+        | Nat.succ fuel, acc, cursor =>
+            match p.eval cursor with
+            | .ok value cursor' =>
+                if remainingSize cursor' < remainingSize cursor then
+                  loop fuel (value :: acc) cursor'
                 else
                   .error progressError
             | .error err =>
                 if err.code = .missing then
-                  .ok acc.reverse stream
+                  .ok acc.reverse cursor
                 else
                   .error err
-      loop fuel [] stream
+      loop fuel [] cursor
   }
 
 /-- One-or-more repetition combinator. -/

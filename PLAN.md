@@ -8,8 +8,8 @@
 
 ## Current Snapshot
 - Normalised argv-to-token pass (`ParsedToken`) already exists and preserves original spellings while respecting `--`.
-- Interpreter currently walks a bespoke `TokenStream`; consumer progress lemmas were removed, and attempts to revive them by adding removal counters became brittle—this approach was logged and abandoned.
-- Regression tests cover the new pipeline plus short-option permutations, but structural proofs are presently missing.
+- Interpreter now consumes a `TokenCursor`; the legacy `TokenStream` helpers were deleted after porting positional/flag/value primitives onto the cursor.
+- Regression tests cover the cursor pipeline plus short-option permutations, but structural proofs are presently missing.
 
 ## Architectural Direction (Iterator-Centric)
 - **TokenCursor Core**: represent parser state as `TokenCursor := { data : Array Token, pos : Nat }`, exposing helpers to advance the cursor and certify that `pos ≤ data.size`. Lean’s array/list iterators (`Std.Data.Array.Iterator`, `Std.Data.List.Iterator`) provide the canonical forward-only traversal model we need.
@@ -20,16 +20,16 @@
 - **Proof Toolkit**: base proofs on `Nat` inequalities (`pos` arithmetic) instead of list surgery. Cursor lemmas (advance monotonicity, progress implies strictly smaller remaining length) give the invariants needed for combinators and interpreters.
 - **Tests & Docs**: extend property tests to repeated flags, sentinel edges, and mixed permutations under iterator semantics. Update documentation to describe the new cursor-based design and its proofs.
 
-## Activity Log (Negative Results Included)
 - ❌ Attempted to prove progress for `consumeFlagList`/`consumeOptionList` by threading explicit removal counters through the recursion. Outcome: unwieldy inductions and failing tests; reverted and recorded for posterity.
 - ✅ Maintained the parsed-token classifier from earlier work; it still serves as the normalisation front-end for the upcoming cursor interpreter.
 - ✅ Added the initial `TokenCursor` scaffold with array-backed storage, cursor helpers, and build coverage so the iterator rewrite has a concrete foundation.
-- 🔁 Reconfirmed the immediate milestone: migrate positional/flag/value primitives onto the cursor and capture the accompanying proofs before expanding scope.
+- ✅ Replaced the `TokenStream` primitives with cursor-based versions, updated the interpreter/tests, and removed the obsolete module.
+- 🔁 Next milestone: restore progress proofs for the cursor primitives before expanding to higher-level combinators.
 
 ## Workstreams
 1. **Cursor Foundation**
    - Implement `TokenCursor`, import the relevant iterator modules from `Std`, and supply helper lemmas (`advance`, `remaining`, arithmetic bounds).
-   - Rewrite primitive consumers on top of the cursor; delete obsolete `TokenStream`/consumer code.
+   - Rewrite primitive consumers on top of the cursor; delete obsolete `TokenStream`/consumer code. (completed)
 2. **Proof Rehabilitation**
    - Establish progress/length lemmas for each primitive.
    - Lift those lemmas through applicative/alternative combinators (`many`, `some`, `<*>`, `<|>`) and the top-level interpreter fold.
@@ -42,6 +42,6 @@
    - Track any remaining gaps (shell completion, usage rendering) for later phases.
 
 ## Immediate Next Steps
-1. Port positional/flag/value primitives onto `TokenCursor`, removing the legacy `TokenStream` entry points in the process.
-2. Prove the associated cursor progress lemmas so incremental progress properties are restored quickly.
-3. Refresh tests and docs in tandem with the new cursor-based interpreter, ensuring the activity log records both successes and setbacks.
+1. Prove the cursor progress lemmas for positional/flag/value primitives so incremental progress properties are restored quickly.
+2. Refresh combinator proofs and interpreter-level invariants using the new cursor lemmas.
+3. Extend tests and docs alongside each milestone, capturing both successful and negative results.
