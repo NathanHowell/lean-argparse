@@ -93,4 +93,5 @@
 20. ✅ **Option bundling & repeat arities** (2025-09-27): Extended option parsing for long/short concatenation and `.many`/`.some` arities; remaining work includes splitting inline bundles like `-n5v` and covering non-`String` payloads.
 21. ✅ **Positional arities** (2025-09-27): Positional combinators now support `.many`/`.some` with corresponding elaboration/storage across pre/post streams.
 22. **Inline short bundle proofs & generalisation**: Finish bundle-splitting proofs, ensure non-`String` `FromArg` payloads integrate cleanly, and capture any remaining edge cases.
-23. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
+23. **Many/some progress lemmas**: Lift the new step-wise cursor bounds through `collectOptionSteps`/`collectPositionalSteps` so `.many`/`.some` combinators expose structural progress facts.
+24. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
