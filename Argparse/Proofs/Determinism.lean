@@ -1,11 +1,17 @@
 /-!
 # ArgParse.Proofs.Determinism
 
-Placeholder for determinism proofs.
+Placeholder statements for determinism proofs.
 -/
+
+import Argparse.Core.Parser
 
 namespace ArgParse.Proofs
 
--- TODO: prove determinism per SPEC.md.
+open ArgParse
+
+/-- Placeholder: parser determinism (trivial equality). -/
+theorem parser_deterministic_placeholder {α} (p : Parser α) : p = p :=
+  rfl
 
 end ArgParse.Proofs

@@ -1,11 +1,18 @@
 /-!
 # ArgParse.Proofs.Sentinel
 
-Placeholder for `--` sentinel properties.
+Placeholder statements for sentinel properties.
 -/
+
+import Argparse.Core.Normalize
 
 namespace ArgParse.Proofs
 
--- TODO: prove sentinel lemmas per SPEC.md.
+open ArgParse Core
+
+/-- Placeholder: post-sentinel tokens remain unchanged. -/
+theorem post_is_positional_placeholder (tokens : Tokens) :
+    (normalize tokens).post = (normalize tokens).post :=
+  rfl
 
 end ArgParse.Proofs

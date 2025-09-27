@@ -52,6 +52,7 @@
 - 2025-09-27: Seeded elaboration stubs in `Argparse.Spec.Elab` to begin translating the AST into runtime parsers.
 - 2025-09-27: Introduced documentation describer stubs in `Argparse.Spec.Describe`.
 - 2025-09-27: Stubbed help/man/completion renderers consuming describer output.
+- 2025-09-27: Registered placeholder theorems across `Argparse/Proofs` modules.
 - _Please append future successes and failures here with short rationales._
 
 ## Immediate Next Steps
@@ -66,5 +67,6 @@
 9. ✅ **Elaborator scaffold** (2025-09-27): Added placeholder elaboration helpers in `Argparse/Spec/Elab.lean` to translate AST items into parsers.
 10. ✅ **Doc describer scaffold** (2025-09-27): Mirrored the AST into `Argparse/Spec/Describe.lean`, producing placeholder documentation entries.
 11. ✅ **Doc renderers placeholder** (2025-09-27): Stubbed help/man/completion renderers to consume describer output.
-12. **Proof scaffolding**: Introduce placeholder modules under `Argparse/Proofs` (Laws, Totality, Determinism, Sentinel, Soundness) that import the new core and register planned theorem statements.
-13. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
+12. ✅ **Proof scaffolding** (2025-09-27): Added placeholder theorems across `Argparse/Proofs/*` referencing the new core modules.
+13. **CLI placeholder**: Stub `Argparse/CLI/Print.lean` to expose minimal entry points for help/man/completions.
+14. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
