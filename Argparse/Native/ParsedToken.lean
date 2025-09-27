@@ -50,8 +50,8 @@ end ParsedToken
 
 /-- Buckets of option and positional tokens after normalisation. -/
 structure ClassifiedTokens where
-  options : Array ParsedOption
-  positionals : Array String
+  options : List ParsedOption
+  positionals : List String
   deriving Inhabited, Repr
 
 namespace Internal
@@ -68,28 +68,30 @@ private def optionFromShort (tok : String) : Option ParsedOption := do
 
 def classifyAux
     (positionalOnly : Bool)
-    (options : Array ParsedOption)
-    (positionals : Array String)
+    (optionsRev : List ParsedOption)
+    (positionalsRev : List String)
     : List String → ClassifiedTokens
-  | [] => { options, positionals }
+  | [] =>
+      { options := optionsRev.reverse
+        , positionals := positionalsRev.reverse }
   | tok :: rest =>
       if positionalOnly then
-        classifyAux true options (positionals.push tok) rest
+        classifyAux true optionsRev (tok :: positionalsRev) rest
       else if tok = "--" then
-        classifyAux true options positionals rest
+        classifyAux true optionsRev positionalsRev rest
       else
         match optionFromLong tok with
-        | some opt => classifyAux positionalOnly (options.push opt) positionals rest
+        | some opt => classifyAux positionalOnly (opt :: optionsRev) positionalsRev rest
         | none =>
             match optionFromShort tok with
-            | some opt => classifyAux positionalOnly (options.push opt) positionals rest
-            | none => classifyAux true options (positionals.push tok) rest
+            | some opt => classifyAux positionalOnly (opt :: optionsRev) positionalsRev rest
+            | none => classifyAux true optionsRev (tok :: positionalsRev) rest
 
 end Internal
 
 /-- Traverse a raw CLI token list and classify each argument. -/
 def classify (tokens : List String) : ClassifiedTokens :=
-  Internal.classifyAux false #[] #[] tokens
+  Internal.classifyAux false [] [] tokens
 
 end Native
 end Argparse

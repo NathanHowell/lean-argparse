@@ -2,9 +2,7 @@ import Std
 import Init.Control.Lawful
 import Argparse.Basic.Docs
 import Argparse.Native.Error
-import Argparse.Native.FieldUpdater
 import Argparse.Native.Token
-import Argparse.Native.Partial
 import Argparse.Native.TokenCursor
 
 namespace Argparse
@@ -148,165 +146,108 @@ instance : LawfulApplicative Grammar where
           cases uh
           simp [Usage.append, List.append_assoc]
 
-private def describe {α : Type} [TokenSpec α] (name : α) : String :=
-  TokenSpec.describe name
+private def leftoverOptionError (opt : ParsedOption) : Error :=
+  { code := .unexpected
+    , subject? := some opt.original
+    , detail? := some "no parser field accepted this option" }
 
-private def missingValueError {α : Type} [TokenSpec α] (name : α) : Error :=
+private def leftoverPositionalError (arg : String) : Error :=
+  { code := .unexpected
+    , subject? := some arg
+    , detail? := some "too many positional arguments" }
+
+private def missingPositionalError (doc : PositionalDoc) : Error :=
   { code := .missing
-    , subject? := some (describe name) }
+    , subject? := some doc.metavar }
 
-private def invalidInlineValue (subject : String) : Error :=
-  { code := .invalid
-    , subject? := some subject
-    , detail? := some s!"Flag {subject} does not accept a value" }
-
-private def popFront (args : Array String) : Option (String × Array String) :=
-  match args[0]? with
-  | none => none
-  | some value =>
-      let rest := args.extract 1 args.size
-      some (value, rest)
-
-/-- Interpreter pairs metadata with a handler bundle and completion spec. -/
+/-- Interpreter pairs usage metadata with a state transformer that consumes
+classified tokens left-to-right. -/
 structure Interpreter (α : Type) where
   grammar : Grammar α
-  state : Type
-  bundle : HandlerBundle state
-  spec : PartialSpec state α
+  run : TokenCursor → Except Error (α × TokenCursor)
 
 namespace Interpreter
 
-@[inline] def eval {α : Type} (i : Interpreter α) (cursor : TokenCursor) : Result α :=
-  HandlerBundle.run i.bundle i.spec cursor
+@[inline] def evalTokens {α : Type}
+    (i : Interpreter α) (cursor : TokenCursor) : Result α := do
+  let (value, cursor') ← i.run cursor
+  match cursor'.options with
+  | opt :: _ => throw (leftoverOptionError opt)
+  | [] =>
+      match cursor'.positionals with
+      | arg :: _ => throw (leftoverPositionalError arg)
+      | [] => pure value
+
+@[inline] def eval {α : Type} (i : Interpreter α) (argv : List String) : Result α :=
+  evalTokens i (TokenCursor.fromArgv argv)
 
 /-- Functorial map over interpreter results. -/
 def map {α β : Type} (i : Interpreter α) (f : α → β) : Interpreter β :=
   { grammar := Grammar.map f i.grammar
-    , state := i.state
-    , bundle := i.bundle
-    , spec :=
-        { init := i.spec.init
-          , complete := fun state => do
-              let value ← i.spec.complete state
-              Except.ok (f value) } }
-
-/-- Remaining machinery combines handler bundles and specs across products. -/
-private def bundleProduct {σ τ : Type}
-    (lhs : HandlerBundle σ) (rhs : HandlerBundle τ) : HandlerBundle (σ × τ) :=
-  HandlerBundle.product lhs rhs
-
-private def specProduct {σ τ α β : Type}
-    (specF : PartialSpec σ (α → β)) (specA : PartialSpec τ α)
-    : PartialSpec (σ × τ) β :=
-  { init := (specF.init, specA.init)
-    , complete := fun state => do
-        let (left, right) := state
-        let fn ← specF.complete left
-        let arg ← specA.complete right
-        Except.ok (fn arg) }
+    , run := fun cursor => do
+        let (value, cursor') ← i.run cursor
+        pure (f value, cursor') }
 
 /-- Pure value interpreter. -/
 def pure {α : Type} (value : α) : Interpreter α :=
   { grammar := Grammar.pure value
-    , state := Unit
-    , bundle := { optionHandlers := [], positionalHandlers := [] }
-    , spec := { init := (), complete := fun _ => Except.ok value } }
+    , run := fun cursor => Except.ok (value, cursor) }
 
 /-- Interpreter that immediately fails with `err`. -/
 def fail {α : Type} (err : Error) : Interpreter α :=
   { grammar := Grammar.fail
-    , state := Unit
-    , bundle := { optionHandlers := [], positionalHandlers := [] }
-    , spec := { init := (), complete := fun _ => Except.error err } }
+    , run := fun _ => Except.error err }
 
 /-- Sequential application of interpreters with thunked right branch. -/
-def seq {α β : Type} (ifn : Interpreter (α → β)) (ival : Unit → Interpreter α) : Interpreter β :=
+def seq {α β : Type} (ifn : Interpreter (α → β)) (ival : Unit → Interpreter α)
+    : Interpreter β :=
   let ival' := ival ()
   { grammar := Grammar.seq ifn.grammar ival'.grammar
-    , state := ifn.state × ival'.state
-    , bundle := bundleProduct ifn.bundle ival'.bundle
-    , spec := specProduct ifn.spec ival'.spec }
+    , run := fun cursor => do
+        let (fn, cursor') ← ifn.run cursor
+        let (arg, cursor'') ← ival'.run cursor'
+        Except.ok (fn arg, cursor'') }
 
 /-- Strict helper for `seq`. -/
-def seqApply {α β : Type} (ifn : Interpreter (α → β)) (ival : Interpreter α) : Interpreter β :=
+def seqApply {α β : Type} (ifn : Interpreter (α → β)) (ival : Interpreter α)
+    : Interpreter β :=
   seq ifn (fun _ => ival)
 
 /-- Primitive positional argument. -/
 def positional (doc : PositionalDoc) : Interpreter String :=
-  let handler : PositionalHandler (Assigned String) :=
-    { apply := fun arg _ => Except.ok (some (Assigned.value arg)) }
   { grammar := Grammar.positional doc
-    , state := Assigned String
-    , bundle := { optionHandlers := [], positionalHandlers := [handler] }
-    , spec :=
-        { init := Assigned.unset
-          , complete := fun state =>
-              Assigned.require
-                { code := .missing
-                  , subject? := some doc.metavar }
-                state } }
+    , run := fun cursor =>
+        match TokenCursor.takePositional? cursor with
+        | some (value, cursor') => Except.ok (value, cursor')
+        | none => Except.error (missingPositionalError doc) }
 
 /-- Boolean flag that reports presence of the given token. -/
 def flag {α : Type} [TokenSpec α] [TokenCursor.ToParsedName α]
     (doc : OptionDoc) (name : α) : Interpreter Bool :=
-  let target := TokenCursor.ToParsedName.toParsedName name
-  let subject := describe name
-  let handler : OptionHandler (Assigned Bool) :=
-    OptionHandler.const fun opt _ positionals =>
-      if opt.name = target then
-        if opt.inlineValue?.isSome then
-          Except.error (invalidInlineValue subject)
-        else
-          Except.ok (some (Assigned.value true, positionals))
-      else
-        Except.ok none
   { grammar := Grammar.flag doc
-    , state := Assigned Bool
-    , bundle := { optionHandlers := [handler], positionalHandlers := [] }
-    , spec :=
-        { init := Assigned.value false
-          , complete := fun state =>
-              Except.ok (Assigned.getD state false) } }
+    , run := fun cursor => do
+        let (present, cursor') ← TokenCursor.consumeFlag name cursor
+        Except.ok (present, cursor') }
 
 /-- Option parser returning the associated value when present. -/
 def option {α : Type} [TokenSpec α] [TokenCursor.ToParsedName α]
     (doc : OptionDoc) (name : α) : Interpreter (Option String) :=
-  let target := TokenCursor.ToParsedName.toParsedName name
-  let handler : OptionHandler (Assigned String) :=
-    OptionHandler.const fun opt _ positionals =>
-      if opt.name = target then
-        match opt.inlineValue? with
-        | some value => Except.ok (some (Assigned.value value, positionals))
-        | none =>
-            match popFront positionals with
-            | some (value, rest) =>
-                Except.ok (some (Assigned.value value, rest))
-            | none => Except.error (missingValueError name)
-      else
-        Except.ok none
   { grammar := Grammar.option doc
-    , state := Assigned String
-    , bundle := { optionHandlers := [handler], positionalHandlers := [] }
-    , spec :=
-        { init := Assigned.unset
-          , complete := fun state =>
-              Except.ok (Assigned.toOption state) } }
+    , run := fun cursor => do
+        let (value?, cursor') ← TokenCursor.consumeValue name cursor
+        Except.ok (value?, cursor') }
 
 /-- Produce an optional result, returning `none` on missing errors. -/
 def optional {α : Type} (p : Interpreter α) : Interpreter (Option α) :=
   { grammar := { usage := Usage.optional p.grammar.usage }
-    , state := p.state
-    , bundle := p.bundle
-    , spec :=
-        { init := p.spec.init
-          , complete := fun state =>
-              match p.spec.complete state with
-              | Except.ok value => Except.ok (Option.some value)
-              | Except.error err =>
-                  if err.code = .missing then
-                    Except.ok Option.none
-                  else
-                    Except.error err } }
+    , run := fun cursor =>
+        match p.run cursor with
+        | Except.ok (value, cursor') => Except.ok (some value, cursor')
+        | Except.error err =>
+            if err.code = .missing then
+              Except.ok (none, cursor)
+            else
+              Except.error err }
 
 /-- Supply a constant default when a parser reports a missing error. -/
 def withDefault {α : Type} (p : Interpreter α) (value : α) : Interpreter α :=

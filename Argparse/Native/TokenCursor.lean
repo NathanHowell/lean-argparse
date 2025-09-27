@@ -1,4 +1,3 @@
-import Std
 import Argparse.Native.Error
 import Argparse.Native.ParsedToken
 import Argparse.Native.Token
@@ -9,34 +8,33 @@ namespace Native
 open Token
 
 /--
-Token cursor that separates option-like tokens from positional arguments.
-Options are stored in their classified form while positionals are kept in a
-queue (front-loaded) so consumers can pop values without revisiting the original
-argv.
+`TokenCursor` stores the classified option tokens alongside the positional
+arguments that remain after the first positional (or explicit `--`). The fields
+use `List` so structural recursion and length arithmetic remain straightforward
+in proofs.
 -/
 structure TokenCursor where
-  options : Array ParsedOption
-  positionals : Array String
+  options : List ParsedOption
+  positionals : List String
   deriving Repr
 
 namespace TokenCursor
 
-@[simp] def ofArrays
-    (options : Array ParsedOption) (positionals : Array String) : TokenCursor :=
+@[simp] def ofLists (options : List ParsedOption) (positionals : List String)
+    : TokenCursor :=
   { options, positionals }
 
 @[simp] def fromClassified (tokens : ClassifiedTokens) : TokenCursor :=
-  { options := tokens.options
-    , positionals := tokens.positionals }
+  { options := tokens.options, positionals := tokens.positionals }
 
 @[simp] def fromArgv (argv : List String) : TokenCursor :=
   fromClassified (classify argv)
 
 @[simp] def optionCount (cursor : TokenCursor) : Nat :=
-  cursor.options.size
+  cursor.options.length
 
 @[simp] def positionalCount (cursor : TokenCursor) : Nat :=
-  cursor.positionals.size
+  cursor.positionals.length
 
 @[simp] def remaining (cursor : TokenCursor) : Nat :=
   cursor.optionCount + cursor.positionalCount
@@ -44,18 +42,14 @@ namespace TokenCursor
 @[simp] def isFinished (cursor : TokenCursor) : Bool :=
   decide (cursor.remaining = 0)
 
-@[simp] def remainingOptions (cursor : TokenCursor) : Array ParsedOption :=
+@[simp] def remainingOptions (cursor : TokenCursor) : List ParsedOption :=
   cursor.options
 
-@[simp] def remainingPositionals (cursor : TokenCursor) : Array String :=
+@[simp] def remainingPositionals (cursor : TokenCursor) : List String :=
   cursor.positionals
 
 @[simp] def toLists (cursor : TokenCursor) : List ParsedOption × List String :=
-  (cursor.options.toList, cursor.positionals.toList)
-
-@[simp] def ofLists (options : List ParsedOption) (positionals : List String)
-    : TokenCursor :=
-  ofArrays options.toArray positionals.toArray
+  (cursor.options, cursor.positionals)
 
 class ToParsedName (α : Type) where
   toParsedName : α → ParsedName
@@ -73,17 +67,17 @@ private def missingValueError {α : Type} [TokenSpec α] (name : α) : Error :=
   { code := .missing
     , subject? := some (describe name) }
 
-private def dropHead {α : Type} (arr : Array α) : Array α :=
-  arr.extract 1 arr.size
+private def invalidInlineValue (subject : String) : Error :=
+  { code := .invalid
+    , subject? := some subject
+    , detail? := some s!"Flag {subject} does not accept a value" }
 
 /-- Remove the next positional argument, if any remain. -/
 @[simp] def takePositional? (cursor : TokenCursor) :
     Option (String × TokenCursor) :=
-  match cursor.positionals[0]? with
-  | none => none
-  | some value =>
-      let rest := dropHead cursor.positionals
-      some (value, { cursor with positionals := rest })
+  match cursor.positionals with
+  | [] => none
+  | value :: rest => some (value, { cursor with positionals := rest })
 
 /-- Remove matching flag tokens and report whether the flag was present. -/
 def consumeFlag {α : Type} [TokenSpec α] [ToParsedName α]
@@ -91,45 +85,47 @@ def consumeFlag {α : Type} [TokenSpec α] [ToParsedName α]
     : Except Error (Bool × TokenCursor) := do
   let target := ToParsedName.toParsedName name
   let subject := describe name
-  let options := cursor.options.toList
-  let isMatch : ParsedOption → Bool := fun opt => decide (opt.name = target)
-  let hasInline := options.any fun opt => isMatch opt && opt.inlineValue?.isSome
-  if hasInline then
-    throw {
-      code := .invalid
-      , subject? := some subject
-      , detail? := some s!"Flag {subject} does not accept a value"
-    }
-  else
-    let present := options.any isMatch
-    let remaining := options.filter fun opt => ! isMatch opt
-    pure (present, { cursor with options := remaining.toArray })
+  let step
+      : Bool × List ParsedOption → ParsedOption → Except Error (Bool × List ParsedOption)
+      := fun acc opt => do
+        let (present, keptRev) := acc
+        if opt.name = target then
+          if opt.inlineValue?.isSome then
+            throw (invalidInlineValue subject)
+          else
+            pure (true, keptRev)
+        else
+          pure (present, opt :: keptRev)
+  let (present, keptRev) ← cursor.options.foldlM step (false, [])
+  pure (present, { cursor with options := keptRev.reverse })
+
+private def popValue {α : Type} [TokenSpec α]
+    (name : α) (positionals : List String) : Except Error (String × List String) :=
+  match positionals with
+  | [] => throw (missingValueError name)
+  | value :: rest => pure (value, rest)
 
 /-- Retrieve the last supplied value for an option, if present. -/
 def consumeValue {α : Type} [TokenSpec α] [ToParsedName α]
     (name : α) (cursor : TokenCursor)
     : Except Error (Option String × TokenCursor) := do
   let target := ToParsedName.toParsedName name
-  let init : Option String × Array ParsedOption × Array String :=
-    (none, Array.mkEmpty cursor.options.size, cursor.positionals)
-  let (value?, remainingOpts, remainingPos) ←
-    cursor.options.foldlM
-      (fun state opt => do
-        let (last?, kept, pos) := state
+  let step
+      : Option String × List ParsedOption × List String → ParsedOption →
+          Except Error (Option String × List ParsedOption × List String)
+      := fun acc opt => do
+        let (last?, keptRev, positionals) := acc
         if opt.name = target then
           match opt.inlineValue? with
-          | some value =>
-              pure (some value, kept, pos)
+          | some value => pure (some value, keptRev, positionals)
           | none =>
-              match pos[0]? with
-              | some value =>
-                  pure (some value, kept, dropHead pos)
-              | none =>
-                  throw <| missingValueError name
+              let (value, rest) ← popValue name positionals
+              pure (some value, keptRev, rest)
         else
-          pure (last?, kept.push opt, pos))
-      init
-  pure (value?, { options := remainingOpts, positionals := remainingPos })
+          pure (last?, opt :: keptRev, positionals)
+  let init : Option String × List ParsedOption × List String := (none, [], cursor.positionals)
+  let (value?, keptRev, remainingPos) ← cursor.options.foldlM step init
+  pure (value?, { options := keptRev.reverse, positionals := remainingPos })
 
 end TokenCursor
 

@@ -3,7 +3,6 @@ import Argparse
 open Argparse
 open Argparse.Native
 open Argparse.Native.Token
-open Argparse.Native.TokenCursor
 open Argparse.Native.Interpreter
 
 namespace ArgparseTests
@@ -12,25 +11,25 @@ open ParsedName
 
 #guard (
   let classified := Argparse.Native.classify ["--verbose"]
-  classified.options.toList =
+  classified.options =
     [{ name := ParsedName.long "verbose", original := "--verbose", inlineValue? := none }]
-    ∧ classified.positionals.isEmpty)
+    ∧ classified.positionals = [])
 
 #guard (
   let classified := Argparse.Native.classify ["-n=3"]
-  classified.options.toList =
+  classified.options =
     [{ name := ParsedName.short 'n', original := "-n=3", inlineValue? := some "3" }]
-    ∧ classified.positionals.isEmpty)
+    ∧ classified.positionals = [])
 
 #guard (
   let classified := Argparse.Native.classify ["--", "--count"]
-  classified.options.isEmpty ∧ classified.positionals.toList = ["--count"])
+  classified.options = [] ∧ classified.positionals = ["--count"])
 
 #guard (
   let classified := Argparse.Native.classify ["-n5", "FILE"]
-  classified.options.toList =
+  classified.options =
     [{ name := ParsedName.short 'n', original := "-n5", inlineValue? := some "5" }]
-    ∧ classified.positionals.toList = ["FILE"])
+    ∧ classified.positionals = ["FILE"])
 
 private def containsSubstring (haystack needle : String) : Bool :=
   if needle.isEmpty then
@@ -61,11 +60,8 @@ private def countDoc : OptionDoc :=
 private def nameDoc : PositionalDoc :=
   { metavar := "NAME", help? := none, required := true }
 
-private def tokensOf (args : List String) : TokenCursor :=
-  TokenCursor.fromArgv args
-
 private def evalNative {α} (parser : Interpreter α) (args : List String) : Result α :=
-  Interpreter.eval parser (tokensOf args)
+  Interpreter.eval parser args
 
 private def nativeExample : Interpreter NativeCfg :=
   Interpreter.pure NativeCfg.mk
