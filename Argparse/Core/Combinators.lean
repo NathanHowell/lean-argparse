@@ -68,6 +68,21 @@ private def stringTake (s : String) (n : Nat) : String :=
 private def stringDrop (s : String) (n : Nat) : String :=
   String.mk (s.data.drop n)
 
+private def findConcatSplit? {α} [FromArg α] (raw : String) : Option (α × String) :=
+  let candidates := ((List.range raw.length).drop 1).reverse
+  let rec loop : List Nat → Option (α × String)
+    | [] => none
+    | idx :: rest =>
+        let prefix := stringTake raw idx
+        let suffix := stringDrop raw idx
+        if suffix.isEmpty then
+          loop rest
+        else
+          match FromArg.run prefix with
+          | .ok value => some (value, suffix)
+          | .error _ => loop rest
+  loop candidates
+
 /-- Determine whether the token matches the flag specification. -/
 inductive FlagMatch
   | none
@@ -133,35 +148,25 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
           .ok true st'
   | [] => .ok false st
 
-private def parseConcatValue
+@[inline] def parseConcatValue
     {α} [FromArg α] (spec : OptSpec α) (token raw : String)
     (pending : List String) (st : State) (expect : Expect) :
     Except Error (Option α × State) :=
-  if raw.isEmpty then
+  if raw = "" then
     .error (missingValueError token expect)
   else
     let stAfter := { st with pre := pending, cursor := st.cursor + 1 }
     match FromArg.run raw with
     | .ok value => .ok (some value, stAfter)
     | .error msg =>
-        let candidateIdxs := ((List.range raw.length).drop 1).reverse
-        let rec loop : List Nat → Except Error (Option α × State)
-        | [] => .error (invalidValueError raw msg expect)
-        | idx :: rest =>
-            let prefix := stringTake raw idx
-            let remainder := stringDrop raw idx
-            if remainder.isEmpty then
-              loop rest
-            else
-              match FromArg.run prefix with
-              | .ok value =>
-                  let newState :=
-                    { stAfter with pre := ("-" ++ remainder) :: pending }
-                  .ok (some value, newState)
-              | .error _ => loop rest
-        loop candidateIdxs
+        match findConcatSplit? (raw := raw) with
+        | some (value, remainder) =>
+            let newState :=
+              { stAfter with pre := ("-" ++ remainder) :: pending }
+            .ok (some value, newState)
+        | none => .error (invalidValueError raw msg expect)
 
-private def takeOptionValue?
+@[inline] def takeOptionValue?
     {α} [FromArg α] (spec : OptSpec α) (st : State) :
     Except Error (Option α × State) :=
   match st.pre with
@@ -224,7 +229,7 @@ private def takeOptionValue?
                 .ok (none, st)
           | none => .ok (none, st)
 
-private def collectOptionValues
+@[inline] def collectOptionValues
     {α} [FromArg α] (spec : OptSpec α) (st : State) : Except Error (List α × State) :=
   let rec loop (acc : List α) (curr : State) : Except Error (List α × State) :=
     match takeOptionValue? spec curr with
@@ -258,7 +263,7 @@ def option {α} [FromArg α] (spec : OptSpec α) :
           | [] => .err (missingOptionError spec)
           | _ => .ok values st'
 
-private def takePositionalValue?
+@[inline] def takePositionalValue?
     {α} [FromArg α] (spec : PosSpec α) (st : State) :
     Except Error (Option α × State) :=
   let expect := expectPositional spec
@@ -275,7 +280,7 @@ private def takePositionalValue?
           | .error msg => .error (invalidValueError token msg expect)
       | none => .ok (none, st)
 
-private def collectPositionalValues
+@[inline] def collectPositionalValues
     {α} [FromArg α] (spec : PosSpec α) (st : State) : Except Error (List α × State) :=
   let rec loop (acc : List α) (curr : State) : Except Error (List α × State) :=
     match takePositionalValue? spec curr with

@@ -5,7 +5,7 @@ import Argparse.Spec.AST
 /-!
 # ArgParse.Proofs.Totality
 
-Early progress/totality lemmas (some now partially proved).
+Early progress/totality lemmas accompanying the new combinators.
 -/
 
 namespace ArgParse.Proofs
@@ -57,6 +57,33 @@ theorem flag_false_preserves_state
           simp [hpre, hmatch] at h
       | shortBundled tail =>
           simp [hpre, hmatch] at h
+
+/-- Successful concatenated short-option parsing consumes exactly one token. -/
+lemma parseConcatValue_cursor
+    {α} [FromArg α] (spec : OptSpec α) (token raw : String)
+    (pending : List String) (st : State) (expect : Expect)
+    (value : α) (st' : State) :
+    parseConcatValue spec token raw pending st expect = .ok (some value, st') →
+    st'.cursor = st.cursor + 1 := by
+  intro h
+  unfold parseConcatValue at h
+  split at h with hraw : raw = ""
+  · simp [hraw] at h
+  · simp [hraw] at h
+    cases hrun : FromArg.run raw with
+    | ok =>
+        simp [hrun] at h
+        cases h
+        rfl
+    | error msg =>
+        cases hsplit : findConcatSplit? raw with
+        | none => simp [hrun, hsplit] at h
+        | some pair =>
+            cases pair with
+            | intro value' remainder =>
+                simp [hrun, hsplit] at h
+                cases h
+                rfl
 
 /-- `positional` with arity `.some` never returns an empty list. -/
 theorem positional_some_nonempty
