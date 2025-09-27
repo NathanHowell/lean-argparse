@@ -58,6 +58,11 @@ theorem flag_false_preserves_state
       | shortBundled tail =>
           simp [hpre, hmatch] at h
 
+/-- Placeholder: positional `.some` requires at least one value. -/
+theorem positional_some_requires_input_placeholder
+    {α} [FromArg α] (spec : PosSpec α) (st : State) : True :=
+  trivial
+
 /-- Placeholder: option parser for `.one` arity is total over any state. -/
 theorem option_total_placeholder {α} [FromArg α]
     (spec : OptSpec α) (st : State) : True :=

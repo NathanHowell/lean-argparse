@@ -81,6 +81,20 @@ private def nameSpec : PosSpec String :=
   | .ok (.some name) st => name = "alice" ∧ st.post = []
   | _ => False)
 
+private def filesSpec : PosSpec String :=
+  { meta := { name := "FILE" }, arity := .many }
+
+#guard (match positional filesSpec (mkState ["a", "b"] ["c"]) with
+  | .ok values st => values = ["a", "b", "c"] ∧ st.pre = [] ∧ st.post = []
+  | _ => False)
+
+private def requiredPosSpec : PosSpec String :=
+  { meta := { name := "ITEM" }, arity := .some }
+
+#guard (match positional requiredPosSpec (mkState [] []) with
+  | .err err => err.kind = .missingValue
+  | _ => False)
+
 private def samplePartial : Spec.Partial :=
   Partial.empty
     |> Partial.addFlag "--verbose" true

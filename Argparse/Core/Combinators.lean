@@ -59,6 +59,9 @@ private def invalidValueError (token msg : String) (expect : Expect) : Error :=
 private def missingOptionError (spec : OptSpec α) : Error :=
   { kind := .missingValue, context := [], expect := [expectOption spec] }
 
+private def expectPositional (spec : PosSpec α) : Expect :=
+  .positional spec.meta.name
+
 /-- Determine whether the token matches the flag specification. -/
 inductive FlagMatch
   | none
@@ -238,22 +241,55 @@ def option {α} [FromArg α] (spec : OptSpec α) :
           | [] => .err (missingOptionError spec)
           | _ => .ok values st'
 
-/-- Parser for positional arguments: consumes from `pre` first, then `post`. -/
-def positional {α} [FromArg α] (spec : PosSpec α) : Parser (Option α) := fun st =>
-  let expect := Expect.positional spec.meta.name
+private def takePositionalValue?
+    {α} [FromArg α] (spec : PosSpec α) (st : State) :
+    Except Error (Option α × State) :=
+  let expect := expectPositional spec
   match State.consumePre? st with
   | some (token, st') =>
       match FromArg.run token with
-      | .ok value => .ok (some value) st'
-      | .error msg =>
-          .err (invalidValueError token msg expect)
+      | .ok value => .ok (some value, st')
+      | .error msg => .error (invalidValueError token msg expect)
   | none =>
       match State.consumePost? st with
       | some (token, st') =>
           match FromArg.run token with
-          | .ok value => .ok (some value) st'
-          | .error msg =>
-              .err (invalidValueError token msg expect)
-      | none => .ok none st
+          | .ok value => .ok (some value, st')
+          | .error msg => .error (invalidValueError token msg expect)
+      | none => .ok (none, st)
+
+private def collectPositionalValues
+    {α} [FromArg α] (spec : PosSpec α) (st : State) : Except Error (List α × State) :=
+  let rec loop (acc : List α) (curr : State) : Except Error (List α × State) :=
+    match takePositionalValue? spec curr with
+    | .error err => .error err
+    | .ok (some value, nextState) => loop (value :: acc) nextState
+    | .ok (none, nextState) => .ok (acc.reverse, nextState)
+  loop [] st
+
+/-- Parser for positional arguments supporting arities. -/
+def positional {α} [FromArg α] (spec : PosSpec α) :
+    Parser (match spec.arity with
+      | .zero => PUnit
+      | .one  => Option α
+      | .many => List α
+      | .some => List α) := fun st =>
+  match spec.arity with
+  | .zero => .ok PUnit.unit st
+  | .one =>
+      match takePositionalValue? spec st with
+      | .error err => .err err
+      | .ok (value?, st') => .ok value? st'
+  | .many =>
+      match collectPositionalValues spec st with
+      | .error err => .err err
+      | .ok (values, st') => .ok values st'
+  | .some =>
+      match collectPositionalValues spec st with
+      | .error err => .err err
+      | .ok (values, st') =>
+          match values with
+          | [] => .err { kind := .missingValue, context := [], expect := [expectPositional spec] }
+          | _ => .ok values st'
 
 end ArgParse.Core

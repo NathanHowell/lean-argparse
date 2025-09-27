@@ -66,12 +66,22 @@ def interpretOption (spec : OptSpec String) : Parser (Partial → Partial) :=
       option spec |>.map fun values =>
         fun p => values.foldl (fun acc value => Partial.addOption spec.meta.name value acc) p
 
-/-- Interpret a positional value and record it. -/
+/-- Interpret a positional value and record it according to arity. -/
 def interpretPositional (spec : PosSpec String) : Parser (Partial → Partial) :=
-  positional spec |>.map fun value? => fun p =>
-    match value? with
-    | some value => Partial.addPositional spec.meta.name value p
-    | none => p
+  match spec.arity with
+  | .zero =>
+      positional spec |>.map (fun _ => id)
+  | .one =>
+      positional spec |>.map fun value? => fun p =>
+        match value? with
+        | some value => Partial.addPositional spec.meta.name value p
+        | none => p
+  | .many =>
+      positional spec |>.map fun values =>
+        fun p => values.foldl (fun acc value => Partial.addPositional spec.meta.name value acc) p
+  | .some =>
+      positional spec |>.map fun values =>
+        fun p => values.foldl (fun acc value => Partial.addPositional spec.meta.name value acc) p
 
 /-- Elaborate a single command item to a partial-state transformer. -/
 def elaborateItem : ItemSpec → Parser (Partial → Partial)
