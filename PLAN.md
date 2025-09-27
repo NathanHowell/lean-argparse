@@ -53,5 +53,8 @@
    - Document the new architecture and remaining gaps so downstream users can migrate confidently.
 
 ## Immediate Next Steps
+
+1. Provide lawful functor/applicative proofs for `Grammar` so metadata reasoning can reuse Lean’s rewriting lemmas.
+2. Investigate an `Alternative` instance for `Interpreter` (or document why it remains absent) once a canonical failure payload is decided.
 1. Reintroduce progress proofs in the updater setting and thread them through applicative combinators, documenting any stalled approaches.
 2. Extend property tests and docs to explain the updater-based architecture, including repeated-option and sentinel permutations, while recording successes and setbacks.
