@@ -1,17 +1,18 @@
 import Std
 import Argparse.Basic.Docs
 import Argparse.Native.Error
-import Argparse.Native.ArgStream
-import Argparse.Native.Consumer
+import Argparse.Native.Token
+import Argparse.Native.TokenStream
 
 namespace Argparse
 namespace Native
 
-open Usage
+open Token
+open TokenStream
 
 /-- Result type returned by the native interpreter. -/
 inductive Result (α : Type) where
-  | ok (value : α) (rest : ArgStream)
+  | ok (value : α) (rest : TokenStream)
   | error (info : Error)
   deriving Repr
 
@@ -59,19 +60,19 @@ def option (doc : OptionDoc) : Grammar (Option String) :=
 
 end Grammar
 
-/-- Interpreter pairs metadata with an evaluator on `ArgStream`. -/
+/-- Interpreter pairs metadata with an evaluator on `TokenStream`. -/
 structure Interpreter (α : Type) where
   grammar : Grammar α
-  eval : ArgStream → Result α
+  eval : TokenStream → Result α
 
 namespace Interpreter
 
 /-- Remaining tokens count, used as a structural measure. -/
-private def remainingSize (stream : ArgStream) : Nat :=
-  (ArgStream.remaining stream).length
+def remainingSize (stream : TokenStream) : Nat :=
+  stream.length
 
 /-- Error emitted when a combinator fails to make progress. -/
-private def progressError : Error :=
+def progressError : Error :=
   { code := .invalid
     , subject? := none
     , detail? := some "Interpreter combinator failed to consume input" }
@@ -141,66 +142,33 @@ def seqRight {α β : Type} (ia : Interpreter α) (ib : Unit → Interpreter β)
 def seqRightApply {α β : Type} (ia : Interpreter α) (ib : Interpreter β) : Interpreter β :=
   seqRight ia (fun _ => ib)
 
-/-- Consume a positional argument using the structural stream. -/
+/-- Consume a positional argument using the classified token stream. -/
 def positional (doc : PositionalDoc) : Interpreter String :=
   { grammar := Grammar.positional doc
-    , eval :=
-        fun stream =>
-          match ArgStream.next? stream with
-          | some (tok, rest) => .ok tok rest
-          | none =>
-              .error {
-                code := .missing,
-                subject? := some doc.metavar
-              } }
+    , eval := fun stream =>
+        match TokenStream.takePositional? stream with
+        | Option.some (tok, rest) => .ok tok rest
+        | Option.none =>
+            .error {
+              code := .missing
+              , subject? := some doc.metavar
+            } }
 
-theorem positional_error_missing (doc : PositionalDoc) (stream : ArgStream) (err : Error) :
-    (positional doc).eval stream = .error err → err.code = .missing := by
-  intro h
-  dsimp [positional] at h
-  cases hNext : ArgStream.next? stream with
-  | some result =>
-      cases result
-      simp [hNext] at h
-  | none =>
-      simp [hNext] at h
-      cases h
-      rfl
-
-/-- Successful positional lookups strictly reduce the `remaining` size. -/
-theorem positional_ok_progress (doc : PositionalDoc)
-    {stream rest : ArgStream} {tok : String} :
-    (positional doc).eval stream = .ok tok rest →
-      (ArgStream.remaining rest).length < (ArgStream.remaining stream).length := by
-  intro h
-  dsimp [positional] at h
-  cases hNext : ArgStream.next? stream with
-  | none =>
-      simp [hNext] at h
-  | some result =>
-      cases result with
-      | mk tok' rest' =>
-          simp [hNext] at h
-          rcases h with ⟨hTok, hRest⟩
-          have hSome : ArgStream.next? stream = some (tok', rest') := hNext
-          have hLt := ArgStream.next?_remaining_length_lt (stream := stream)
-              (tok := tok') (rest := rest') hSome
-          exact hRest ▸ hLt
 /-- Boolean flag that reports presence of the given token. -/
-def flag {α : Type} [DecidableEq α] [Token.TokenSpec α]
+def flag {α : Type} [TokenSpec α] [TokenStream.ToParsedName α]
     (doc : OptionDoc) (name : α) : Interpreter Bool :=
   { grammar := Grammar.flag doc
     , eval := fun stream =>
-        match Consumer.consumeFlag name stream with
+        match TokenStream.consumeFlag name stream with
         | .ok (present, stream') => .ok present stream'
         | .error err => .error err }
 
 /-- Option parser returning the associated value when present. -/
-def option {α : Type} [DecidableEq α] [Token.TokenSpec α]
+def option {α : Type} [TokenSpec α] [TokenStream.ToParsedName α]
     (doc : OptionDoc) (name : α) : Interpreter (Option String) :=
   { grammar := Grammar.option doc
     , eval := fun stream =>
-        match Consumer.consumeValue name stream with
+        match TokenStream.consumeValue name stream with
         | .ok (value?, stream') => .ok value? stream'
         | .error err => .error err }
 
@@ -223,46 +191,6 @@ def longOption (name : String)
 def shortOption (name : Char)
     (doc : OptionDoc := { short? := some name, required := false }) : Interpreter (Option String) :=
   option doc name
-
-/-- Zero-or-more repetition combinator. -/
-def many {α : Type} (p : Interpreter α) : Interpreter (List α) :=
-  {
-    grammar := {
-      usage := Usage.optional p.grammar.usage
-    },
-    eval := fun stream =>
-      let fuel := remainingSize stream
-      let rec loop : Nat → List α → ArgStream → Result (List α)
-        | 0, acc, stream => .ok acc.reverse stream
-        | Nat.succ fuel, acc, stream =>
-            match p.eval stream with
-            | .ok value stream' =>
-                if remainingSize stream' < remainingSize stream then
-                  loop fuel (value :: acc) stream'
-                else
-                  .error progressError
-            | .error err =>
-                if err.code = .missing then
-                  .ok acc.reverse stream
-                else
-                  .error err
-      loop fuel [] stream
-  }
-
-/-- One-or-more repetition combinator. -/
-def some {α : Type} (p : Interpreter α) : Interpreter (List α) :=
-  {
-    grammar := {
-      usage := Usage.append p.grammar.usage (Usage.optional p.grammar.usage)
-    },
-    eval := fun stream =>
-      match p.eval stream with
-      | .ok head stream' =>
-          match (many p).eval stream' with
-          | .ok tail stream'' => .ok (head :: tail) stream''
-          | .error err => .error err
-      | .error err => .error err
-  }
 
 /-- Parser that always fails with a structural `missing` error. -/
 def failure {α : Type} (message? : Option String := none) : Interpreter α :=
@@ -320,6 +248,46 @@ def optionalOrElse {α : Type} (p : Interpreter α) (backup : Unit → Interpret
 /-- Supply a constant default when a parser reports a missing error. -/
 def withDefault {α : Type} (p : Interpreter α) (value : α) : Interpreter α :=
   map (optional p) (fun opt : Option α => opt.getD value)
+
+/-- Zero-or-more repetition combinator. -/
+def many {α : Type} (p : Interpreter α) : Interpreter (List α) :=
+  {
+    grammar := {
+      usage := Usage.optional p.grammar.usage
+    },
+    eval := fun stream =>
+      let fuel := remainingSize stream
+      let rec loop : Nat → List α → TokenStream → Result (List α)
+        | 0, acc, stream => .ok acc.reverse stream
+        | Nat.succ fuel, acc, stream =>
+            match p.eval stream with
+            | .ok value stream' =>
+                if remainingSize stream' < remainingSize stream then
+                  loop fuel (value :: acc) stream'
+                else
+                  .error progressError
+            | .error err =>
+                if err.code = .missing then
+                  .ok acc.reverse stream
+                else
+                  .error err
+      loop fuel [] stream
+  }
+
+/-- One-or-more repetition combinator. -/
+def some {α : Type} (p : Interpreter α) : Interpreter (List α) :=
+  {
+    grammar := {
+      usage := Usage.append p.grammar.usage (Usage.optional p.grammar.usage)
+    },
+    eval := fun stream =>
+      match p.eval stream with
+      | .ok head stream' =>
+          match (many p).eval stream' with
+          | .ok tail stream'' => .ok (head :: tail) stream''
+          | .error err => .error err
+      | .error err => .error err
+  }
 
 instance : Functor Interpreter where
   map f p := map p f

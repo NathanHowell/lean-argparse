@@ -6,29 +6,12 @@
 - Maintain ergonomic API for downstream users, with clear migration guidance.
 
 ## Progress
-- Implemented `Argparse.Native.ArgStream` as the structural representation of front tokens with proofs that `remaining` matches `ParseState` semantics.
-- Added `Argparse.Native.Grammar` with a pure interpreter skeleton that evaluates primitive positional arguments via `ArgStream` while maintaining usage metadata and structured error codes.
-- Ported the token parsing adapters (`TokenSpec`) into `Argparse.Native.Token`, preserving the long/short option analysis and diagnostics used by `ParseState`.
-- Introduced `Argparse.Native.Consumer.takePositional?` to structurally recover the next positional token while keeping option-like front tokens intact.
-- Added `Argparse.Native.Consumer.consume{Flag,Value}` helpers that reuse `TokenSpec` on `ArgStream`, enabling flag/option removal without mutating `ParseState`.
-- Extended `Argparse.Native.Interpreter` with flag/option primitives wired to the new consumers, plus convenience constructors for short/long variants and usage metadata.
-- Added a native example in `Tests/Main.lean` that mirrors the existing CLI parser, validating the new interpreter pipeline end-to-end.
-- Added regression tests covering native flag/value consumers and short/long token handling.
-- Implemented `Interpreter.many`/`Interpreter.some` using structural recursion over `ArgStream`, with tests covering empty and non-empty inputs.
-- Ported the remaining applicative combinators (`optional`, `choice`, `withDefault`, lazy `orElse`) onto `Interpreter`, providing `Functor`/`Applicative`/`Alternative` instances that mirror the legacy parser API.
-- Expanded native tests to exercise the new combinators in conjunction with `many`/`some`, ensuring missing/invalid error propagation remains structural.
-- Added property-style test generators that permute long flag/option placements (including `--` sentinels) to validate `consume*` helpers and `many`/`some` progress invariants.
-- Began formalisation work with lemmas relating `ArgStream.remaining` length to its structural components and proving `Interpreter.positional` can only emit `.missing` errors.
-- Strengthened the proof toolbox with `ArgStream.next?` progress and `Interpreter.positional_ok_progress`, streamlining the existing missing-error lemma to be purely `simp`-driven.
-- Added `Consumer.takePositional?` progress lemmas via `ArgStream.remaining`, letting structural consumers participate in interpreter termination proofs.
-- Refactored flag consumption through a reusable `consumeFlagFront` helper and proved a front-length lemma, preparing the groundwork for a stream-level progress theorem.
-- Completed the stream-level progress lemma for `consumeFlag`, showing that successful flag removal strictly decreases `ArgStream.remaining` length and tying the helper proofs into the structural invariant.
-- Re-expressed `consumeValue` directly on `ArgStream`, removing the list-accumulator loop and aligning the option consumer with the existing structural lemmas.
-- Proved the `consumeValue` progress lemma via the structural helper, completing the Phase 1 consumer progress work and ensuring option values also decrease `ArgStream.remaining` length.
-- Reworked the native CLI sample to showcase the applicative/alternative helpers (`<*>`, `<|>`, `withDefault`), giving downstream users a concrete migration reference built on the structural consumers.
-- Expanded the property-test generators to cover short-option permutations and validated `flagLongShort`/`optionLongShortNat` against structural expectations for mixed flag/value inputs.
-- Introduced `Argparse.Native.ParsedToken` with a single-pass `classify` that normalises long/short option spellings, preserves inline values, and honours the `--` sentinel while preparing for a list-based interpreter.
-- Added `Argparse.Native.TokenStream` helpers to manipulate classified tokens directly, providing positional/flag/value removal with last-value-wins semantics and regression guards for the new helper API.
+- Implemented `Argparse.Native.ArgStream` as a structural view of CLI fronts, showing that `remaining` mirrors the legacy `ParseState` semantics.
+- Added `Argparse.Native.Grammar` with a pure interpreter skeleton that pairs usage metadata with structured error reporting.
+- Ported the token parsing adapters (`TokenSpec`) into `Argparse.Native.Token`, preserving long/short option diagnostics.
+- Introduced `Argparse.Native.ParsedToken` with a single-pass `classify` that normalises long/short spellings, preserves inline values, and honours the `--` sentinel.
+- Built `Argparse.Native.TokenStream` helpers to manipulate classified tokens directly, enabling positional/flag/value removal with last-value-wins semantics.
+- Replaced the ArgStream consumer layer with a TokenStream-native interpreter and updated the native example plus regression suite to exercise the new pipeline end-to-end.
 
 ## Phase 1 – Foundations
 1. **Introduce `ArgStream`**
@@ -77,6 +60,6 @@
  - Confirm that “last value wins” aligns with downstream expectations; document any intentional divergence from the legacy parser’s first-hit behaviour.
 
 ## Next Steps
-1. Re-express the native interpreter over the `ParsedToken` list with last-value-wins semantics, adapting the existing consumer proofs to the new fold.
-2. Extend the property and regression tests to exercise the classifier/integrator pipeline (repeated options, sentinel boundaries, mixed short/long values).
-3. Document the parsed-token pass and migration guidance so downstream users understand the semantic shift before broader interpreter changes land.
+1. Rebuild the proof toolbox for the TokenStream interpreter (progress, missing/invalid soundness) so the new pipeline regains formal guarantees.
+2. Extend property and regression tests to cover repeated options, sentinel boundaries, and short/long permutations under last-value-wins semantics.
+3. Document the parsed-token pass and the semantics shift (last-value-wins, two-pass pipeline) to guide downstream migrations.
