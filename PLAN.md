@@ -24,6 +24,7 @@
 - ❌ Attempted to prove progress for `consumeFlagList`/`consumeOptionList` by threading explicit removal counters through the recursion. Outcome: unwieldy inductions and failing tests; reverted and recorded for posterity.
 - ✅ Maintained the parsed-token classifier from earlier work; it still serves as the normalisation front-end for the upcoming cursor interpreter.
 - ✅ Added the initial `TokenCursor` scaffold with array-backed storage, cursor helpers, and build coverage so the iterator rewrite has a concrete foundation.
+- 🔁 Reconfirmed the immediate milestone: migrate positional/flag/value primitives onto the cursor and capture the accompanying proofs before expanding scope.
 
 ## Workstreams
 1. **Cursor Foundation**
