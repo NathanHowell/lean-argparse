@@ -7,9 +7,9 @@
 - Maintain an explicit activity log, including failed experiments and reverted approaches, so future agents can learn from them.
 
 ## Current Snapshot
-- Normalised argv-to-token pass (`ParsedToken`) now splits argv into option tokens and positional strings after the first positional/`--`, simplifying downstream consumers.
-- Interpreter now consumes a cursor backed by two arrays (`options`, `positionals`); the legacy `TokenStream` helpers were deleted after porting positional/flag/value primitives onto the cursor.
-- Regression tests cover the cursor pipeline plus short-option permutations under the new “first positional locks positional mode” semantics, but structural proofs are presently missing.
+- Normalised argv-to-token pass (`ParsedToken`) still splits argv into option tokens and positional strings after the first positional/`--`, feeding the new cursor-based interpreter.
+- Interpreter primitives now run entirely through the field-updater bundle: `HandlerBundle.apply/run` fold classified options before positionals, while `PartialSpec` finalises the partial state.
+- Lean tests were pared back to focus on the public interpreter API—flag/option/positional success paths, last-value-wins semantics, and optional/default helpers—dropping the legacy `TokenCursor.consume*` assertions that no longer reflect the design.
 
 ## Architectural Direction (Cursor + Field Updaters)
 - **TokenCursor Core**: keep the classified argv pass yielding `TokenCursor := { options : Array ParsedOption, positionals : Array String }`, measuring progress via array sizes so helper lemmas stay arithmetic and array-native.
@@ -24,8 +24,8 @@
 - ✅ Added the initial `TokenCursor` scaffold with array-backed storage, cursor helpers, and build coverage so the iterator rewrite has a concrete foundation.
 - ✅ Replaced the `TokenStream` primitives with cursor-based versions, updated the interpreter/tests, and removed the obsolete module.
 - ✅ Split classification output into option/positional arrays, rewrote `TokenCursor` to operate on those arrays directly, and refreshed tests/documentation to match the simplified semantics.
-- 🔁 Next milestone: prototype the field-updater fold on top of `TokenCursor`, then rebuild progress proofs in that setting before lifting them to higher-level combinators.
-- 🚧 Added a first-cut `OptionHandler`/`PositionalHandler` dispatch module that folds classified tokens into an arbitrary partial state; integration with the public interpreter (and richer partial records) is the next step.
+- ✅ Integrated the handler bundle with the interpreter: `HandlerBundle.run` plus `PartialSpec` now power all native primitives, giving an explicit folding surface for upcoming proofs.
+- ✅ Retired low-level cursor consumer tests and replaced them with interpreter-level guards that exercise flag, option, positional, optional, and default behaviours under last-value-wins semantics.
 
 ## Workstreams
 1. **Cursor & Partial Foundations**
@@ -42,6 +42,6 @@
    - Document the new architecture and remaining gaps so downstream users can migrate confidently.
 
 ## Immediate Next Steps
-1. Prototype the field-updater fold atop `TokenCursor`, capturing any negative experiments while shaping the partial-state abstraction.
-2. Reintroduce progress proofs in the updater setting and thread them through the fold/combinators.
-3. Extend property tests and docs to explain the updater-based architecture, logging successes and setbacks as they occur.
+1. Shape richer partial-state abstractions (e.g., field bookkeeping helpers) and capture any negative prototypes while extending the handler bundle beyond trivial states.
+2. Reintroduce progress proofs in the updater setting and thread them through applicative combinators, documenting any stalled approaches.
+3. Extend property tests and docs to explain the updater-based architecture, including repeated-option and sentinel permutations, while recording successes and setbacks.
