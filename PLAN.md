@@ -49,6 +49,7 @@
 - 2025-09-27: Added normalization pass (`Argparse.Core.Normalize.normalize`) splitting tokens on `--` into the new state record.
 - 2025-09-27: Introduced the `FromArg` class with baseline instances (String, Substring, Nat, Int, Bool) in `Argparse/Core/Value.lean`.
 - 2025-09-27: Added AST scaffolding (`Argparse.Spec.AST`) covering metadata, items, and command tree structures.
+- 2025-09-27: Seeded elaboration stubs in `Argparse.Spec.Elab` to begin translating the AST into runtime parsers.
 - _Please append future successes and failures here with short rationales._
 
 ## Immediate Next Steps
@@ -60,5 +61,6 @@
 6. ✅ **Normalization draft** (2025-09-27): Implemented `Argparse.Core.Normalize.normalize` to split tokens on the first `--` and populate the new `State` record.
 7. ✅ **Value parsing scaffold** (2025-09-27): Added the `FromArg` class with baseline instances (String, Substring, Nat, Int, Bool) in `Argparse/Core/Value.lean`.
 8. ✅ **Spec AST skeleton** (2025-09-27): Outlined the command specification tree in `Argparse/Spec/AST.lean` covering flags, options, positionals, and subcommands.
-9. **Elaborator scaffold**: Establish the scaffold in `Argparse/Spec/Elab.lean` to translate the AST into runtime parsers.
-10. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
+9. ✅ **Elaborator scaffold** (2025-09-27): Added placeholder elaboration helpers in `Argparse/Spec/Elab.lean` to translate AST items into parsers.
+10. **Doc describer scaffold**: Mirror the AST into `Argparse/Spec/Describe.lean`, preparing helpers for help/man/completion generation.
+11. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
