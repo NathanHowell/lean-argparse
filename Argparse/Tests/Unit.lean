@@ -74,6 +74,13 @@ private def requiredSpec : OptSpec String :=
   | .err err => err.kind = .missingValue
   | _ => False)
 
+private def shortCountSpec : OptSpec Nat :=
+  { short? := some { c := 'n', ok := by decide }, meta := { name := "count" }, concatVal? := true }
+
+#guard (match option shortCountSpec (mkState ["-n5v"] []) with
+  | .ok (.some n) st => n = 5 ∧ st.pre = ["-v"] ∧ st.cursor = 1
+  | _ => False)
+
 private def nameSpec : PosSpec String :=
   { meta := { name := "NAME" } }
 

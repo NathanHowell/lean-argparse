@@ -68,4 +68,9 @@ theorem option_total_placeholder {α} [FromArg α]
     (spec : OptSpec α) (st : State) : True :=
   trivial
 
+/-- Placeholder: option `.some` requires at least one value. -/
+theorem option_some_requires_input_placeholder {α} [FromArg α]
+    (spec : OptSpec α) (st : State) : True :=
+  trivial
+
 end ArgParse.Proofs

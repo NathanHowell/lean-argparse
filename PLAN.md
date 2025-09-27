@@ -63,6 +63,8 @@
 - 2025-09-27: Added short-flag bundling to the core flag parser and proved cursor/state lemmas for flag success/failure cases.
 - 2025-09-27: Extended option parsing to honour `.many`/`.some` arities, long `--name=value`, and short concatenations; elaborator/doc layers now reflect the collected lists (inline bundle splitting like `-n5v` still pending).
 - 2025-09-27: Extended positional parsing/elaboration to support `.many`/`.some` arities across pre/post token streams.
+- 2025-09-27: Implemented basic inline short-bundle splitting for options (e.g. `-n5v` yields value `5` and requeued `-v`), with placeholder lemmas queued for completion.
+- 2025-09-27: Added placeholder totality lemmas for positional/option `.some` cases alongside the established flag progress proofs.
 - _Please append future successes and failures here with short rationales._
 
 ## Immediate Next Steps
@@ -87,5 +89,5 @@
 19. ✅ **Documentation alignment** (2025-09-27): Doc helpers now accept optional `Partial` annotations through `render*With`, surfacing runtime values alongside spec entries.
 20. ✅ **Option bundling & repeat arities** (2025-09-27): Extended option parsing for long/short concatenation and `.many`/`.some` arities; remaining work includes splitting inline bundles like `-n5v` and covering non-`String` payloads.
 21. ✅ **Positional arities** (2025-09-27): Positional combinators now support `.many`/`.some` with corresponding elaboration/storage across pre/post streams.
-22. **Inline short bundle splitting**: Allow mixed tokens like `-n5v` to yield both option value and trailing flag, and generalise option/positional parsing to non-`String` payloads.
+22. **Inline short bundle proofs & generalisation**: Finish bundle-splitting proofs, ensure non-`String` `FromArg` payloads integrate cleanly, and capture any remaining edge cases.
 23. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
