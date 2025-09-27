@@ -116,6 +116,34 @@ instance instMonad : Monad Assigned :=
       bind := bind
       map := Functor.map }
 
+instance instLawfulMonad : LawfulMonad Assigned :=
+  LawfulMonad.mk'
+    (id_map := by
+      intro α x
+      cases x <;> rfl)
+    (pure_bind := by
+      intro α β x f
+      rfl)
+    (bind_assoc := by
+      intro α β γ x f g
+      cases x <;> rfl)
+    (map_const := by
+      intro α β x y
+      cases y <;> rfl)
+    (seqLeft_eq := by
+      intro α β x y
+      cases x <;> cases y <;> rfl)
+    (seqRight_eq := by
+      intro α β x y
+      cases x <;> cases y <;> rfl)
+    (bind_pure_comp := by
+      intro α β f x
+      cases x <;> rfl)
+    (bind_map := by
+      intro α β f x
+      cases f <;> cases x <;> rfl)
+
+
 end Assigned
 
 end Native

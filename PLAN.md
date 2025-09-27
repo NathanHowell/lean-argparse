@@ -8,10 +8,10 @@
 
 ## Current Snapshot
 
-- **Typeclass audit findings**:
-  - `Argparse/Native/Grammar.lean:34` already provides `pure`/`map`/`seq`; add `Functor`/`Applicative` (and likely `Alternative`) instances so downstream code can use Lean’s standard combinators instead of bespoke helpers.
-  - `Argparse/Native/Grammar.lean:15` defines `Result` with a custom `map`; either reuse `Except Error` or supply the usual instance stack (`Functor`/`Applicative`/`Monad`, etc.) to avoid re-implementing common behaviour.
-  - `Argparse/Native/Partial.lean:42` now includes `Assigned` instances, but we still owe `LawfulFunctor`/`LawfulApplicative`/`LawfulMonad` proofs so Lean can apply the generated simplification lemmas automatically.
+- ✅ Typeclass audit resolved:
+  - `Grammar` now exposes `Functor`/`Applicative`/`Alternative` instances so downstream code can lean on `<$>`/`<*>` rather than bespoke helpers.
+  - Native `Result` is an `Except Error` alias, inheriting the standard `Monad`/`Applicative` stack and eliminating the custom wrapper.
+  - `Assigned` gained `LawfulMonad` (and therefore `LawfulApplicative`/`LawfulFunctor`) proofs, unlocking Lean’s simplification lemmas for the partial-field helpers.
 - Normalised argv-to-token pass (`ParsedToken`) still splits argv into option tokens and positional strings after the first positional/`--`, feeding the new cursor-based interpreter.
 - Interpreter primitives now run entirely through the field-updater bundle: `HandlerBundle.apply/run` fold classified options before positionals, while `PartialSpec` finalises the partial state.
 - Lean tests were pared back to focus on the public interpreter API—flag/option/positional success paths, last-value-wins semantics, and optional/default helpers—dropping the legacy `TokenCursor.consume*` assertions that no longer reflect the design.

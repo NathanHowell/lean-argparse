@@ -12,18 +12,7 @@ namespace Native
 open Token
 
 /-- Result type returned by the native interpreter. -/
-inductive Result (α : Type) where
-  | ok (value : α)
-  | error (info : Error)
-  deriving Repr
-
-namespace Result
-
-@[simp] def map {α β : Type} (f : α → β) : Result α → Result β
-  | .ok value => .ok (f value)
-  | .error err => .error err
-
-end Result
+abbrev Result (α : Type) := Except Error α
 
 /-- Metadata-only grammar description. -/
 structure Grammar (α : Type) where
@@ -40,7 +29,7 @@ def fail {α : Type} : Grammar α :=
   { usage := Usage.empty }
 
 /-- Map over a grammar without changing usage. -/
-def map {α β : Type} (g : Grammar α) (_ : α → β) : Grammar β :=
+def map {α β : Type} (_ : α → β) (g : Grammar α) : Grammar β :=
   { usage := g.usage }
 
 /-- Sequential application combines usage from left to right. -/
@@ -59,7 +48,36 @@ def flag (doc : OptionDoc) : Grammar Bool :=
 def option (doc : OptionDoc) : Grammar (Option String) :=
   { usage := Usage.mergeOption doc Usage.empty }
 
+/-- Grammar that always fails. Mirrors `Alternative.failure`. -/
+def failure {α : Type} : Grammar α := fail
+
+/-- Grammar-level alternative combining usage information for both branches. -/
+def orElse {α : Type} (ga : Grammar α) (gb : Unit → Grammar α) : Grammar α :=
+  let gb' := gb ()
+  { usage := Usage.optional (Usage.append ga.usage gb'.usage) }
+
+/-- Strict helper for `orElse`. -/
+def orElse' {α : Type} (ga gb : Grammar α) : Grammar α :=
+  orElse ga (fun _ => gb)
+
 end Grammar
+
+instance : Functor Grammar where
+  map := Grammar.map
+
+instance : Pure Grammar := ⟨Grammar.pure⟩
+
+instance : Seq Grammar where
+  seq gf ga := Grammar.seq gf (ga ())
+
+instance : Applicative Grammar where
+  pure := Grammar.pure
+  seq := Seq.seq
+  map := Functor.map
+
+instance : Alternative Grammar where
+  failure := Grammar.failure
+  orElse := Grammar.orElse
 
 private def describe {α : Type} [TokenSpec α] (name : α) : String :=
   TokenSpec.describe name
@@ -90,13 +108,11 @@ structure Interpreter (α : Type) where
 namespace Interpreter
 
 @[inline] def eval {α : Type} (i : Interpreter α) (cursor : TokenCursor) : Result α :=
-  match HandlerBundle.run i.bundle i.spec cursor with
-  | Except.ok value => .ok value
-  | Except.error err => .error err
+  HandlerBundle.run i.bundle i.spec cursor
 
 /-- Functorial map over interpreter results. -/
 def map {α β : Type} (i : Interpreter α) (f : α → β) : Interpreter β :=
-  { grammar := Grammar.map i.grammar f
+  { grammar := Grammar.map f i.grammar
     , state := i.state
     , bundle := i.bundle
     , spec :=
