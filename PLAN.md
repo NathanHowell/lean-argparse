@@ -15,7 +15,9 @@
 - ✅ Parser primitives (`flag`, `option`, `positional`, `optional`, `withDefault`) now delegate directly to list-based helpers; leftover option/positional checks live in `Interpreter.evalTokens` instead of the old handler stacks.
 - ✅ Tests compile against the new API (classification assertions updated for lists, interpreter evaluation now accepts raw argv).
 - ✅ Directive upheld: prefer Lean’s built-in type classes over bespoke combinators; all new abstractions must either reuse existing instances or provide private instance declarations that piggy-back on the standard hierarchy.
-- 📓 Failure log (unchanged): the counter-based cursor proofs, list-rewrite attempt, and `RespectsPositionals` lemmas all stalled due to brittle arithmetic or missing standard predicates; keeping them documented here prevents repetition once we pivot to a new structure.
+- 📓 Failure log:
+  - Counter-based cursor proofs, list-rewrite attempt, and `RespectsPositionals` lemmas all stalled due to brittle arithmetic or missing standard predicates.
+  - **New:** Refactoring `consumeFlag`/`consumeValue` to return removal counters (`FlagSweep`/`ValueSweep`) looked promising for progress lemmas, but the recursive proofs required heavy case-splitting on `Except` and inline-value branches; the helper types were reverted after `lake test` failures.
 
 The codebase compiles/tests with the new state-transformer interpreter; next steps focus on rebuilding structural proofs and richer property coverage.
 
@@ -41,6 +43,6 @@ The codebase compiles/tests with the new state-transformer interpreter; next ste
 
 ## Immediate Next Steps
 
-1. Develop and document progress lemmas for the new list-based helpers, recording any failed attempts.
+1. Develop and document progress lemmas for the new list-based helpers, recording any failed attempts (next experiment: derive inequalities directly from the existing `foldlM` definitions instead of introducing new sweep structures).
 2. Expand the native test suite with property-style coverage for repeated options and positional spillover, ensuring `lake test` stays green.
 3. Update docs (including this plan) as results land, highlighting lessons learned and remaining proof obligations.
