@@ -1,11 +1,29 @@
 /-!
 # ArgParse.CLI.Print
 
-Placeholder for built-in CLI rendering helpers.
+Stub helpers that expose help/man/completion entry points.
 -/
+
+import Argparse.Doc.Help
+import Argparse.Doc.Man
+import Argparse.Doc.Completion
 
 namespace ArgParse.CLI
 
--- TODO: implement CLI built-ins per SPEC.md.
+open ArgParse
+open ArgParse.Doc
+open ArgParse.Spec
+
+/-- Render `--help` output for an application spec. -/
+def renderHelp (spec : Spec.AppSpec) : String :=
+  Doc.renderHelp spec
+
+/-- Render `--man` output for an application spec. -/
+def renderMan (spec : Spec.AppSpec) : String :=
+  Doc.renderMan spec
+
+/-- Render `--generate-completions` output for an application spec. -/
+def renderCompletions (spec : Spec.AppSpec) : String :=
+  Doc.renderCompletion spec
 
 end ArgParse.CLI

@@ -53,6 +53,7 @@
 - 2025-09-27: Introduced documentation describer stubs in `Argparse.Spec.Describe`.
 - 2025-09-27: Stubbed help/man/completion renderers consuming describer output.
 - 2025-09-27: Registered placeholder theorems across `Argparse/Proofs` modules.
+- 2025-09-27: Exposed CLI helpers delegating to the doc renderers in `Argparse.CLI.Print`.
 - _Please append future successes and failures here with short rationales._
 
 ## Immediate Next Steps
@@ -68,5 +69,6 @@
 10. ✅ **Doc describer scaffold** (2025-09-27): Mirrored the AST into `Argparse/Spec/Describe.lean`, producing placeholder documentation entries.
 11. ✅ **Doc renderers placeholder** (2025-09-27): Stubbed help/man/completion renderers to consume describer output.
 12. ✅ **Proof scaffolding** (2025-09-27): Added placeholder theorems across `Argparse/Proofs/*` referencing the new core modules.
-13. **CLI placeholder**: Stub `Argparse/CLI/Print.lean` to expose minimal entry points for help/man/completions.
-14. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
+13. ✅ **CLI placeholder** (2025-09-27): Stubbed `Argparse/CLI/Print.lean` to expose minimal help/man/completion entry points.
+14. **Examples placeholder**: Populate `Argparse/Examples/Xargs0.lean` and `.GitLike` with minimal scaffolds referencing the new spec.
+15. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
