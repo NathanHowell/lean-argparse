@@ -134,10 +134,6 @@ private def missingValueError [TokenSpec α] (name : α) : Error :=
 private def rebuild (front tail : List String) : ArgStream :=
   ArgStream.ofFrontTail front tail
 
-/-- Measure contribution from the tail section to `remaining` length. -/
-private def tailMeasure (tail : List String) : Nat :=
-  if tail = [] then 0 else tail.length + 1
-
 /-- Scan the front tokens for `name`, returning the updated front when found. -/
 private def consumeFlagFront [DecidableEq α] [TokenSpec α]
     (name : α) : List String → Except Error (Bool × List String)
@@ -283,41 +279,39 @@ theorem consumeFlag_progress [DecidableEq α] [TokenSpec α]
             Nat.add_lt_add_right hLtFront (if tail = [] then 0 else tail.length + 1)
           simpa [hNewLen'.symm, hOldLen'.symm] using hIneq
 
+/-- Locate the option named `name`, returning its value and rebuilt stream. -/
+private def consumeValueLoop [DecidableEq α] [TokenSpec α]
+    (name : α) (revSkipped : List String)
+    : ArgStream → Except Error (Option (String × ArgStream))
+  | .step tok rest =>
+      match TokenSpec.parse (α := α) tok with
+      | some (found, some v) =>
+          if found = name then
+            let newStream := restoreFront revSkipped rest
+            .ok (some (v, newStream))
+          else
+            consumeValueLoop name (tok :: revSkipped) rest
+      | some (found, none) =>
+          if found = name then
+            match rest with
+            | .step next restTail =>
+                let newStream := restoreFront revSkipped restTail
+                .ok (some (next, newStream))
+            | .tail [] =>
+                .error <| missingValueError name
+            | .tail (next :: tailRest) =>
+                let newStream := restoreFront revSkipped (ArgStream.tail tailRest)
+                .ok (some (next, newStream))
+          else
+            consumeValueLoop name (tok :: revSkipped) rest
+      | none => consumeValueLoop name (tok :: revSkipped) rest
+  | .tail _ => .ok none
+
 /-- Attempt to consume an option value token from the front of the stream. -/
 def consumeValue [DecidableEq α] [TokenSpec α]
     (name : α) (stream : ArgStream) : Except Error (Option String × ArgStream) :=
-  let front := ArgStream.toList stream
-  let tail := ArgStream.tailList stream
-  let rec loop (processed : List String)
-      : List String → Except Error (Option (Option String × List String × List String))
-    | [] => .ok none
-    | tok :: rest =>
-        match TokenSpec.parse tok with
-        | some (found, value?) =>
-            if found = name then
-              match value? with
-              | some v =>
-                  let newFront := processed.reverse ++ rest
-                  .ok (some (some v, newFront, tail))
-              | none =>
-                  match rest with
-                  | next :: restTail =>
-                      let newFront := processed.reverse ++ restTail
-                      .ok (some (some next, newFront, tail))
-                  | [] =>
-                      match tail with
-                      | next :: tailRest =>
-                          let newFront := processed.reverse
-                          .ok (some (some next, newFront, tailRest))
-                      | [] =>
-                          .error <| missingValueError name
-            else
-              loop (tok :: processed) rest
-        | none => loop (tok :: processed) rest
-  match loop [] front with
-  | .ok (some (value, newFront, newTail)) =>
-      let newStream := rebuild newFront newTail
-      .ok (value, newStream)
+  match consumeValueLoop (name := name) [] stream with
+  | .ok (some (value, newStream)) => .ok (some value, newStream)
   | .ok none => .ok (none, stream)
   | .error err => .error err
 

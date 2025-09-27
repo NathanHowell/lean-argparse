@@ -23,6 +23,7 @@
 - Added `Consumer.takePositional?` progress lemmas via `ArgStream.remaining`, letting structural consumers participate in interpreter termination proofs.
 - Refactored flag consumption through a reusable `consumeFlagFront` helper and proved a front-length lemma, preparing the groundwork for a stream-level progress theorem.
 - Completed the stream-level progress lemma for `consumeFlag`, showing that successful flag removal strictly decreases `ArgStream.remaining` length and tying the helper proofs into the structural invariant.
+- Re-expressed `consumeValue` directly on `ArgStream`, removing the list-accumulator loop and aligning the option consumer with the existing structural lemmas.
 
 ## Phase 1 – Foundations
 1. **Introduce `ArgStream`**
