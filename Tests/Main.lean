@@ -11,6 +11,19 @@ open Argparse.Native.Token
 
 namespace ArgparseTests
 
+#guard (Argparse.Native.classify ["--verbose"] =
+  [ParsedToken.option { name := ParsedName.long "verbose", original := "--verbose", inlineValue? := none }])
+
+#guard (Argparse.Native.classify ["-n=3"] =
+  [ParsedToken.option { name := ParsedName.short 'n', original := "-n=3", inlineValue? := some "3" }])
+
+#guard (Argparse.Native.classify ["--", "--count"] =
+  [ParsedToken.positional "--count"])
+
+#guard (Argparse.Native.classify ["-n5", "FILE"] =
+  [ParsedToken.option { name := ParsedName.short 'n', original := "-n5", inlineValue? := some "5" },
+   ParsedToken.positional "FILE"])
+
 private def containsSubstring (haystack needle : String) : Bool :=
   if needle.isEmpty then
     true

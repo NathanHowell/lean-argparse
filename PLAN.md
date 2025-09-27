@@ -27,6 +27,7 @@
 - Proved the `consumeValue` progress lemma via the structural helper, completing the Phase 1 consumer progress work and ensuring option values also decrease `ArgStream.remaining` length.
 - Reworked the native CLI sample to showcase the applicative/alternative helpers (`<*>`, `<|>`, `withDefault`), giving downstream users a concrete migration reference built on the structural consumers.
 - Expanded the property-test generators to cover short-option permutations and validated `flagLongShort`/`optionLongShortNat` against structural expectations for mixed flag/value inputs.
+- Introduced `Argparse.Native.ParsedToken` with a single-pass `classify` that normalises long/short option spellings, preserves inline values, and honours the `--` sentinel while preparing for a list-based interpreter.
 
 ## Phase 1 – Foundations
 1. **Introduce `ArgStream`**
@@ -75,6 +76,6 @@
  - Confirm that “last value wins” aligns with downstream expectations; document any intentional divergence from the legacy parser’s first-hit behaviour.
 
 ## Next Steps
-1. Draft the `ParsedToken` structure and a single-pass classifier from `[String]` to `List ParsedToken`, embedding source spellings and normalising short/long option names.
-2. Update the native interpreter to operate on the classified list with last-value-wins semantics, porting existing proofs/tests to the new backbone.
-3. Refresh documentation and migration notes to call out the semantic shift for repeated options, and extend property tests to cover the new canonical pipeline.
+1. Re-express the native interpreter over the `ParsedToken` list with last-value-wins semantics, adapting the existing consumer proofs to the new fold.
+2. Extend the property and regression tests to exercise the classifier/integrator pipeline (repeated options, sentinel boundaries, mixed short/long values).
+3. Document the parsed-token pass and migration guidance so downstream users understand the semantic shift before broader interpreter changes land.
