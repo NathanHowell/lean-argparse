@@ -13,7 +13,7 @@
 - Introduced `Argparse.Native.ParsedToken` with a single-pass `classify` that normalises long/short spellings, preserves inline values, and honours the `--` sentinel.
 - Built `Argparse.Native.TokenStream` helpers to manipulate classified tokens directly, enabling positional/flag/value removal with last-value-wins semantics.
 - Replaced the ArgStream consumer layer with a TokenStream-native interpreter and updated the native example plus regression suite to exercise the new pipeline end-to-end.
-- Attempted to reintroduce the structural progress lemmas for `consumeFlag`/`consumeValue`; initial induction over `consumeFlagList` stalled because the current helper does not expose how many tokens were removed, making the length inequalities cumbersome.
+- Attempted to reintroduce the structural progress lemmas for `consumeFlag`/`consumeValue`; the latest effort added removal counters to `consumeFlagList`/`consumeOptionList` but the resulting induction became unwieldy and was reverted after `lake test` failed. Captured the blocker so the next iteration can revisit the design with a clearer strategy.
 
 ## Phase 1 – Foundations
 1. **Introduce `ArgStream`**
