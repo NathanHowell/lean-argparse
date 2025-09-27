@@ -22,7 +22,7 @@
 - Strengthened the proof toolbox with `ArgStream.next?` progress and `Interpreter.positional_ok_progress`, streamlining the existing missing-error lemma to be purely `simp`-driven.
 - Added `Consumer.takePositional?` progress lemmas via `ArgStream.remaining`, letting structural consumers participate in interpreter termination proofs.
 - Refactored flag consumption through a reusable `consumeFlagFront` helper and proved a front-length lemma, preparing the groundwork for a stream-level progress theorem.
-- Explored progress proofs for `consumeFlag`, noting the current list-scanning loop needs a dedicated helper that returns updated fronts directly; captured the refactoring strategy required before reattempting the lemma.
+- Completed the stream-level progress lemma for `consumeFlag`, showing that successful flag removal strictly decreases `ArgStream.remaining` length and tying the helper proofs into the structural invariant.
 
 ## Phase 1 – Foundations
 1. **Introduce `ArgStream`**
@@ -67,6 +67,6 @@
 - Explore integrating with `Std`’s parser combinator ecosystem if/when one lands, to avoid duplication.
 
 ## Next Steps
-1. Finish the stream-level progress lemma for `consumeFlag` (and extend to `consumeValue`) now that the front-scanning helper and length lemma are in place.
+1. Extend the progress lemma work to `consumeValue`, reusing the front/tail splitting strategy now validated for `consumeFlag`.
 2. Rework the native CLI sample to lean on the new applicative/alternative helpers (`<*>`, `<|>`, `withDefault`) and document the migration pattern for downstream adopters.
 3. Extend property coverage to short-option combinators and mixed flag/value permutations, ensuring the generator utilities cover both token specs.

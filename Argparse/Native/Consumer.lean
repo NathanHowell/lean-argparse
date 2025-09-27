@@ -233,6 +233,56 @@ def consumeFlag [DecidableEq α] [TokenSpec α]
   | .ok (false, _) => .ok (false, stream)
   | .error err => .error err
 
+theorem consumeFlag_progress [DecidableEq α] [TokenSpec α]
+    (name : α) {stream newStream : ArgStream} :
+    consumeFlag name stream = .ok (true, newStream) →
+      (ArgStream.remaining newStream).length <
+        (ArgStream.remaining stream).length := by
+  intro h
+  dsimp [consumeFlag] at h
+  cases hConsume : consumeFlagFront name (ArgStream.toList stream) with
+  | error err =>
+      simp [hConsume] at h
+  | ok result =>
+      rcases result with ⟨present, newFront⟩
+      cases present with
+      | false =>
+          simp [hConsume] at h
+      | true =>
+          let tail := ArgStream.tailList stream
+          have hConsumeTrue :
+              consumeFlagFront name (ArgStream.toList stream) =
+                .ok (true, newFront) := by
+            simpa [hConsume]
+          have hPair : (true, rebuild newFront tail) = (true, newStream) := by
+            simpa [tail, hConsume] using h
+          have hStream : newStream = rebuild newFront tail :=
+            (congrArg Prod.snd hPair).symm
+          subst hStream
+          have hFrontLen :=
+            consumeFlagFront_ok_length (name := name)
+              (front := ArgStream.toList stream) (newFront := newFront) hConsumeTrue
+          have hLtFront : newFront.length < (ArgStream.toList stream).length := by
+            have hNat : newFront.length < newFront.length + 1 :=
+              Nat.lt_succ_self _
+            exact Nat.lt_of_lt_of_eq hNat hFrontLen
+          have hNewLen :=
+            ArgStream.remaining_length (stream := rebuild newFront tail)
+          have hOldLen := ArgStream.remaining_length (stream := stream)
+          have hNewLen' :
+              (ArgStream.remaining (rebuild newFront tail)).length =
+                newFront.length + (if tail = [] then 0 else tail.length + 1) := by
+            simpa [rebuild, ArgStream.toList_ofFrontTail,
+              ArgStream.tailList_ofFrontTail] using hNewLen
+          have hOldLen' :
+              (ArgStream.remaining stream).length =
+                (ArgStream.toList stream).length +
+                  (if tail = [] then 0 else tail.length + 1) := by
+            simpa using hOldLen
+          have hIneq :=
+            Nat.add_lt_add_right hLtFront (if tail = [] then 0 else tail.length + 1)
+          simpa [hNewLen'.symm, hOldLen'.symm] using hIneq
+
 /-- Attempt to consume an option value token from the front of the stream. -/
 def consumeValue [DecidableEq α] [TokenSpec α]
     (name : α) (stream : ArgStream) : Except Error (Option String × ArgStream) :=
