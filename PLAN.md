@@ -42,10 +42,11 @@
 ## Activity Log
 - 2025-09-27: Re-read `SPEC.md`/`KNOWLEDGE.md`; prepared to align plan accordingly.
 - 2025-09-27: Scaffolding audit complete — inventoried legacy modules under `Argparse/Basic` and `Argparse/Native`; marked them for removal during migration to the `ArgParse/` hierarchy.
+- 2025-09-27: Created SPEC-aligned module skeleton under `ArgParse/` (Core, Spec, Doc, Proofs, CLI, Examples, Tests).
 - _Please append future successes and failures here with short rationales._
 
 ## Immediate Next Steps
 1. **Scaffolding audit**: Inventory existing files under `Argparse/` and determine which must be deleted or relocated to match the new `ArgParse/` hierarchy; capture any destructive changes in the log.
-2. **Module skeleton**: Generate empty modules for each file listed in the spec (Core, Spec, Doc, Proofs, CLI, Examples, Tests) with minimal docstrings and `section`s.
+2. ✅ **Module skeleton** (2025-09-27): Generated empty modules for each file listed in the spec (Core, Spec, Doc, Proofs, CLI, Examples, Tests) with minimal docstrings and `section`s.
 3. **Core type draft**: Introduce the spec’s core types (`Tokens`, `State`, `Result`, `Error`, etc.) in `ArgParse/Core/Types.lean`, replacing ad-hoc structures; document any mismatches discovered during the rewrite.
 4. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
