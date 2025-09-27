@@ -25,6 +25,7 @@
 - ✅ Replaced the `TokenStream` primitives with cursor-based versions, updated the interpreter/tests, and removed the obsolete module.
 - ✅ Split classification output into option/positional arrays, rewrote `TokenCursor` to operate on those arrays directly, and refreshed tests/documentation to match the simplified semantics.
 - 🔁 Next milestone: prototype the field-updater fold on top of `TokenCursor`, then rebuild progress proofs in that setting before lifting them to higher-level combinators.
+- 🚧 Added a first-cut `OptionHandler`/`PositionalHandler` dispatch module that folds classified tokens into an arbitrary partial state; integration with the public interpreter (and richer partial records) is the next step.
 
 ## Workstreams
 1. **Cursor & Partial Foundations**

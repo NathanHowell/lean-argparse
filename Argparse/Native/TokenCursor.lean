@@ -69,17 +69,11 @@ instance : ToParsedName Char where
 private def describe {α : Type} [TokenSpec α] (name : α) : String :=
   TokenSpec.describe name
 
-private def mismatchError {α : Type} [TokenSpec α]
-    (name : α) (detail : String) : Error :=
-  { code := .invalid
-    , subject? := some (describe name)
-    , detail? := some detail }
-
 private def missingValueError {α : Type} [TokenSpec α] (name : α) : Error :=
   { code := .missing
     , subject? := some (describe name) }
 
-private def dropHead (arr : Array String) : Array String :=
+private def dropHead {α : Type} (arr : Array α) : Array α :=
   arr.extract 1 arr.size
 
 /-- Remove the next positional argument, if any remain. -/
@@ -96,24 +90,20 @@ def consumeFlag {α : Type} [TokenSpec α] [ToParsedName α]
     (name : α) (cursor : TokenCursor)
     : Except Error (Bool × TokenCursor) := do
   let target := ToParsedName.toParsedName name
-  let init : Bool × Array ParsedOption :=
-    (false, Array.mkEmpty cursor.options.size)
-  let (present, remaining) ←
-    cursor.options.foldlM
-      (fun state opt => do
-        let (seen, kept) := state
-        if opt.name = target then
-          match opt.inlineValue? with
-          | some _ =>
-              throw <|
-                mismatchError name
-                  s!"Flag {describe name} does not accept a value"
-          | none =>
-              pure (true, kept)
-        else
-          pure (seen, kept.push opt))
-      init
-  pure (present, { cursor with options := remaining })
+  let subject := describe name
+  let options := cursor.options.toList
+  let isMatch : ParsedOption → Bool := fun opt => decide (opt.name = target)
+  let hasInline := options.any fun opt => isMatch opt && opt.inlineValue?.isSome
+  if hasInline then
+    throw {
+      code := .invalid
+      , subject? := some subject
+      , detail? := some s!"Flag {subject} does not accept a value"
+    }
+  else
+    let present := options.any isMatch
+    let remaining := options.filter fun opt => ! isMatch opt
+    pure (present, { cursor with options := remaining.toArray })
 
 /-- Retrieve the last supplied value for an option, if present. -/
 def consumeValue {α : Type} [TokenSpec α] [ToParsedName α]
