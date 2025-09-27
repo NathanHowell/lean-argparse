@@ -74,7 +74,7 @@ lemma parseConcatValue_cursor
     | ok =>
         simp [hrun] at h
         cases h
-        rfl
+        simp [Nat.succ_eq_add_one]
     | error msg =>
         cases hsplit : findConcatSplit? raw with
         | none => simp [hrun, hsplit] at h
@@ -84,6 +84,128 @@ lemma parseConcatValue_cursor
                 simp [hrun, hsplit] at h
                 cases h
                 simp [Nat.succ_eq_add_one]
+
+/-- `takeOptionStep?` succeeds only after consuming one or two tokens. -/
+lemma takeOptionStep_some_progress
+    {α} [FromArg α] (spec : OptSpec α)
+    {st st' : State} {value : α} {c : Nat} :
+    takeOptionStep? spec st = .ok { value? := some value, state := st', consumed := c } →
+    (c = 1 ∧ st'.cursor = st.cursor + 1) ∨ (c = 2 ∧ st'.cursor = st.cursor + 2) := by
+  classical
+  intro h
+  unfold takeOptionStep? at h
+  cases hpre : st.pre with
+  | nil => simp [hpre] at h
+  | cons token rest =>
+      set expect := expectOption spec
+      cases hlong : spec.long? with
+      | none =>
+          cases hshort : spec.short? with
+          | none => simp [hpre, hlong, hshort] at h
+          | some short =>
+              set prefix := shortLexeme short
+              by_cases htok : token = prefix
+              · subst htok
+                cases rest with
+                | nil => simp [hpre, hlong, hshort] at h
+                | cons valueTok restTail =>
+                    cases hrun : FromArg.run valueTok with
+                    | ok parsed =>
+                        simp [hpre, hlong, hshort, hrun] at h
+                        rcases h with ⟨hv, hs, hc⟩
+                        cases hv; cases hs; cases hc
+                        exact Or.inr ⟨rfl, by simp [State.consumePre?, hpre, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc]⟩
+                    | error msg => simp [hpre, hlong, hshort, hrun] at h
+              · have : token ≠ prefix := htok
+                by_cases hconcat : spec.concatVal? ∧ token.startsWith prefix
+                · simp [hpre, hlong, hshort, this, hconcat] at h
+                  rcases h with ⟨hv, hs, hc⟩
+                  cases hv; cases hs; cases hc
+                  exact Or.inl ⟨rfl,
+                    parseConcatValue_cursor (spec := spec) (token := token)
+                      (raw := token.drop prefix.length) (pending := rest)
+                      (st := st) (expect := expect) (value := value) rfl⟩
+                · simp [hpre, hlong, hshort, this, hconcat] at h
+  | some name =>
+      set prefix := longLexeme name
+      set eqPrefix := prefix ++ "="
+      by_cases hconcat : spec.eqVal? ∧ token.startsWith eqPrefix
+      · simp [hpre, hlong, hconcat] at h
+        rcases h with ⟨hv, hs, hc⟩
+        cases hv; cases hs; cases hc
+        exact Or.inl ⟨rfl,
+          parseConcatValue_cursor (spec := spec) (token := token)
+            (raw := token.drop eqPrefix.length) (pending := rest)
+            (st := st) (expect := expect) (value := value) rfl⟩
+          · have : ¬ (spec.eqVal? ∧ token.startsWith eqPrefix) := hconcat
+            by_cases hprefix : token = prefix
+            · subst hprefix
+              simp [hpre, hlong, hconcat] at h
+              cases rest with
+              | nil => simp at h
+              | cons valueTok restTail =>
+                  cases hrun : FromArg.run valueTok with
+                  | ok parsed =>
+                      simp [hrun] at h
+                      rcases h with ⟨hv, hs, hc⟩
+                      cases hv; cases hs; cases hc
+                      exact Or.inr ⟨rfl, by simp [State.consumePre?, hpre, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc]⟩
+                  | error msg => simp [hrun] at h
+            · have : token ≠ prefix := hprefix
+              simp [hpre, hlong, hconcat, this] at h
+              cases hshort : spec.short? with
+              | none => simp [hshort] at h
+              | some short =>
+                  set prefixShort := shortLexeme short
+                  by_cases htok : token = prefixShort
+                  · subst htok
+                    simp [hshort] at h
+                    cases rest with
+                    | nil => simp at h
+                    | cons valueTok restTail =>
+                        cases hrun : FromArg.run valueTok with
+                        | ok parsed =>
+                            simp [hrun] at h
+                            rcases h with ⟨hv, hs, hc⟩
+                            cases hv; cases hs; cases hc
+                            exact Or.inr ⟨rfl, by simp [State.consumePre?, hpre, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc]⟩
+                        | error msg => simp [hrun] at h
+                  · have : token ≠ prefixShort := htok
+                    by_cases hconcatShort : spec.concatVal? ∧ token.startsWith prefixShort
+                    · simp [hshort, this, hconcatShort] at h
+                      rcases h with ⟨hv, hs, hc⟩
+                      cases hv; cases hs; cases hc
+                      exact Or.inl ⟨rfl,
+                        parseConcatValue_cursor (spec := spec) (token := token)
+                          (raw := token.drop prefixShort.length) (pending := rest)
+                          (st := st) (expect := expect) (value := value) rfl⟩
+                    · simp [hshort, this, hconcatShort] at h
+
+/-- `takeOptionValue?` advances the cursor by one or two tokens on success. -/
+theorem takeOptionValue_some_progress
+    {α} [FromArg α] (spec : OptSpec α) (st st' : State) (value : α) :
+    takeOptionValue? spec st = .ok (some value, st') →
+    st'.cursor = st.cursor + 1 ∨ st'.cursor = st.cursor + 2 := by
+  intro h
+  unfold takeOptionValue? at h
+  classical
+  cases hstep : takeOptionStep? spec st with
+  | error err => simp [hstep] at h
+  | ok step =>
+      simp [hstep] at h
+      rcases step with ⟨value?, state', consumed⟩
+      cases value? with
+      | none => simp at h
+      | some valueStep =>
+          simp at h
+          intro hstate
+          cases hstate
+          have hprogress := takeOptionStep_some_progress
+            (spec := spec) (st := st) (st' := state')
+            (value := value) (c := consumed) hstep
+          cases hprogress with
+          | inl h1 => exact Or.inl h1.2
+          | inr h2 => exact Or.inr h2.2
 
 /-- `takePositionalStep?` consumes exactly one token whenever it succeeds. -/
 lemma takePositionalStep_some_progress
