@@ -57,6 +57,7 @@
 - 2025-09-27: Added minimal `Argparse.Examples` specs for xargs-style and git-style demos.
 - 2025-09-27: Stubbed unit and golden tests against the new helpers.
 - 2025-09-27: Updated the placeholder executable to print help for the git-style example.
+- 2025-09-27: Implemented baseline flag/option/positional parsers in `Argparse/Core/Combinators` (front-of-stream only; no bundling yet).
 - _Please append future successes and failures here with short rationales._
 
 ## Immediate Next Steps
@@ -76,5 +77,6 @@
 14. ✅ **Examples placeholder** (2025-09-27): Populated `Argparse/Examples/Xargs0.lean` and `.GitLike` with minimal scaffolds referencing the new spec.
 15. ✅ **Tests placeholder** (2025-09-27): Stubbed `Argparse/Tests/Unit.lean` and `.Golden` to exercise the new helpers.
 16. ✅ **Main executable placeholder** (2025-09-27): Pointed `Main.lean` at the git-like example help output.
-17. **Parser primitive implementation**: Begin replacing placeholders in `Argparse/Core/Combinators.lean` with real flag/option/positional parsers.
-18. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
+17. ✅ **Parser primitive implementation** (2025-09-27): Replaced placeholders in `Argparse/Core/Combinators.lean` with baseline flag/option/positional parsers (currently front-of-stream only; no bundles or repeated arities yet).
+18. **Elaborator integration**: Teach `Argparse/Spec/Elab` to delegate to the new core combinators instead of stubs, threading parsed values into simple payloads.
+19. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
