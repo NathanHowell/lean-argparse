@@ -9,57 +9,45 @@
 ## Current Snapshot
 
 - ✅ Typeclass audit resolved:
-  - `Grammar` now exposes `Functor`/`Applicative`/`Alternative` instances and carries `LawfulFunctor`/`LawfulApplicative` lemmas, unlocking Lean’s rewriting rules for `<$>`/`<*>` without bespoke simplifiers (fresh `Usage.empty_append`/`Usage.append_empty` helpers power the proofs).
-  - Native `Result` is an `Except Error` alias, inheriting the standard `Monad`/`Applicative` stack and eliminating the custom wrapper.
-  - `Assigned` gained `LawfulMonad` (and therefore `LawfulApplicative`/`LawfulFunctor`) proofs, unlocking Lean’s simplification lemmas for the partial-field helpers.
-- Normalised argv-to-token pass (`ParsedToken`) still splits argv into option tokens and positional strings after the first positional/`--`, feeding the new cursor-based interpreter.
-- Interpreter primitives now run entirely through the field-updater bundle: `HandlerBundle.apply/run` fold classified options before positionals, while `PartialSpec` finalises the partial state.
-- Lean tests were pared back to focus on the public interpreter API—flag/option/positional success paths, last-value-wins semantics, and optional/default helpers—dropping the legacy `TokenCursor.consume*` assertions that no longer reflect the design.
-- Primitives now hydrate `Assigned` field slots (new in `Argparse/Native/Partial.lean`), giving each handler an explicit notion of "unset" versus "last value wins" while keeping completion logic local to the finalisation pass.
-- New directive: audit the native stack for ad-hoc functor/applicative helpers and replace them with Lean’s type class instances (e.g. provide `Functor`/`Applicative`/`Monad` instances for the new `Assigned` partial fields and remove bespoke combinators where type classes suffice); continue logging negative results when attempts stall.
-- ✅ `Assigned` now carries Lean-standard `Functor`, `Applicative`, and `Monad` instances so downstream code can lean on established combinators instead of bespoke helpers.
-- Standing rule: future abstractions must default to Lean’s standard type classes (Functor, Applicative, Monad, etc.) instead of hand-rolled combinators; when we implement instances the supporting definitions should remain `private` or namespace-scoped helpers whenever possible to reduce API surface.
+  - `Grammar` now exposes `Functor`/`Applicative`/`Alternative` instances with accompanying `LawfulFunctor`/`LawfulApplicative` lemmas, so `<$>`/`<*>` rewrite support comes for free.
+  - Native `Result` aliases `Except Error`, inheriting Lean’s standard monad stack.
+  - `Assigned` carries `LawfulMonad` (and therefore lawful functor/applicative) proofs, allowing the partial-field helpers to use Lean’s simplification lemmas.
+- ❗ The existing implementation still routes through `TokenCursor`, `HandlerBundle`, and `PartialSpec`, but we have decided to retire that stack entirely because array arithmetic and destructive folds have made progress proofs painful.
+- ✅ Directive upheld: prefer Lean’s built-in type classes over bespoke combinators; all new abstractions must either reuse existing instances or provide private instance declarations that piggy-back on the standard hierarchy.
+- 📓 Failure log (unchanged): the counter-based cursor proofs, list-rewrite attempt, and `RespectsPositionals` lemmas all stalled due to brittle arithmetic or missing standard predicates; keeping them documented here prevents repetition once we pivot to a new structure.
 
-## Architectural Direction (Cursor + Field Updaters)
-- **TokenCursor Core**: keep the classified argv pass yielding `TokenCursor := { options : Array ParsedOption, positionals : Array String }`, measuring progress via array sizes so helper lemmas stay arithmetic and array-native.
-- **Partial-State Interpreter**: invert parsing so each primitive contributes a field updater `Partial α → Except Error (Partial α)` (or curried on tokens). Folding these updaters over the option/positional buckets hydrates a `Partial α`; overwriting fields naturally gives “last value wins”.
-- **Applicative Composition**: expose user-facing grammars by composing updaters applicatively. Each primitive exports usage metadata plus its updater; `many`, `some`, `<*>`, and `<|>` lift those updaters without reimplementing cursor plumbing.
-- **Progress Accounting**: attach lemmas to every updater showing that relevant tokens strictly decrease the cursor’s `remaining` measure. Positionals pop from their queue once positional mode starts, eliminating the earlier cursor gymnastics.
-- **Completion Pass**: after folding all tokens, run a final completion check that turns the partial state into the target value (or structured `.missing/.invalid` errors). Structural proofs focus on the fold; semantic proofs live in completion.
-- **Tests & Docs**: broaden property coverage to exercise the updater fold (repeated flags, sentinel edges, mixed permutations, partially filled states) and document the token-classification → field-updater → completion pipeline.
+The codebase still compiles/tests, but we expect large-scale churn as we replace the cursor/updater pipeline with the upcoming list-based architecture.
 
-- ❌ Attempted to prove progress for `consumeFlagList`/`consumeOptionList` by threading explicit removal counters through the recursion. Outcome: unwieldy inductions and failing tests; reverted and recorded for posterity.
-- ✅ Maintained the parsed-token classifier from earlier work; it still serves as the normalisation front-end for the upcoming cursor interpreter.
-- ✅ Added the initial `TokenCursor` scaffold with array-backed storage, cursor helpers, and build coverage so the iterator rewrite has a concrete foundation.
-- ✅ Replaced the `TokenStream` primitives with cursor-based versions, updated the interpreter/tests, and removed the obsolete module.
-- ✅ Split classification output into option/positional arrays, rewrote `TokenCursor` to operate on those arrays directly, and refreshed tests/documentation to match the simplified semantics.
-- ✅ Integrated the handler bundle with the interpreter: `HandlerBundle.run` plus `PartialSpec` now power all native primitives, giving an explicit folding surface for upcoming proofs.
-- ✅ Retired low-level cursor consumer tests and replaced them with interpreter-level guards that exercise flag, option, positional, optional, and default behaviours under last-value-wins semantics.
-- ✅ Introduced the `Assigned` partial-field helper and ported flag/option/positional primitives to it, so required-versus-default distinction lives in one reusable abstraction.
-- ❌ Adding an `Alternative` instance for `Interpreter` is currently blocked: the handler fold mutates state destructively, so supporting `<|>` would require a backtracking story (or fresh token folds) we do not have yet. Documented here so future work can revisit once a reversible execution model exists.
-- ❌ Tried to swap the option/positional folds over to `List` to simplify length/progress proofs, but Lean rejected the refactor mid-way (parser issues around the new helper defs), so the change was reverted. Proof work will need to proceed on the existing array-backed implementation for now.
-- ❌ Follow-up attempt to encode handler monotonicity via `OptionHandler.respectsPositionals` (plus helper lemmas for `flag`/`option`) ran into missing library support for `List.Forall` in this environment; reverted the changes and noted that any future proof path will either need bespoke list predicates or a different measurement strategy.
-- ❌ Attempted to prove positional-length monotonicity for the option handlers by introducing `respectsPositionals` lemmas (plus `flag`/`option` handler proofs), but Lean’s `Array.extract` defaults caused the helper lemma `dropHead_size_le` to fail to elaborate; reverted the code and logged the blocker for a future array-centric approach.
-- ❌ Tried refactoring the handler progress story around a list-based `AllNonexpanding` predicate (rewriting `OptionHandler` to consume `List String` queues and threading proofs through `HandlerBundle.product`), but Lean’s elaborator could not infer the required implicit parameters and the recursion on mapped handler lists became unmanageable; rolled the patch back and recorded the failure for future reference.
-- ❌ Follow-up attempt to keep the existing array-based handlers while proving a `popFront` length lemma and per-handler progress theorems stalled: Lean’s array length lemmas were awkward to apply and the handler proofs introduced brittle pattern-matching obligations. Reverted the edits and noted the dead end.
-- ❌ Today’s attempt to resurrect `RespectsPositionals` proofs directly on the cursor-based `OptionHandler` list (adding `mapLeft`/`mapRight` preservation lemmas and folding them through `dispatchOption`/`foldOptions`) ran aground on Lean’s implicit-argument inference: recursive calls kept expecting pre-simplified handler states, and the resulting obligations ballooned. Reverted the experiment to keep the tree building while we rethink a narrower proof surface.
+## Architectural Direction (List-Based Fold)
+- **Classify Once into Lists**: keep the existing `classify : List String → ClassifiedTokens` front-end but immediately convert the result to a list of disjoint option tokens and a list of trailing positionals. Lists give simple structural recursion and `List.length` arithmetic for proofs.
+- **Last-Value-Wins via Right Fold**: represent the parser as a right fold over the classified option list. Each option contributes a `State` transformer that updates a partial record (`Assigned` slots) while recording usage information. Later occurrences overwrite earlier field assignments by construction.
+- **Positional Queue as List**: model remaining positionals as a `List String` carried alongside the partial state. Once a positional token is seen during classification, the classifier moves everything after (and the `--` sentinel) into this list so the fold never toggles modes at runtime.
+- **Applicative Grammar on Partial Builders**: expose user-facing combinators as applicative operations on partial builders. The grammar type remains, but its primitives now expand to list folds rather than cursor/handler machinery. With `Result = Except Error`, the applicative stack reuses Lean’s laws directly.
+- **Proof Surface**: length/progress lemmas reduce to `List.length` under `List.tail` or `List.drop`. The fold’s structural recursion automatically gives a measure for termination. Error soundness proofs operate on the list elements without array index gymnastics.
+- **Tests & Docs**: update regression/property tests to exercise the two-pass list pipeline (classification + fold). Document the new semantics, emphasising last-value-wins and the simplified proof story.
+
+- ❌ Legacy failures (kept for posterity): counter-based cursor proofs, `RespectsPositionals`, list/array churn, `popFront` lemma attempts. These remain relevant as reminders of why we abandoned the cursor/updater stack entirely.
+
+All remaining cursor/handler modules are marked for deletion in the next workstream; they stay only long enough to keep the tree building while the list-based replacements land.
 
 ## Workstreams
-1. **Cursor & Partial Foundations**
-   - Maintain the array-backed `TokenCursor` helpers already landed and introduce a reusable `Partial α` abstraction plus field-updater combinators.
-   - Relate cursor measures to partial-state obligations (e.g., remaining option tokens vs. unset fields). *(cursor groundwork complete; partial abstraction pending)*
-   - ✅ Implement Lean-standard `Functor`/`Applicative` instances for partial-field helpers so downstream code can reuse the standard combinator ecosystem instead of hand-rolled utilities.
-2. **Updater Fold & Completion**
-   - Express primitives as field updaters, build the fold that applies them over classified tokens, and add a completion pass that finalises the partial value or reports structured errors.
-   - Ensure “last value wins”/positional semantics come directly from the fold (without bespoke cursor rewrites).
-3. **Proof Rehabilitation**
-   - Prove per-updater progress/length lemmas, then lift them to the fold and applicative combinators.
-   - Re-establish error soundness/determinism for the completed parser.
-4. **Ergonomics, Testing, and Migration Docs**
-   - Expand regression/property tests to cover the updater pipeline (repeated options, sentinel boundaries, mixed permutations, incomplete partial states).
-   - Document the new architecture and remaining gaps so downstream users can migrate confidently.
+1. **List-Based Parser Core**
+   - Delete `TokenCursor`, `HandlerBundle`, and related modules.
+   - Introduce a `ParserState` built on plain lists (`options : List ParsedOption`, `positionals : List String`).
+   - Re-implement flag/value/positional primitives as structurally recursive functions over these lists, keeping progress lemmas local to the recursion.
+2. **Applicative Grammar Rebuild**
+   - Re-express `Grammar` primitives in terms of the new list-based parser core.
+   - Ensure `Applicative`/`Alternative` usage leans on the lawful instances already established.
+   - Provide completion helpers that assemble the final value from a partial state, emitting `Except Error` results.
+3. **Proof Suite**
+   - Prove progress/termination lemmas for the new list folds (length strictly decreases when consuming options or positionals).
+   - Re-establish error soundness and determinism theorems on top of the simplified data structures.
+4. **Tests & Documentation**
+   - Update regression/property tests to cover repeated options, sentinel behaviour, and positional overflow under the list-based semantics.
+   - Document the architecture, highlighting the shift away from cursors/arrays and summarising past dead ends.
 
 ## Immediate Next Steps
 
-1. Reintroduce updater progress/length proofs and lift them through the applicative combinators, recording any stalled approaches.
-2. Extend property tests and docs to explain the updater-based architecture, covering repeated options, sentinel permutations, and partial-state completion results while logging both successful and negative findings.
+1. Remove the cursor/field-updater modules and stand up the list-based parser skeleton (data types + basic flag/value/positional consumers) while keeping the build green.
+2. Thread the new parser core through the applicative grammar, updating existing primitives and recording any negative experiments.
+3. Refresh tests and documentation (including this plan) to reflect the list-based pipeline, ensuring `lake test` passes and capturing lessons learned.
