@@ -41,6 +41,7 @@
 - ❌ Follow-up attempt to encode handler monotonicity via `OptionHandler.respectsPositionals` (plus helper lemmas for `flag`/`option`) ran into missing library support for `List.Forall` in this environment; reverted the changes and noted that any future proof path will either need bespoke list predicates or a different measurement strategy.
 - ❌ Attempted to prove positional-length monotonicity for the option handlers by introducing `respectsPositionals` lemmas (plus `flag`/`option` handler proofs), but Lean’s `Array.extract` defaults caused the helper lemma `dropHead_size_le` to fail to elaborate; reverted the code and logged the blocker for a future array-centric approach.
 - ❌ Tried refactoring the handler progress story around a list-based `AllNonexpanding` predicate (rewriting `OptionHandler` to consume `List String` queues and threading proofs through `HandlerBundle.product`), but Lean’s elaborator could not infer the required implicit parameters and the recursion on mapped handler lists became unmanageable; rolled the patch back and recorded the failure for future reference.
+- ❌ Follow-up attempt to keep the existing array-based handlers while proving a `popFront` length lemma and per-handler progress theorems stalled: Lean’s array length lemmas were awkward to apply and the handler proofs introduced brittle pattern-matching obligations. Reverted the edits and noted the dead end.
 
 ## Workstreams
 1. **Cursor & Partial Foundations**
