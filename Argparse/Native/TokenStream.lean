@@ -79,13 +79,9 @@ private def missingValueError [TokenSpec α] (name : α) : Error :=
   { code := .missing
     , subject? := some (describe name) }
 
-private def consumeFlagLoop [TokenSpec α] [ToParsedName α]
-    (name : α)
-    (tokens : List ParsedToken)
-    (revKept : List ParsedToken)
-    (present : Bool) : Except Error (Bool × List ParsedToken) :=
-  match tokens with
-  | [] => .ok (present, revKept.reverse)
+private def consumeFlagList [TokenSpec α] [ToParsedName α]
+    (name : α) : List ParsedToken → Except Error (Bool × List ParsedToken)
+  | [] => .ok (false, [])
   | ParsedToken.option data :: rest =>
       if data.name = ToParsedName.toParsedName name then
         match data.inlineValue? with
@@ -93,58 +89,61 @@ private def consumeFlagLoop [TokenSpec α] [ToParsedName α]
             .error <|
               mismatchError name
                 s!"Flag {describe name} does not accept a value"
-        | none => consumeFlagLoop name rest revKept true
+        | none =>
+            match consumeFlagList name rest with
+            | .ok (_, restTokens) => .ok (true, restTokens)
+            | .error err => .error err
       else
-        consumeFlagLoop name rest (ParsedToken.option data :: revKept) present
-  | tok :: rest => consumeFlagLoop name rest (tok :: revKept) present
+        match consumeFlagList name rest with
+        | .ok (present, restTokens) =>
+            .ok (present, ParsedToken.option data :: restTokens)
+        | .error err => .error err
+  | tok :: rest =>
+      match consumeFlagList name rest with
+      | .ok (present, restTokens) => .ok (present, tok :: restTokens)
+      | .error err => .error err
 
 /-- Remove matching flag tokens, reporting whether any were present. -/
 def consumeFlag [TokenSpec α] [ToParsedName α]
     (name : α) (stream : TokenStream)
-    : Except Error (Bool × TokenStream) :=
-  match consumeFlagLoop name stream.tokens [] false with
-  | .ok (present, newTokens) => .ok (present, ofList newTokens)
-  | .error err => .error err
+    : Except Error (Bool × TokenStream) := do
+  let (present, restTokens) ← consumeFlagList name stream.tokens
+  pure (present, ofList restTokens)
 
-private def consumeOptionLoop [TokenSpec α] [ToParsedName α]
+private def consumeOptionList [TokenSpec α] [ToParsedName α]
     (name : α)
-    (tokens : List ParsedToken)
-    (revKept : List ParsedToken)
-    (revValues : List String)
-    : Except Error (List String × List ParsedToken) :=
-  match tokens with
-  | [] => .ok (revValues, revKept.reverse)
-  | ParsedToken.option data :: rest =>
-      if data.name = ToParsedName.toParsedName name then
-        match data.inlineValue? with
-        | some value =>
-            consumeOptionLoop name rest revKept (value :: revValues)
-        | none =>
-            match rest with
-            | ParsedToken.positional value :: restTail =>
-                consumeOptionLoop name restTail revKept (value :: revValues)
-            | _ => .error <| missingValueError name
-      else
-        consumeOptionLoop name rest (ParsedToken.option data :: revKept) revValues
-  | tok :: rest =>
-      consumeOptionLoop name rest (tok :: revKept) revValues
+    : List ParsedToken → Except Error (Option String × List ParsedToken)
+  | tokens =>
+      let rec go
+          : List ParsedToken → List ParsedToken → Option String → Except Error (Option String × List ParsedToken)
+        | [], kept, last? => .ok (last?, kept.reverse)
+        | ParsedToken.option data :: rest, kept, last? =>
+            if data.name = ToParsedName.toParsedName name then
+              match data.inlineValue? with
+              | some value =>
+                  go rest kept (some value)
+              | none =>
+                  match rest with
+                  | ParsedToken.positional value :: restTail =>
+                      go restTail kept (some value)
+                  | _ => .error <| missingValueError name
+            else
+              go rest (ParsedToken.option data :: kept) last?
+        | tok :: rest, kept, last? =>
+            go rest (tok :: kept) last?
+      go tokens [] none
 
-/-- Remove option tokens and collect their supplied values in reverse order. -/
 private def extractOptionValues [TokenSpec α] [ToParsedName α]
     (name : α) (stream : TokenStream)
-    : Except Error (List String × TokenStream) :=
-  match consumeOptionLoop name stream.tokens [] [] with
-  | .ok (values, newTokens) => .ok (values, ofList newTokens)
-  | .error err => .error err
+    : Except Error (Option String × TokenStream) := do
+  let (value?, restTokens) ← consumeOptionList name stream.tokens
+  pure (value?, ofList restTokens)
 
 /-- Retrieve the last value supplied for an option, if any, using last-wins semantics. -/
 def consumeValue [TokenSpec α] [ToParsedName α]
     (name : α) (stream : TokenStream)
     : Except Error (Option String × TokenStream) := do
-  let (values, newStream) ← extractOptionValues name stream
-  match values with
-  | [] => pure (none, newStream)
-  | value :: _ => pure (some value, newStream)
+  extractOptionValues name stream
 
 end TokenStream
 
