@@ -4,6 +4,7 @@
 - Reduce reliance on ad-hoc runtime state while preserving current CLI behaviour.
 - Provide structures that enable proofs of correctness, termination, and documentation coherence.
 - Maintain ergonomic API for downstream users, with clear migration guidance.
+- Keep a full activity log for future agents, including negative results and abandoned approaches.
 
 ## Progress
 - Implemented `Argparse.Native.ArgStream` as a structural view of CLI fronts, showing that `remaining` mirrors the legacy `ParseState` semantics.
@@ -12,6 +13,7 @@
 - Introduced `Argparse.Native.ParsedToken` with a single-pass `classify` that normalises long/short spellings, preserves inline values, and honours the `--` sentinel.
 - Built `Argparse.Native.TokenStream` helpers to manipulate classified tokens directly, enabling positional/flag/value removal with last-value-wins semantics.
 - Replaced the ArgStream consumer layer with a TokenStream-native interpreter and updated the native example plus regression suite to exercise the new pipeline end-to-end.
+- Attempted to reintroduce the structural progress lemmas for `consumeFlag`/`consumeValue`; initial induction over `consumeFlagList` stalled because the current helper does not expose how many tokens were removed, making the length inequalities cumbersome.
 
 ## Phase 1 – Foundations
 1. **Introduce `ArgStream`**
@@ -60,6 +62,6 @@
  - Confirm that “last value wins” aligns with downstream expectations; document any intentional divergence from the legacy parser’s first-hit behaviour.
 
 ## Next Steps
-1. Rebuild the proof toolbox for the TokenStream interpreter (progress, missing/invalid soundness) so the new pipeline regains formal guarantees.
+1. Rebuild the proof toolbox for the TokenStream interpreter (progress, missing/invalid soundness) so the new pipeline regains formal guarantees. Capture the blocker from the latest attempt (length accounting for `consumeFlagList`) and consider adding an accumulator that tracks removed tokens or refactoring the recursion for easier induction.
 2. Extend property and regression tests to cover repeated options, sentinel boundaries, and short/long permutations under last-value-wins semantics.
 3. Document the parsed-token pass and the semantics shift (last-value-wins, two-pass pipeline) to guide downstream migrations.
