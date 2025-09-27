@@ -38,6 +38,7 @@
 - ✅ Introduced the `Assigned` partial-field helper and ported flag/option/positional primitives to it, so required-versus-default distinction lives in one reusable abstraction.
 - ❌ Adding an `Alternative` instance for `Interpreter` is currently blocked: the handler fold mutates state destructively, so supporting `<|>` would require a backtracking story (or fresh token folds) we do not have yet. Documented here so future work can revisit once a reversible execution model exists.
 - ❌ Tried to swap the option/positional folds over to `List` to simplify length/progress proofs, but Lean rejected the refactor mid-way (parser issues around the new helper defs), so the change was reverted. Proof work will need to proceed on the existing array-backed implementation for now.
+- ❌ Follow-up attempt to encode handler monotonicity via `OptionHandler.respectsPositionals` (plus helper lemmas for `flag`/`option`) ran into missing library support for `List.Forall` in this environment; reverted the changes and noted that any future proof path will either need bespoke list predicates or a different measurement strategy.
 - ❌ Attempted to prove positional-length monotonicity for the option handlers by introducing `respectsPositionals` lemmas (plus `flag`/`option` handler proofs), but Lean’s `Array.extract` defaults caused the helper lemma `dropHead_size_le` to fail to elaborate; reverted the code and logged the blocker for a future array-centric approach.
 
 ## Workstreams
