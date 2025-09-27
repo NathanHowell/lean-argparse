@@ -1,12 +1,12 @@
+import Argparse.Doc.Help
+import Argparse.Doc.Man
+import Argparse.Doc.Completion
+
 /-!
 # ArgParse.CLI.Print
 
 Stub helpers that expose help/man/completion entry points.
 -/
-
-import Argparse.Doc.Help
-import Argparse.Doc.Man
-import Argparse.Doc.Completion
 
 namespace ArgParse.CLI
 

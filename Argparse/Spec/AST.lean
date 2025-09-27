@@ -1,10 +1,10 @@
+import Argparse.Core.Value
+
 /-!
 # ArgParse.Spec.AST
 
 Single-source-of-truth specification AST following `SPEC.md`.
 -/
-
-import Argparse.Core.Value
 
 namespace ArgParse.Spec
 

@@ -1,11 +1,11 @@
+import Argparse.Core.Parser
+import Argparse.Spec.Elab
+
 /-!
 # ArgParse.Proofs.Soundness
 
 Placeholder statements for soundness proofs.
 -/
-
-import Argparse.Core.Parser
-import Argparse.Spec.Elab
 
 namespace ArgParse.Proofs
 

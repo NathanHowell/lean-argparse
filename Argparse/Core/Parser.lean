@@ -1,10 +1,10 @@
+import Argparse.Core.Types
+
 /-!
 # ArgParse.Core.Parser
 
 Core parser type and standard instances, following `SPEC.md`.
 -/
-
-import Argparse.Core.Types
 
 namespace ArgParse
 

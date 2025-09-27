@@ -1,10 +1,10 @@
+import Argparse.Spec.Describe
+
 /-!
 # ArgParse.Doc.Completion
 
 Placeholder completion emitters built from describer output.
 -/
-
-import Argparse.Spec.Describe
 
 namespace ArgParse.Doc
 

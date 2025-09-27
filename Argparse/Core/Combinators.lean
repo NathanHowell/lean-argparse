@@ -1,13 +1,13 @@
+import Argparse.Core.Parser
+import Argparse.Core.Value
+import Argparse.Core.Normalize
+import Argparse.Spec.AST
+
 /-!
 # ArgParse.Core.Combinators
 
 Baseline flag/option/positional parsers operating on the core `State`.
 -/
-
-import Argparse.Core.Parser
-import Argparse.Core.Value
-import Argparse.Core.Normalize
-import Argparse.Spec.AST
 
 namespace ArgParse.Core
 

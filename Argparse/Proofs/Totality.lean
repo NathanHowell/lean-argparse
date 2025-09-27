@@ -1,10 +1,10 @@
+import Argparse.Core.Parser
+
 /-!
 # ArgParse.Proofs.Totality
 
 Placeholder statements for parser totality.
 -/
-
-import Argparse.Core.Parser
 
 namespace ArgParse.Proofs
 

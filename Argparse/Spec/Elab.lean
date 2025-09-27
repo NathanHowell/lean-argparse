@@ -1,47 +1,79 @@
+import Argparse.Core.Combinators
+import Argparse.Core.Parser
+import Argparse.Spec.AST
+
 /-!
 # ArgParse.Spec.Elab
 
 Scaffold for elaborating the specification AST into runtime parsers.
 -/
 
-import Argparse.Core.Parser
-import Argparse.Spec.AST
-
 namespace ArgParse.Spec
 
 open ArgParse
+open ArgParse.Core
 
-/-- Placeholder payload type for elaborated commands (to be refined). -/
-abbrev Payload := Unit
+/-- Intermediate record collecting the outputs of primitive parsers. -/
+structure Partial where
+  flags : List (String × Bool) := []
+  options : List (String × String) := []
+  positionals : List String := []
+deriving Repr
 
-/-- Interpret a flag spec; currently a stub returning `false`. -/
-def interpretFlag (_ : FlagSpec) : Parser Bool :=
-  Parser.pure false
+namespace Partial
 
-/-- Interpret an option spec; currently returns `Unit` while the real parser is pending. -/
-def interpretOption (_ : ItemSpec) : Parser Payload :=
-  Parser.pure ()
+@[simp] def addFlag (name : String) (value : Bool) (p : Partial) : Partial :=
+  { p with flags := (name, value) :: p.flags }
 
-/-- Interpret a positional spec; stubbed until the parser pipeline is implemented. -/
-def interpretPositional (_ : ItemSpec) : Parser Payload :=
-  Parser.pure ()
+@[simp] def addOption (name : String) (value : String) (p : Partial) : Partial :=
+  { p with options := (name, value) :: p.options }
 
-/-- Elaborate an item within a command. -/
-def elaborateItem (item : ItemSpec) : Parser Payload :=
-  match item with
-  | .flag spec =>
-      -- TODO: thread the boolean flag into the eventual payload.
-      interpretFlag spec *> Parser.pure ()
-  | .opt _ => interpretOption item
-  | .pos _ => interpretPositional item
+@[simp] def addPositional (name : String) (value : String) (p : Partial) : Partial :=
+  { p with positionals := (name, value) :: p.positionals }
 
-/-- Elaborate a command and all of its child items; currently returns `Unit`. -/
-def elaborateCommand (cmd : CmdSpec) : Parser Payload :=
-  cmd.args.foldl (init := Parser.pure ()) fun acc item =>
-    Parser.seqLeft acc (elaborateItem item)
+end Partial
+
+/-- Interpret a flag spec and record the boolean result. -/
+def interpretFlag (spec : FlagSpec) : Parser (Partial → Partial) :=
+  flag spec |>.map fun enabled => fun p =>
+    Partial.addFlag spec.meta.name enabled p
+
+/-- Interpret a single-valued option (arity `.one`). -/
+def interpretOption (spec : OptSpec String) : Parser (Partial → Partial) :=
+  option spec |>.map fun value? => fun p =>
+    match value? with
+    | some value => Partial.addOption spec.meta.name value p
+    | none => p
+
+/-- Interpret a positional value and record it. -/
+def interpretPositional (spec : PosSpec String) : Parser (Partial → Partial) :=
+  positional spec |>.map fun value? => fun p =>
+    match value? with
+    | some value => Partial.addPositional spec.meta.name value p
+    | none => p
+
+/-- Elaborate a single command item to a partial-state transformer. -/
+def elaborateItem : ItemSpec → Parser (Partial → Partial)
+  | .flag spec => interpretFlag spec
+  | .opt spec =>
+      -- TODO: handle general arities; currently assumes `.one` yielding `String` values.
+      interpretOption (α := String) spec
+  | .pos spec => interpretPositional spec
+
+/-- Compose the transformers for a list of items. -/
+private def foldItems : List ItemSpec → Parser (Partial → Partial)
+  | [] => Parser.pure id
+  | item :: rest =>
+      Parser.seq
+        (Parser.map (fun f g => fun p => g (f p)) (elaborateItem item))
+        (foldItems rest)
+
+/-- Elaborate a command by folding its items; subcommands unimplemented. -/
+def elaborateCommand (cmd : CmdSpec) : Parser Partial :=
+  Parser.map (fun t => t Partial.mk) (foldItems cmd.args)
 
 /-- Entry point: elaborate the root application spec. -/
-def elaborateApp (app : AppSpec) : Parser Payload :=
+def elaborateApp (app : AppSpec) : Parser Partial :=
   elaborateCommand app.root
 
 end ArgParse.Spec

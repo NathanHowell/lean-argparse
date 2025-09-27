@@ -1,10 +1,10 @@
+import Argparse.Core.Normalize
+
 /-!
 # ArgParse.Proofs.Sentinel
 
 Placeholder statements for sentinel properties.
 -/
-
-import Argparse.Core.Normalize
 
 namespace ArgParse.Proofs
 

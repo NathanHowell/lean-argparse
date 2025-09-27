@@ -1,10 +1,10 @@
+import Argparse.Core.Parser
+
 /-!
 # ArgParse.Proofs.Determinism
 
 Placeholder statements for determinism proofs.
 -/
-
-import Argparse.Core.Parser
 
 namespace ArgParse.Proofs
 

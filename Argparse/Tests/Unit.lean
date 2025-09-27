@@ -1,15 +1,15 @@
-/-!
-# ArgParse.Tests.Unit
-
-Placeholder unit tests targeting the new scaffolds.
--/
-
 import Argparse.CLI.Print
 import Argparse.Core.Combinators
 import Argparse.Core.Types
 import Argparse.Examples.GitLike
 import Argparse.Examples.Xargs0
 import Argparse.Spec.AST
+
+/-!
+# ArgParse.Tests.Unit
+
+Placeholder unit tests targeting the new scaffolds.
+-/
 
 namespace ArgParse.Tests
 

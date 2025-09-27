@@ -1,10 +1,10 @@
+import Argparse.Spec.Describe
+
 /-!
 # ArgParse.Doc.Man
 
 Placeholder manpage emitter consuming describer output.
 -/
-
-import Argparse.Spec.Describe
 
 namespace ArgParse.Doc
 

@@ -1,10 +1,10 @@
+import Argparse.Spec.Describe
+
 /-!
 # ArgParse.Doc.Help
 
 Placeholder help renderer that consumes describer output.
 -/
-
-import Argparse.Spec.Describe
 
 namespace ArgParse.Doc
 

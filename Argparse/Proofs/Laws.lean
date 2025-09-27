@@ -1,10 +1,10 @@
+import Argparse.Core.Parser
+
 /-!
 # ArgParse.Proofs.Laws
 
 Placeholder statements for Functor/Applicative/Alternative laws.
 -/
-
-import Argparse.Core.Parser
 
 namespace ArgParse.Proofs
 

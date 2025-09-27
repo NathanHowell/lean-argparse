@@ -1,11 +1,11 @@
+import Argparse.CLI.Print
+import Argparse.Spec.AST
+
 /-!
 # ArgParse.Examples.Xargs0
 
 Minimal xargs-style example exercising the new spec structures.
 -/
-
-import Argparse.CLI.Print
-import Argparse.Spec.AST
 
 namespace ArgParse.Examples
 

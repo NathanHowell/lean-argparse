@@ -1,11 +1,11 @@
+import Argparse.CLI.Print
+import Argparse.Spec.AST
+
 /-!
 # ArgParse.Examples.GitLike
 
 Minimal git-style example showcasing subcommands.
 -/
-
-import Argparse.CLI.Print
-import Argparse.Spec.AST
 
 namespace ArgParse.Examples
 

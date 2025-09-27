@@ -1,10 +1,10 @@
+import Argparse.Spec.AST
+
 /-!
 # ArgParse.Spec.Describe
 
 Scaffold for deriving documentation artefacts from the specification AST.
 -/
-
-import Argparse.Spec.AST
 
 namespace ArgParse.Spec
 

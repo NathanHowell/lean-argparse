@@ -1,11 +1,11 @@
+import Argparse.CLI.Print
+import Argparse.Examples.GitLike
+
 /-!
 # ArgParse.Tests.Golden
 
 Placeholder golden tests for rendering helpers.
 -/
-
-import Argparse.CLI.Print
-import Argparse.Examples.GitLike
 
 namespace ArgParse.Tests
 

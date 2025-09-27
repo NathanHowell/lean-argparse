@@ -1,10 +1,10 @@
+import Argparse.Core.Types
+
 /-!
 # ArgParse.Core.Value
 
 `FromArg` typeclass and a handful of baseline instances.
 -/
-
-import Argparse.Core.Types
 
 namespace ArgParse
 

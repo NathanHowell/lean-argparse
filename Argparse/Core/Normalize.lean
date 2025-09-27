@@ -1,10 +1,10 @@
+import Argparse.Core.Types
+
 /-!
 # ArgParse.Core.Normalize
 
 Normalization pass that splits tokens on the first `--` sentinel.
 -/
-
-import Argparse.Core.Types
 
 namespace ArgParse.Core
 
