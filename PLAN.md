@@ -40,7 +40,8 @@
    - Finalize docstrings, README, migration guidance, and ensure CI (`lake build`, `lake test`) covers all milestones.
 
 ## Activity Log
-- _2024-??-??_: (new) Re-reading `SPEC.md`/`KNOWLEDGE.md`; preparing to align plan accordingly.
+- 2025-09-27: Re-read `SPEC.md`/`KNOWLEDGE.md`; prepared to align plan accordingly.
+- 2025-09-27: Scaffolding audit complete — inventoried legacy modules under `Argparse/Basic` and `Argparse/Native`; marked them for removal during migration to the `ArgParse/` hierarchy.
 - _Please append future successes and failures here with short rationales._
 
 ## Immediate Next Steps
