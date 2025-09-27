@@ -62,6 +62,16 @@ private def missingOptionError (spec : OptSpec α) : Error :=
 private def expectPositional (spec : PosSpec α) : Expect :=
   .positional spec.meta.name
 
+structure OptionStep (α) where
+  value? : Option α
+  state : State
+  consumed : Nat
+
+structure PosStep (α) where
+  value? : Option α
+  state : State
+  consumed : Nat
+
 private def stringTake (s : String) (n : Nat) : String :=
   String.mk (s.data.take n)
 
@@ -166,11 +176,11 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
             .ok (some value, newState)
         | none => .error (invalidValueError raw msg expect)
 
-@[inline] def takeOptionValue?
+@[inline] def takeOptionStep?
     {α} [FromArg α] (spec : OptSpec α) (st : State) :
-    Except Error (Option α × State) :=
+    Except Error (OptionStep α) :=
   match st.pre with
-  | [] => .ok (none, st)
+  | [] => .ok { value? := none, state := st, consumed := 0 }
   | token :: rest =>
       let expect := expectOption spec
       match spec.long? with
@@ -179,20 +189,21 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
           let eqPrefix := prefix ++ "="
           if spec.eqVal? ∧ token.startsWith eqPrefix then
             let raw := token.drop eqPrefix.length
-            parseConcatValue spec token raw rest st expect
+            match parseConcatValue spec token raw rest st expect with
+            | .ok (value?, st') => .ok { value? := value?, state := st', consumed := 1 }
+            | .error err => .error err
           else if token = prefix then
             match rest with
             | valueTok :: restTail =>
                 match FromArg.run valueTok with
                 | .ok value =>
                     let st' : State := { st with pre := restTail, cursor := st.cursor + 2 }
-                    .ok (some value, st')
+                    .ok { value? := some value, state := st', consumed := 2 }
                 | .error msg => .error (invalidValueError valueTok msg expect)
-                | [] => .error (missingValueError token expect)
-            else
-                -- fall through to short handling
-                match spec.short? with
-                | some short =>
+            | [] => .error (missingValueError token expect)
+          else
+            match spec.short? with
+            | some short =>
                 let prefixShort := shortLexeme short
                 if token = prefixShort then
                   match rest with
@@ -200,15 +211,17 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
                       match FromArg.run valueTok with
                       | .ok value =>
                           let st' : State := { st with pre := restTail, cursor := st.cursor + 2 }
-                          .ok (some value, st')
+                          .ok { value? := some value, state := st', consumed := 2 }
                       | .error msg => .error (invalidValueError valueTok msg expect)
                   | [] => .error (missingValueError token expect)
                 else if spec.concatVal? ∧ token.startsWith prefixShort then
                   let raw := token.drop prefixShort.length
-                  parseConcatValue spec token raw rest st expect
+                  match parseConcatValue spec token raw rest st expect with
+                  | .ok (value?, st') => .ok { value? := value?, state := st', consumed := 1 }
+                  | .error err => .error err
                 else
-                  .ok (none, st)
-            | none => .ok (none, st)
+                  .ok { value? := none, state := st, consumed := 0 }
+            | none => .ok { value? := none, state := st, consumed := 0 }
       | none =>
           match spec.short? with
           | some short =>
@@ -219,15 +232,24 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
                     match FromArg.run valueTok with
                     | .ok value =>
                         let st' : State := { st with pre := restTail, cursor := st.cursor + 2 }
-                        .ok (some value, st')
-                      | .error msg => .error (invalidValueError valueTok msg expect)
+                        .ok { value? := some value, state := st', consumed := 2 }
+                    | .error msg => .error (invalidValueError valueTok msg expect)
                 | [] => .error (missingValueError token expect)
               else if spec.concatVal? ∧ token.startsWith prefix then
                 let raw := token.drop prefix.length
-                parseConcatValue spec token raw rest st expect
+                match parseConcatValue spec token raw rest st expect with
+                | .ok (value?, st') => .ok { value? := value?, state := st', consumed := 1 }
+                | .error err => .error err
               else
-                .ok (none, st)
-          | none => .ok (none, st)
+                .ok { value? := none, state := st, consumed := 0 }
+          | none => .ok { value? := none, state := st, consumed := 0 }
+
+@[inline] def takeOptionValue?
+    {α} [FromArg α] (spec : OptSpec α) (st : State) :
+    Except Error (Option α × State) :=
+  match takeOptionStep? spec st with
+  | .ok step => .ok (step.value?, step.state)
+  | .error err => .error err
 
 @[inline] def collectOptionValues
     {α} [FromArg α] (spec : OptSpec α) (st : State) : Except Error (List α × State) :=
@@ -263,22 +285,29 @@ def option {α} [FromArg α] (spec : OptSpec α) :
           | [] => .err (missingOptionError spec)
           | _ => .ok values st'
 
-@[inline] def takePositionalValue?
+@[inline] def takePositionalStep?
     {α} [FromArg α] (spec : PosSpec α) (st : State) :
-    Except Error (Option α × State) :=
+    Except Error (PosStep α) :=
   let expect := expectPositional spec
   match State.consumePre? st with
   | some (token, st') =>
       match FromArg.run token with
-      | .ok value => .ok (some value, st')
+      | .ok value => .ok { value? := some value, state := st', consumed := 1 }
       | .error msg => .error (invalidValueError token msg expect)
   | none =>
       match State.consumePost? st with
       | some (token, st') =>
           match FromArg.run token with
-          | .ok value => .ok (some value, st')
+          | .ok value => .ok { value? := some value, state := st', consumed := 1 }
           | .error msg => .error (invalidValueError token msg expect)
-      | none => .ok (none, st)
+      | none => .ok { value? := none, state := st, consumed := 0 }
+
+@[inline] def takePositionalValue?
+    {α} [FromArg α] (spec : PosSpec α) (st : State) :
+    Except Error (Option α × State) :=
+  match takePositionalStep? spec st with
+  | .ok step => .ok (step.value?, step.state)
+  | .error err => .error err
 
 @[inline] def collectPositionalValues
     {α} [FromArg α] (spec : PosSpec α) (st : State) : Except Error (List α × State) :=

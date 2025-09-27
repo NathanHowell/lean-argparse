@@ -81,9 +81,132 @@ lemma parseConcatValue_cursor
         | some pair =>
             cases pair with
             | intro value' remainder =>
-        simp [hrun, hsplit] at h
-        cases h
-        simp [Nat.succ_eq_add_one]
+                simp [hrun, hsplit] at h
+                cases h
+                simp [Nat.succ_eq_add_one]
+
+/-- `takePositionalStep?` consumes exactly one token whenever it succeeds. -/
+lemma takePositionalStep_some_progress
+    {α} [FromArg α] (spec : PosSpec α) (st st' : State)
+    (value : α) (c : Nat) :
+    takePositionalStep? spec st = .ok { value? := some value, state := st', consumed := c } →
+    c = 1 ∧ st'.cursor = st.cursor + 1 := by
+  intro h
+  unfold takePositionalStep? at h
+  classical
+  have expect := expectPositional spec
+  cases hpreList : st.pre with
+  | nil =>
+      have hPre : State.consumePre? st = none := by
+        simp [State.consumePre?, hpreList]
+      simp [hPre] at h
+      cases hpostList : st.post with
+      | nil =>
+          have hPost : State.consumePost? st = none := by
+            simp [State.consumePost?, hpostList]
+          simp [hPost] at h
+      | cons postHead postTail =>
+          have hPost : State.consumePost? st =
+              some (postHead, { st with post := postTail, cursor := st.cursor + 1 }) := by
+            simp [State.consumePost?, hpostList]
+          simp [hPost] at h
+          cases hrun : FromArg.run postHead with
+          | ok parsed =>
+              simp [hrun] at h
+              cases h
+              constructor
+              · rfl
+              · simp [State.consumePost?, hpostList]
+          | error msg => simp [hrun] at h
+  | cons head tail =>
+      have hPre : State.consumePre? st =
+          some (head, { st with pre := tail, cursor := st.cursor + 1 }) := by
+        simp [State.consumePre?, hpreList]
+      simp [hPre] at h
+      cases hrun : FromArg.run head with
+      | ok parsed =>
+          simp [hrun] at h
+          cases h
+          constructor
+          · rfl
+          · simp [State.consumePre?, hpreList]
+      | error msg => simp [hrun] at h
+
+/-- `takePositionalValue?` advances the cursor on success. -/
+theorem takePositionalValue_some_progress
+    {α} [FromArg α] (spec : PosSpec α) (st st' : State)
+    (value : α) :
+    takePositionalValue? spec st = .ok (some value, st') →
+    st'.cursor = st.cursor + 1 := by
+  intro h
+  unfold takePositionalValue? at h
+  classical
+  cases hstep : takePositionalStep? spec st with
+  | error err => simp [hstep] at h
+  | ok step =>
+      simp [hstep] at h
+      rcases step with ⟨value?, state', consumed⟩
+      cases value? with
+      | none => simp at h
+      | some valueStep =>
+          simp at h
+          intro hstate
+          cases hstate
+          have hprogress := takePositionalStep_some_progress
+            (spec := spec) (st := st) (st' := state')
+            (value := value) (c := consumed) hstep
+          exact hprogress.2
+
+/-- `takePositionalStep?` consumes exactly one token whenever it succeeds. -/
+lemma takePositionalStep_some_progress
+    {α} [FromArg α] (spec : PosSpec α) (st st' : State)
+    (value : α) (c : Nat) :
+    takePositionalStep? spec st = .ok { value? := some value, state := st', consumed := c } →
+    c = 1 ∧ st'.cursor = st.cursor + 1 := by
+  intro h
+  unfold takePositionalStep? at h
+  classical
+  have expect := expectPositional spec
+  cases hpreList : st.pre with
+  | nil =>
+      have hPre : State.consumePre? st = none := by
+        simp [State.consumePre?, hpreList]
+      simp [hPre] at h
+      cases hpostList : st.post with
+      | nil =>
+          have hPost : State.consumePost? st = none := by
+            simp [State.consumePost?, hpostList]
+          simp [hPost] at h
+      | cons postHead postTail =>
+          have hPost : State.consumePost? st =
+              some (postHead, { st with post := postTail, cursor := st.cursor + 1 }) := by
+            simp [State.consumePost?, hpostList]
+          simp [hPost] at h
+          cases hrun : FromArg.run postHead with
+          | ok parsed =>
+              simp [hrun] at h
+              cases h with
+              | intro hv hs =>
+                  cases hv; cases hs
+                  constructor
+                  · rfl
+                  · simp [State.consumePost?, hpostList]
+          | error msg => simp [hrun] at h
+  | cons head tail =>
+      have hPre : State.consumePre? st =
+          some (head, { st with pre := tail, cursor := st.cursor + 1 }) := by
+        simp [State.consumePre?, hpreList]
+      simp [hPre] at h
+      cases hrun : FromArg.run head with
+      | ok parsed =>
+          simp [hrun] at h
+          cases h with
+          | intro hv hs =>
+              cases hv; cases hs
+              constructor
+              · rfl
+              · simp [State.consumePre?, hpreList]
+      | error msg => simp [hrun] at h
 
 /-- `positional` with arity `.some` never returns an empty list. -/
 theorem positional_some_nonempty

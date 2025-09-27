@@ -66,6 +66,7 @@
 - 2025-09-27: Implemented basic inline short-bundle splitting for options (e.g. `-n5v` yields value `5` and requeued `-v`), with placeholder lemmas queued for completion.
 - 2025-09-27: Proved that `.some` arity for options/positionals cannot return empty lists, and captured a cursor lemma for inline option concatenation.
 - 2025-09-27: Attempted to prove full cursor monotonicity for `takeOptionValue?`; case analysis on the long/short branches became unwieldy, so the effort was reverted pending helper refactors.
+- 2025-09-27: Established cursor progress for positional parsing via `takePositionalStep?`/`takePositionalValue?` lemmas.
 - _Please append future successes and failures here with short rationales._
 
 ## Immediate Next Steps
