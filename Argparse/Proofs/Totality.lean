@@ -81,9 +81,9 @@ lemma parseConcatValue_cursor
         | some pair =>
             cases pair with
             | intro value' remainder =>
-                simp [hrun, hsplit] at h
-                cases h
-                rfl
+        simp [hrun, hsplit] at h
+        cases h
+        simp [Nat.succ_eq_add_one]
 
 /-- `positional` with arity `.some` never returns an empty list. -/
 theorem positional_some_nonempty
