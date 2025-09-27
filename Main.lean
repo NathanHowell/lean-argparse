@@ -1,5 +1,10 @@
 import Argparse
+import Argparse.CLI.Print
+import Argparse.Examples.GitLike
 
-/-- Temporary executable placeholder while the SPEC-aligned library is under construction. -/
-def main : IO Unit :=
-  pure ()
+open ArgParse.CLI
+open ArgParse.Examples
+
+/-- Temporary executable: emit help text for the git-like example. -/
+def main : IO Unit := do
+  IO.println (renderHelp GitLike.spec)
