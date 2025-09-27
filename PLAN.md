@@ -11,6 +11,8 @@
 - Interpreter primitives now run entirely through the field-updater bundle: `HandlerBundle.apply/run` fold classified options before positionals, while `PartialSpec` finalises the partial state.
 - Lean tests were pared back to focus on the public interpreter API—flag/option/positional success paths, last-value-wins semantics, and optional/default helpers—dropping the legacy `TokenCursor.consume*` assertions that no longer reflect the design.
 - Primitives now hydrate `Assigned` field slots (new in `Argparse/Native/Partial.lean`), giving each handler an explicit notion of "unset" versus "last value wins" while keeping completion logic local to the finalisation pass.
+- New directive: audit the native stack for ad-hoc functor/applicative helpers and replace them with Lean’s type class instances (e.g. provide `Functor`/`Applicative`/`Monad` instances for the new `Assigned` partial fields and remove bespoke combinators where type classes suffice).
+- ✅ `Assigned` now carries Lean-standard `Functor`, `Applicative`, and `Monad` instances so downstream code can lean on established combinators instead of bespoke helpers.
 
 ## Architectural Direction (Cursor + Field Updaters)
 - **TokenCursor Core**: keep the classified argv pass yielding `TokenCursor := { options : Array ParsedOption, positionals : Array String }`, measuring progress via array sizes so helper lemmas stay arithmetic and array-native.
@@ -33,6 +35,7 @@
 1. **Cursor & Partial Foundations**
    - Maintain the array-backed `TokenCursor` helpers already landed and introduce a reusable `Partial α` abstraction plus field-updater combinators.
    - Relate cursor measures to partial-state obligations (e.g., remaining option tokens vs. unset fields). *(cursor groundwork complete; partial abstraction pending)*
+   - ✅ Implement Lean-standard `Functor`/`Applicative` instances for partial-field helpers so downstream code can reuse the standard combinator ecosystem instead of hand-rolled utilities.
 2. **Updater Fold & Completion**
    - Express primitives as field updaters, build the fold that applies them over classified tokens, and add a completion pass that finalises the partial value or reports structured errors.
    - Ensure “last value wins”/positional semantics come directly from the fold (without bespoke cursor rewrites).

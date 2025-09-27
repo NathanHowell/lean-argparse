@@ -17,6 +17,11 @@ inductive Assigned (α : Type) where
 
 namespace Assigned
 
+/-- Unset is the default inhabitant for any `Assigned` field. -/
+instance instInhabited {α : Type} : Inhabited (Assigned α) := ⟨Assigned.unset⟩
+
+@[simp] def pure {α : Type} (value : α) : Assigned α := .value value
+
 /--
 Extract the underlying value as an `Option`. Returns `none` when the field has
 never been assigned.
@@ -41,9 +46,9 @@ function is not applied.
 /--
 Bind over the stored value, propagating `unset` unchanged.
 -/
-@[simp] def bind {α β : Type} (f : α → Assigned β) : Assigned α → Assigned β
-  | .unset => .unset
-  | .value val => f val
+@[simp] def bind {α β : Type} : Assigned α → (α → Assigned β) → Assigned β
+  | .unset, _ => .unset
+  | .value val, f => f val
 
 /-- Retrieve the stored value or return `default` if the field is unset. -/
 @[simp] def getD {α : Type} (self : Assigned α) (default : α) : α :=
@@ -67,6 +72,49 @@ completion pass.
 
 /-- Convert an `Assigned` field back into an `Option`. -/
 @[simp] def toOption {α : Type} (self : Assigned α) : Option α := self.value?
+
+/-- `Assigned` behaves like an `Option` with respect to the standard type classes. -/
+instance instFunctor : Functor Assigned where
+  map := map
+
+instance instPure : Pure Assigned := ⟨pure⟩
+
+instance instSeq : Seq Assigned where
+  seq
+  | .value f, k =>
+      match k () with
+      | .value x => .value (f x)
+      | .unset => .unset
+  | .unset, _ => .unset
+
+instance instSeqLeft : SeqLeft Assigned where
+  seqLeft
+  | .value x, k =>
+      match k () with
+      | .value _ => .value x
+      | .unset => .unset
+  | .unset, _ => .unset
+
+instance instSeqRight : SeqRight Assigned where
+  seqRight
+  | .value _, k =>
+      match k () with
+      | .value y => .value y
+      | .unset => .unset
+  | .unset, _ => .unset
+
+instance instApplicative : Applicative Assigned where
+  pure := pure
+  seq := Seq.seq
+  map := Functor.map
+
+instance instBind : Bind Assigned where
+  bind := bind
+
+instance instMonad : Monad Assigned :=
+  { instApplicative with
+      bind := bind
+      map := Functor.map }
 
 end Assigned
 
