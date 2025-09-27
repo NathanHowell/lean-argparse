@@ -21,6 +21,7 @@
   - **New:** Refactoring `consumeFlag`/`consumeValue` to return removal counters (`FlagSweep`/`ValueSweep`) looked promising for progress lemmas, but the recursive proofs required heavy case-splitting on `Except` and inline-value branches; the helper types were reverted after `lake test` failures.
   - **New:** A follow-up attempt to wrap the list helpers in `FlagSweepResult`/`ValueSweepResult` (returning removal counts plus kept lists) still ballooned into unwieldy `Except` pattern matching and could not discharge the inductive cases cleanly; the spike was rolled back immediately.
   - **New:** The direct `foldlM` approach for option consumption made length inequalities opaque; we will replace it with structural recursion to avoid reasoning about auxiliary accumulators.
+  - **New:** Proved fresh progress lemmas for `takePositional?` (`TokenCursor.takePositional?_progress` / `_remaining`) and `consumeFlagList`, but the follow-on attempt to lift those bounds through `consumeFlag` itself ran into stubborn `match`/`Except` equalities. The `consumeFlag`-level lemma was dropped for now; revisit once a cleaner way to destruct the `match` result is identified.
 
 The codebase compiles/tests with the new state-transformer interpreter; next steps focus on rebuilding structural proofs and richer property coverage.
 
@@ -46,6 +47,6 @@ The codebase compiles/tests with the new state-transformer interpreter; next ste
 
 ## Immediate Next Steps
 
-1. With the structural recursion in place, prove the length/progress lemmas for `takePositional?`, `consumeFlag`, and `consumeValue`, recording both successful proofs and any new obstacles (and be ready to rethink the helper signatures if direct `Except` induction remains stubborn).
+1. With the structural recursion in place, finish the length/progress lemmas: `takePositional?` and `consumeFlagList` now have length/remaining facts, but the `consumeFlag` lift is still blocked on awkward `Except` equalities and `consumeValue` remains untouched—capture the blockers and keep iterating on cleaner destructors.
 2. Expand the native test suite with property-style coverage for repeated options and positional spillover, ensuring `lake test` stays green.
 3. Update docs (including this plan) as results land, highlighting lessons learned and remaining proof obligations.
