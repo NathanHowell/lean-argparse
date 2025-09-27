@@ -1,6 +1,28 @@
--- This module serves as the root of the `Argparse` library.
--- Import modules here that should be built as part of the library.
-import Argparse.Basic
-import Argparse.Completion
-import Argparse.Manpage
-import Argparse.Native
+-- Root module for the SPEC-aligned implementation.
+import Argparse.Core.Types
+import Argparse.Core.Parser
+import Argparse.Core.Value
+import Argparse.Core.Combinators
+import Argparse.Core.Normalize
+import Argparse.Spec.AST
+import Argparse.Spec.Elab
+import Argparse.Spec.Describe
+import Argparse.Doc.Help
+import Argparse.Doc.Man
+import Argparse.Doc.Completion
+import Argparse.Proofs.Laws
+import Argparse.Proofs.Totality
+import Argparse.Proofs.Determinism
+import Argparse.Proofs.Sentinel
+import Argparse.Proofs.Soundness
+import Argparse.CLI.Print
+import Argparse.Examples.Xargs0
+import Argparse.Examples.GitLike
+import Argparse.Tests.Unit
+import Argparse.Tests.Golden
+
+namespace ArgParse
+
+-- TODO: expose top-level API once the modules are implemented.
+
+end ArgParse
