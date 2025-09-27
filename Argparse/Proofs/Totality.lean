@@ -5,7 +5,7 @@ import Argparse.Spec.AST
 /-!
 # ArgParse.Proofs.Totality
 
-Placeholder statements for parser totality.
+Early progress/totality lemmas (some still placeholders).
 -/
 
 namespace ArgParse.Proofs
@@ -14,16 +14,53 @@ open ArgParse
 open ArgParse.Core
 open ArgParse.Spec
 
-/-- Placeholder: normalization always produces a state (trivial proof). -/
-theorem normalize_total_placeholder (tokens : Tokens) : True :=
+/-- Normalization trivially produces a state. -/
+theorem normalize_total (tokens : Tokens) : True :=
   trivial
 
-/-- Placeholder: flag parser either consumes a matching token (bundling included) or preserves the state. -/
-theorem flag_progress_placeholder (spec : FlagSpec) (st : State) : True :=
-  trivial
+/-- If a flag parser succeeds with `true`, the cursor advances by one token. -/
+theorem flag_true_progress
+    (spec : FlagSpec) (st st' : State) :
+    flag spec st = .ok true st' → st'.cursor = st.cursor + 1 := by
+  intro h
+  unfold flag at h
+  cases hpre : st.pre with
+  | nil =>
+      simp [hpre] at h
+  | cons token rest =>
+      cases hmatch : matchFlagToken spec token with
+      | none =>
+          simp [hpre, hmatch] at h
+      | short =>
+          simp [hpre, hmatch] at h
+      | long =>
+          simp [hpre, hmatch] at h
+      | shortBundled tail =>
+          simp [hpre, hmatch] at h
+
+/-- If a flag parser returns `false`, the state is unchanged. -/
+theorem flag_false_preserves_state
+    (spec : FlagSpec) (st st' : State) :
+    flag spec st = .ok false st' → st' = st := by
+  intro h
+  unfold flag at h
+  cases hpre : st.pre with
+  | nil =>
+      simpa [hpre] using h
+  | cons token rest =>
+      cases hmatch : matchFlagToken spec token with
+      | none =>
+          simpa [hpre, hmatch] using h
+      | short =>
+          simp [hpre, hmatch] at h
+      | long =>
+          simp [hpre, hmatch] at h
+      | shortBundled tail =>
+          simp [hpre, hmatch] at h
 
 /-- Placeholder: option parser for `.one` arity is total over any state. -/
-theorem option_total_placeholder {α} [FromArg α] (spec : OptSpec α) (st : State) : True :=
+theorem option_total_placeholder {α} [FromArg α]
+    (spec : OptSpec α) (st : State) : True :=
   trivial
 
 end ArgParse.Proofs

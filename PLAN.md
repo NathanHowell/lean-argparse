@@ -60,7 +60,7 @@
 - 2025-09-27: Implemented baseline flag/option/positional parsers in `Argparse/Core/Combinators` (front-of-stream only; no bundling yet).
 - 2025-09-27: Rewired `Argparse.Spec.Elab` to compose the new core combinators into a `Partial` record capturing flags/options/positionals (arity/bundling work still pending).
 - 2025-09-27: Updated doc renderers (help/man/completions) to accept optional `Partial` annotations via `render*With` helpers.
-- 2025-09-27: Added short-flag bundling to the core flag parser and recorded placeholder progress theorems.
+- 2025-09-27: Added short-flag bundling to the core flag parser and proved cursor/state lemmas for flag success/failure cases.
 - _Please append future successes and failures here with short rationales._
 
 ## Immediate Next Steps
