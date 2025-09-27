@@ -4,6 +4,7 @@ import Argparse.Native.Grammar
 import Argparse.Native.Token
 import Argparse.Native.ParsedToken
 import Argparse.Native.Consumer
+import Argparse.Native.TokenStream
 
 namespace Argparse
 

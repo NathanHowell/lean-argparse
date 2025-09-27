@@ -8,6 +8,7 @@ open Argparse.Native
 open Argparse.Native.Interpreter
 open Argparse.Native.Consumer
 open Argparse.Native.Token
+open Argparse.Native.TokenStream
 
 namespace ArgparseTests
 
@@ -23,6 +24,39 @@ namespace ArgparseTests
 #guard (Argparse.Native.classify ["-n5", "FILE"] =
   [ParsedToken.option { name := ParsedName.short 'n', original := "-n5", inlineValue? := some "5" },
    ParsedToken.positional "FILE"])
+
+#guard
+  let tokens := Argparse.Native.classify ["-n", "FILE"]
+  let expected := Argparse.Native.classify ["-n"]
+  match TokenStream.takePositional? (TokenStream.ofList tokens) with
+  | Option.some (value, rest) => value = "FILE" ∧ rest.toList = expected
+  | Option.none => False
+
+#guard
+  let tokens := Argparse.Native.classify ["--verbose", "-x", "FILE"]
+  let expected := Argparse.Native.classify ["-x", "FILE"]
+  match TokenStream.consumeFlag "verbose" (TokenStream.ofList tokens) with
+  | .ok (present, rest) => present && rest.toList = expected
+  | _ => False
+
+#guard
+  let tokens := Argparse.Native.classify ["--verbose=1"]
+  match TokenStream.consumeFlag "verbose" (TokenStream.ofList tokens) with
+  | .error err => err.code = ErrorCode.invalid
+  | _ => False
+
+#guard
+  let tokens := Argparse.Native.classify ["--count=1", "--count", "3", "FILE"]
+  let expected := Argparse.Native.classify ["FILE"]
+  match TokenStream.consumeValue "count" (TokenStream.ofList tokens) with
+  | .ok (Option.some value, rest) => value = "3" ∧ rest.toList = expected
+  | _ => False
+
+#guard
+  let tokens := Argparse.Native.classify ["--count", "--other"]
+  match TokenStream.consumeValue "count" (TokenStream.ofList tokens) with
+  | .error err => err.code = ErrorCode.missing
+  | _ => False
 
 private def containsSubstring (haystack needle : String) : Bool :=
   if needle.isEmpty then

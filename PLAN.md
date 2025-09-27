@@ -28,6 +28,7 @@
 - Reworked the native CLI sample to showcase the applicative/alternative helpers (`<*>`, `<|>`, `withDefault`), giving downstream users a concrete migration reference built on the structural consumers.
 - Expanded the property-test generators to cover short-option permutations and validated `flagLongShort`/`optionLongShortNat` against structural expectations for mixed flag/value inputs.
 - Introduced `Argparse.Native.ParsedToken` with a single-pass `classify` that normalises long/short option spellings, preserves inline values, and honours the `--` sentinel while preparing for a list-based interpreter.
+- Added `Argparse.Native.TokenStream` helpers to manipulate classified tokens directly, providing positional/flag/value removal with last-value-wins semantics and regression guards for the new helper API.
 
 ## Phase 1 – Foundations
 1. **Introduce `ArgStream`**
