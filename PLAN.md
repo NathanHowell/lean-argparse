@@ -43,14 +43,17 @@
    - Specify lemmas linking token recognition to stream constructors so later proofs can reason about `consume*` helpers without re-opening string parsing details.
 
 ## Phase 2 – Proof-Oriented API
-1. **Structural Recursion & Termination**
-   - Rewrite repetition combinators (`many`, `some`, `many1`) using structural recursion on `ArgStream`, eliminating manual fuel arguments.
-   - Recast flag/option consumers (`consumeFromFront`, `consumeValue`, `takePositional?`) atop the structural stream, replacing while-loop fuel with proofs of progress and exclusivity between option-like and positional tokens.
-   - Prove termination and bounds lemmas (`many` consumes no more tokens than available, `some` fails exactly when `many` produces `[]`), along with preservation of the `remaining` invariant for the consumer helpers.
-2. **Error Soundness Proofs**
-   - Establish that `Interpreter.eval` returns `Unexpected` iff `ArgStream` is non-empty, and `Missing` only when the grammar marks an entry as required.
-   - Demonstrate equivalence between runtime leftovers and `ArgStream`’s structural remainder.
-3. **Documentation Coherence**
+1. **Structured Token Pass**
+   - Replace ad-hoc stream rewrites with a dedicated token classification pass that traverses the raw CLI list once, producing a `ParsedToken` sequence (flags, options with/without inline values, positionals, `--` sentinel).
+   - Adopt “last value wins” semantics while constructing the token list so short and long option canonicalisation is uniform and easy to reason about.
+   - Preserve original spellings in the token metadata so diagnostics remain faithful to user input.
+2. **Interpreter over Parsed Tokens**
+   - Re-express `Interpreter.eval` as a fold over the `ParsedToken` list, eliminating the need for `restoreFront` bookkeeping and letting progress proofs rely on plain list recursion.
+   - Port the existing consumer lemmas to the new representation and show that every successful step removes exactly one classified token (or keeps it for `missing` cases).
+3. **Error Soundness Proofs**
+   - Establish that `Interpreter.eval` returns `Unexpected` iff the parsed token list is non-empty, and `Missing` only when the grammar marks an entry as required.
+   - Demonstrate equivalence between runtime leftovers and the unconsumed suffix of the classified token list.
+4. **Documentation Coherence**
    - Index `Grammar` with its `Usage` tree (e.g., `Grammar α (usage : Usage)`) and carry a proof that combinators update usage consistently.
    - Prove `renderHelp` enumerates exactly the options/arguments accepted by `eval`, leveraging the indexed structure.
 
@@ -69,7 +72,9 @@
 - How far should we push dependently typed usage indexing without sacrificing ergonomics? Investigate a lightweight `UsageWitness` record versus full dependent types.
 - Determine whether shell completion generation should operate on `Grammar` or remain a separate derivation.
 - Explore integrating with `Std`’s parser combinator ecosystem if/when one lands, to avoid duplication.
+ - Confirm that “last value wins” aligns with downstream expectations; document any intentional divergence from the legacy parser’s first-hit behaviour.
 
 ## Next Steps
-1. Begin the next round of proofs: propagate the progress lemmas through `Interpreter.consumeValue` and kick off error-classification lemmas for option/value consumers.
-2. Reconcile the native interpreter’s option semantics (short inline values, defaulted counts) with the legacy behaviour and capture any intentional deviations in documentation/tests before widening migration guidance.
+1. Draft the `ParsedToken` structure and a single-pass classifier from `[String]` to `List ParsedToken`, embedding source spellings and normalising short/long option names.
+2. Update the native interpreter to operate on the classified list with last-value-wins semantics, porting existing proofs/tests to the new backbone.
+3. Refresh documentation and migration notes to call out the semantic shift for repeated options, and extend property tests to cover the new canonical pipeline.
