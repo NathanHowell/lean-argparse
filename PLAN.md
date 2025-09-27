@@ -44,10 +44,13 @@
 - 2025-09-27: Scaffolding audit complete — inventoried legacy modules under `Argparse/Basic` and `Argparse/Native`; marked them for removal during migration to the `ArgParse/` hierarchy.
 - 2025-09-27: Created SPEC-aligned module skeleton under `ArgParse/` (Core, Spec, Doc, Proofs, CLI, Examples, Tests).
 - 2025-09-27: Drafted core runtime types (`Tokens`, `State`, `Result`, `Error`, `Expect`, `ErrorKind`) per the spec in `Argparse/Core/Types.lean`.
+- 2025-09-27: Implemented parser core (`Parser` alias plus Functor/Applicative/Alternative instances) in `Argparse/Core/Parser.lean`.
 - _Please append future successes and failures here with short rationales._
 
 ## Immediate Next Steps
 1. ✅ **Scaffolding audit** (2025-09-27): Inventoried legacy files under `Argparse/` and flagged them for removal during the migration to the `ArgParse/` hierarchy.
 2. ✅ **Module skeleton** (2025-09-27): Generated empty modules for each file listed in the spec (Core, Spec, Doc, Proofs, CLI, Examples, Tests) with minimal docstrings and `section`s.
 3. ✅ **Core type draft** (2025-09-27): Introduced the spec’s core types (`Tokens`, `State`, `Result`, `Error`, etc.) in `Argparse/Core/Types.lean`, matching the specification and noting diagnostic fields.
-4. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
+4. ✅ **Parser core** (2025-09-27): Defined `Parser := State → Result` with `pure`/`map`/`seq`/`fail` helpers and `Functor`/`Applicative`/`Alternative` instances.
+5. **Legacy cleanup**: Remove or quarantine the old `Argparse.Basic`/`Argparse.Native` hierarchy so only the spec-aligned tree remains active.
+6. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
