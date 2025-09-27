@@ -68,6 +68,7 @@
 - 2025-09-27: Attempted to prove full cursor monotonicity for `takeOptionValue?`; case analysis on the long/short branches became unwieldy, so the effort was reverted pending helper refactors.
 - 2025-09-27: takePositionalValue? and takeOptionValue? now have cursor-progress lemmas (option case yields a one- or two-token bound).
 - 2025-09-27: Established cursor progress for positional parsing via `takePositionalStep?`/`takePositionalValue?` lemmas.
+- 2025-09-27: Exposed `findConcatSplit?` for proofs and added `parseConcatValue_split_state` to confirm short-bundle leftovers are requeued for arbitrary `FromArg` payloads.
 - _Please append future successes and failures here with short rationales._
 
 ## Immediate Next Steps
@@ -92,7 +93,7 @@
 19. ✅ **Documentation alignment** (2025-09-27): Doc helpers now accept optional `Partial` annotations through `render*With`, surfacing runtime values alongside spec entries.
 20. ✅ **Option bundling & repeat arities** (2025-09-27): Extended option parsing for long/short concatenation and `.many`/`.some` arities; remaining work includes splitting inline bundles like `-n5v` and covering non-`String` payloads.
 21. ✅ **Positional arities** (2025-09-27): Positional combinators now support `.many`/`.some` with corresponding elaboration/storage across pre/post streams.
-22. **Inline short bundle proofs & generalisation**: Finish bundle-splitting proofs, ensure non-`String` `FromArg` payloads integrate cleanly, and capture any remaining edge cases.
+22. ✅ **Inline short bundle proofs & generalisation** (2025-09-27): Proved `parseConcatValue_split_state` and surfaced the helper so bundle splitting requeues leftovers for any `FromArg` payload.
 23. ✅ **Step-result refactor** (2025-09-27): Reworked option/positional collectors to track consumption via `CollectResult`, paving the way for aggregate progress proofs.
 24. **Many/some progress lemmas**: Lift the new step-wise cursor bounds through `collectOptionSteps`/`collectPositionalSteps` so `.many`/`.some` combinators expose structural progress facts.
 25. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.

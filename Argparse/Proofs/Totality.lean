@@ -85,6 +85,29 @@ lemma parseConcatValue_cursor
                 cases h
                 simp [Nat.succ_eq_add_one]
 
+/-- When concatenation splitting succeeds, the leftover bundle is pushed back to `pre`. -/
+lemma parseConcatValue_split_state
+    {α} [FromArg α] (spec : OptSpec α) (token raw : String)
+    (pending : List String) (st : State) (expect : Expect)
+    (msg : String) (value : α) (st' : State) :
+    raw ≠ "" →
+    FromArg.run raw = .error msg →
+    parseConcatValue spec token raw pending st expect = .ok (some value, st') →
+    ∃ remainder,
+      findConcatSplit? raw = some (value, remainder) ∧
+      st' = { st with pre := ("-" ++ remainder) :: pending, cursor := st.cursor + 1 } := by
+  intro hRaw hRun h
+  classical
+  unfold parseConcatValue at h
+  simp [hRaw, hRun] at h
+  cases hsplit : findConcatSplit? raw with
+  | none => simp [hsplit] at h
+  | some pair =>
+      rcases pair with ⟨value', remainder⟩
+      simp [hsplit] at h
+      rcases h with ⟨rfl, rfl⟩
+      exact ⟨remainder, ⟨rfl, rfl⟩⟩
+
 /-- `takeOptionStep?` succeeds only after consuming one or two tokens. -/
 lemma takeOptionStep_some_progress
     {α} [FromArg α] (spec : OptSpec α)

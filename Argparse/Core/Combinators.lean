@@ -77,13 +77,13 @@ structure CollectResult (α) where
   state  : State
   consumed : Nat
 
-private def stringTake (s : String) (n : Nat) : String :=
+@[inline] def stringTake (s : String) (n : Nat) : String :=
   String.mk (s.data.take n)
 
-private def stringDrop (s : String) (n : Nat) : String :=
+@[inline] def stringDrop (s : String) (n : Nat) : String :=
   String.mk (s.data.drop n)
 
-private def findConcatSplit? {α} [FromArg α] (raw : String) : Option (α × String) :=
+@[inline] def findConcatSplit? {α} [FromArg α] (raw : String) : Option (α × String) :=
   let candidates := ((List.range raw.length).drop 1).reverse
   let rec loop : List Nat → Option (α × String)
     | [] => none
