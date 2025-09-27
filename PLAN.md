@@ -24,6 +24,7 @@
 - Refactored flag consumption through a reusable `consumeFlagFront` helper and proved a front-length lemma, preparing the groundwork for a stream-level progress theorem.
 - Completed the stream-level progress lemma for `consumeFlag`, showing that successful flag removal strictly decreases `ArgStream.remaining` length and tying the helper proofs into the structural invariant.
 - Re-expressed `consumeValue` directly on `ArgStream`, removing the list-accumulator loop and aligning the option consumer with the existing structural lemmas.
+- Proved the `consumeValue` progress lemma via the structural helper, completing the Phase 1 consumer progress work and ensuring option values also decrease `ArgStream.remaining` length.
 
 ## Phase 1 – Foundations
 1. **Introduce `ArgStream`**
@@ -68,6 +69,6 @@
 - Explore integrating with `Std`’s parser combinator ecosystem if/when one lands, to avoid duplication.
 
 ## Next Steps
-1. Extend the progress lemma work to `consumeValue`, reusing the front/tail splitting strategy now validated for `consumeFlag`.
-2. Rework the native CLI sample to lean on the new applicative/alternative helpers (`<*>`, `<|>`, `withDefault`) and document the migration pattern for downstream adopters.
-3. Extend property coverage to short-option combinators and mixed flag/value permutations, ensuring the generator utilities cover both token specs.
+1. Rework the native CLI sample to lean on the new applicative/alternative helpers (`<*>`, `<|>`, `withDefault`) and document the migration pattern for downstream adopters.
+2. Extend property coverage to short-option combinators and mixed flag/value permutations, ensuring the generator utilities cover both token specs.
+3. Begin the next round of proofs: propagate the progress lemmas through `Interpreter.consumeValue` and kick off error-classification lemmas for option/value consumers.

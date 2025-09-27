@@ -307,6 +307,130 @@ private def consumeValueLoop [DecidableEq α] [TokenSpec α]
       | none => consumeValueLoop name (tok :: revSkipped) rest
   | .tail _ => .ok none
 
+/-- Successful value consumption strictly decreases `ArgStream.remaining` length. -/
+theorem consumeValueLoop_progress [DecidableEq α] [TokenSpec α]
+    (name : α) :
+    ∀ (stream : ArgStream) (revSkipped : List String)
+      {value : String} {newStream : ArgStream},
+      consumeValueLoop (name := name) revSkipped stream = .ok (some (value, newStream)) →
+        (ArgStream.remaining newStream).length <
+          (ArgStream.remaining (restoreFront revSkipped stream)).length := by
+  classical
+  intro stream
+  induction stream with
+  | tail tailTokens =>
+      intro revSkipped value newStream h
+      simp [consumeValueLoop] at h
+  | step tok rest ih =>
+      intro revSkipped value newStream h
+      dsimp [consumeValueLoop] at h
+      cases hParse : TokenSpec.parse (α := α) tok with
+      | none =>
+          have hHyp : consumeValueLoop (name := name) (tok :: revSkipped) rest =
+              .ok (some (value, newStream)) := by
+            simpa [consumeValueLoop, hParse] using h
+          have hRec := ih (revSkipped := tok :: revSkipped)
+            (value := value) (newStream := newStream) hHyp
+          simpa [restoreFront_cons] using hRec
+      | some parsed =>
+          rcases parsed with ⟨found, value?⟩
+          cases value? with
+          | some v =>
+              by_cases hFound : found = name
+              · subst hFound
+                simp [consumeValueLoop, hParse] at h
+                rcases h with ⟨hValue, hStream⟩
+                subst hValue
+                subst hStream
+                have hNext : ArgStream.next? (ArgStream.step tok rest) = some (tok, rest) := by
+                  simp [ArgStream.next?]
+                have hLt := ArgStream.next?_remaining_length_lt
+                    (stream := ArgStream.step tok rest)
+                    (tok := tok) (rest := rest) hNext
+                have hAdd := Nat.add_lt_add_left hLt revSkipped.length
+                have hGoal :
+                    (ArgStream.remaining (restoreFront revSkipped rest)).length <
+                      (ArgStream.remaining (restoreFront revSkipped (ArgStream.step tok rest))).length := by
+                  simpa [remaining_length_restoreFront] using hAdd
+                simpa using hGoal
+              ·
+                have hHyp : consumeValueLoop (name := name) (tok :: revSkipped) rest =
+                    .ok (some (value, newStream)) := by
+                  simpa [consumeValueLoop, hParse, hFound] using h
+                have hRec := ih (revSkipped := tok :: revSkipped)
+                  (value := value) (newStream := newStream) hHyp
+                simpa [restoreFront_cons] using hRec
+          | none =>
+              by_cases hFound : found = name
+              · subst hFound
+                cases rest with
+                | tail tailTokens =>
+                    cases tailTokens with
+                    | nil =>
+                        simp [consumeValueLoop, hParse] at h
+                    | cons next tailRest =>
+                        simp [consumeValueLoop, hParse] at h
+                        rcases h with ⟨hValue, hStream⟩
+                        subst hValue
+                        subst hStream
+                        have hNextStream : ArgStream.next? (ArgStream.step tok (.tail (next :: tailRest))) =
+                            some (tok, ArgStream.tail (next :: tailRest)) := by
+                          simp [ArgStream.next?]
+                        have hLtStream := ArgStream.next?_remaining_length_lt
+                            (stream := ArgStream.step tok (.tail (next :: tailRest)))
+                            (tok := tok)
+                            (rest := ArgStream.tail (next :: tailRest))
+                            hNextStream
+                        have hNextTail : ArgStream.next? (.tail (next :: tailRest)) =
+                            some (next, ArgStream.tail tailRest) := by
+                          simp [ArgStream.next?]
+                        have hLtTail := ArgStream.next?_remaining_length_lt
+                            (stream := ArgStream.tail (next :: tailRest))
+                            (tok := next)
+                            (rest := ArgStream.tail tailRest)
+                            hNextTail
+                        have hChain := Nat.lt_trans hLtTail hLtStream
+                        have hAdd := Nat.add_lt_add_left hChain revSkipped.length
+                        have hGoal :
+                            (ArgStream.remaining (restoreFront revSkipped (ArgStream.tail tailRest))).length <
+                              (ArgStream.remaining (restoreFront revSkipped (ArgStream.step tok (.tail (next :: tailRest))))).length := by
+                          simpa [remaining_length_restoreFront] using hAdd
+                        simpa using hGoal
+                | step next restTail =>
+                    simp [consumeValueLoop, hParse] at h
+                    rcases h with ⟨hValue, hStream⟩
+                    subst hValue
+                    subst hStream
+                    have hNextStream : ArgStream.next? (ArgStream.step tok (.step next restTail)) =
+                        some (tok, ArgStream.step next restTail) := by
+                      simp [ArgStream.next?]
+                    have hLtStream := ArgStream.next?_remaining_length_lt
+                        (stream := ArgStream.step tok (.step next restTail))
+                        (tok := tok)
+                        (rest := ArgStream.step next restTail)
+                        hNextStream
+                    have hNextRest : ArgStream.next? (ArgStream.step next restTail) =
+                        some (next, restTail) := by
+                      simp [ArgStream.next?]
+                    have hLtRest := ArgStream.next?_remaining_length_lt
+                        (stream := ArgStream.step next restTail)
+                        (tok := next)
+                        (rest := restTail)
+                        hNextRest
+                    have hChain := Nat.lt_trans hLtRest hLtStream
+                    have hAdd := Nat.add_lt_add_left hChain revSkipped.length
+                    have hGoal :
+                        (ArgStream.remaining (restoreFront revSkipped restTail)).length <
+                          (ArgStream.remaining (restoreFront revSkipped (ArgStream.step tok (.step next restTail)))).length := by
+                      simpa [remaining_length_restoreFront] using hAdd
+                    simpa using hGoal
+              · have hHyp : consumeValueLoop (name := name) (tok :: revSkipped) rest =
+                      .ok (some (value, newStream)) := by
+                    simpa [consumeValueLoop, hParse, hFound] using h
+                have hRec := ih (revSkipped := tok :: revSkipped)
+                  (value := value) (newStream := newStream) hHyp
+                simpa [restoreFront_cons] using hRec
+
 /-- Attempt to consume an option value token from the front of the stream. -/
 def consumeValue [DecidableEq α] [TokenSpec α]
     (name : α) (stream : ArgStream) : Except Error (Option String × ArgStream) :=
@@ -314,6 +438,31 @@ def consumeValue [DecidableEq α] [TokenSpec α]
   | .ok (some (value, newStream)) => .ok (some value, newStream)
   | .ok none => .ok (none, stream)
   | .error err => .error err
+
+theorem consumeValue_progress [DecidableEq α] [TokenSpec α]
+    (name : α) {stream newStream : ArgStream} {value : String} :
+    consumeValue name stream = .ok (some value, newStream) →
+      (ArgStream.remaining newStream).length <
+        (ArgStream.remaining stream).length := by
+  intro h
+  dsimp [consumeValue] at h
+  cases hLoop : consumeValueLoop (name := name) [] stream with
+  | error err =>
+      simp [hLoop] at h
+  | ok result =>
+      cases result with
+      | none =>
+          simp [hLoop] at h
+      | some pair =>
+          rcases pair with ⟨value', newStream'⟩
+          simp [hLoop] at h
+          rcases h with ⟨hValue, hStream⟩
+          subst hValue
+          subst hStream
+          have hProgress := consumeValueLoop_progress (name := name)
+              (stream := stream) (revSkipped := [])
+              (value := value') (newStream := newStream') hLoop
+          simpa [restoreFront_nil] using hProgress
 
 def consumeLongFlag := consumeFlag (α := String)
 
