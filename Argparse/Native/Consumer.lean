@@ -134,30 +134,103 @@ private def missingValueError [TokenSpec α] (name : α) : Error :=
 private def rebuild (front tail : List String) : ArgStream :=
   ArgStream.ofFrontTail front tail
 
+/-- Measure contribution from the tail section to `remaining` length. -/
+private def tailMeasure (tail : List String) : Nat :=
+  if tail = [] then 0 else tail.length + 1
+
+/-- Scan the front tokens for `name`, returning the updated front when found. -/
+private def consumeFlagFront [DecidableEq α] [TokenSpec α]
+    (name : α) : List String → Except Error (Bool × List String)
+  | [] => .ok (false, [])
+  | tok :: rest =>
+      match TokenSpec.parse (α := α) tok with
+      | some (found, value?) =>
+          if found = name then
+            match value? with
+            | some _ =>
+                .error <|
+                  mismatchError name s!"Flag {describe name} does not accept a value"
+            | none => .ok (true, rest)
+          else
+            match consumeFlagFront name rest with
+            | .ok (present, newRest) => .ok (present, tok :: newRest)
+            | .error err => .error err
+      | none =>
+          match consumeFlagFront name rest with
+          | .ok (present, newRest) => .ok (present, tok :: newRest)
+          | .error err => .error err
+
+/-- Removing a present flag shortens the front list by one. -/
+theorem consumeFlagFront_ok_length [DecidableEq α] [TokenSpec α]
+    (name : α) :
+    ∀ front {newFront : List String},
+      consumeFlagFront name front = .ok (true, newFront) →
+        newFront.length + 1 = front.length := by
+  intro front
+  induction front with
+  | nil =>
+      intro newFront h
+      simp [consumeFlagFront] at h
+  | cons tok rest ih =>
+      intro newFront h
+      dsimp [consumeFlagFront] at h
+      cases hParse : TokenSpec.parse (α := α) tok with
+      | none =>
+          cases hRec : consumeFlagFront name rest with
+          | error err =>
+              simp [hParse, hRec] at h
+          | ok result =>
+              rcases result with ⟨present, newRest⟩
+              cases present with
+              | false =>
+                  simp [hParse, hRec] at h
+              | true =>
+                  have hRecTrue : consumeFlagFront name rest = .ok (true, newRest) := by
+                    simpa using hRec
+                  have hLen := ih (newFront := newRest) hRecTrue
+                  have hEq : newFront = tok :: newRest := by
+                    simpa [consumeFlagFront, hParse, hRec] using h.symm
+                  simpa [hEq, List.length_cons, hLen, Nat.add_comm, Nat.add_left_comm,
+                    Nat.add_assoc]
+      | some pair =>
+          rcases pair with ⟨found, value?⟩
+          by_cases hFound : found = name
+          · subst hFound
+            cases value? with
+            | some _ =>
+                simp [consumeFlagFront, hParse] at h
+            | none =>
+                have hEq : newFront = rest := by
+                  simpa [consumeFlagFront, hParse] using h.symm
+                simpa [hEq, List.length_cons, Nat.add_comm, Nat.add_left_comm]
+          · cases hRec : consumeFlagFront name rest with
+          | error err =>
+              simp [hParse, hFound, hRec] at h
+            | ok result =>
+                rcases result with ⟨present, newRest⟩
+                cases present with
+                | false =>
+                    simp [hParse, hFound, hRec] at h
+                | true =>
+                    have hRecTrue : consumeFlagFront name rest = .ok (true, newRest) := by
+                      simpa using hRec
+                    have hLen := ih (newFront := newRest) hRecTrue
+                    have hEq : newFront = tok :: newRest := by
+                      simpa [consumeFlagFront, hParse, hFound, hRec] using h.symm
+                    simpa [consumeFlagFront, hParse, hFound, hRec, hEq,
+                      List.length_cons, hLen, Nat.add_comm, Nat.add_left_comm,
+                      Nat.add_assoc]
+
 /-- Attempt to consume a flag token from the front of the stream. -/
 def consumeFlag [DecidableEq α] [TokenSpec α]
     (name : α) (stream : ArgStream) : Except Error (Bool × ArgStream) :=
   let front := ArgStream.toList stream
   let tail := ArgStream.tailList stream
-  let rec loop (processed : List String) : List String → Except Error (Option (List String))
-    | [] => .ok none
-    | tok :: rest =>
-        match TokenSpec.parse tok with
-        | some (found, value?) =>
-            if found = name then
-              match value? with
-              | some _ => .error <| mismatchError name s!"Flag {describe name} does not accept a value"
-              | none =>
-                  let newFront := processed.reverse ++ rest
-                  .ok (some newFront)
-            else
-              loop (tok :: processed) rest
-        | none => loop (tok :: processed) rest
-  match loop [] front with
-  | .ok (some newFront) =>
+  match consumeFlagFront name front with
+  | .ok (true, newFront) =>
       let newStream := rebuild newFront tail
       .ok (true, newStream)
-  | .ok none => .ok (false, stream)
+  | .ok (false, _) => .ok (false, stream)
   | .error err => .error err
 
 /-- Attempt to consume an option value token from the front of the stream. -/
