@@ -64,7 +64,7 @@
 - 2025-09-27: Extended option parsing to honour `.many`/`.some` arities, long `--name=value`, and short concatenations; elaborator/doc layers now reflect the collected lists (inline bundle splitting like `-n5v` still pending).
 - 2025-09-27: Extended positional parsing/elaboration to support `.many`/`.some` arities across pre/post token streams.
 - 2025-09-27: Implemented basic inline short-bundle splitting for options (e.g. `-n5v` yields value `5` and requeued `-v`), with placeholder lemmas queued for completion.
-- 2025-09-27: Added placeholder totality lemmas for positional/option `.some` cases alongside the established flag progress proofs.
+- 2025-09-27: Proved that `.some` arity for options/positionals cannot return empty lists, replacing earlier placeholders.
 - _Please append future successes and failures here with short rationales._
 
 ## Immediate Next Steps

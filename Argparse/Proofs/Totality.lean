@@ -5,7 +5,7 @@ import Argparse.Spec.AST
 /-!
 # ArgParse.Proofs.Totality
 
-Early progress/totality lemmas (some still placeholders).
+Early progress/totality lemmas (some now partially proved).
 -/
 
 namespace ArgParse.Proofs
@@ -58,19 +58,50 @@ theorem flag_false_preserves_state
       | shortBundled tail =>
           simp [hpre, hmatch] at h
 
-/-- Placeholder: positional `.some` requires at least one value. -/
-theorem positional_some_requires_input_placeholder
-    {α} [FromArg α] (spec : PosSpec α) (st : State) : True :=
-  trivial
+/-- `positional` with arity `.some` never returns an empty list. -/
+theorem positional_some_nonempty
+    {α} [FromArg α] (spec : PosSpec α) (st st' : State)
+    (values : List α) :
+    spec.arity = .some → positional spec st = .ok values st' → values ≠ [] := by
+  intro harity hres
+  subst harity
+  unfold positional at hres
+  cases hcollect : collectPositionalValues spec st with
+  | error err =>
+      simp [hcollect] at hres
+  | ok result =>
+      cases result with
+      | intro vs stAfter =>
+          cases vs with
+          | nil =>
+              simp [hcollect] at hres
+          | cons x xs =>
+              simp [hcollect] at hres
+              cases hres
+              intro hnil
+              cases hnil
 
-/-- Placeholder: option parser for `.one` arity is total over any state. -/
-theorem option_total_placeholder {α} [FromArg α]
-    (spec : OptSpec α) (st : State) : True :=
-  trivial
-
-/-- Placeholder: option `.some` requires at least one value. -/
-theorem option_some_requires_input_placeholder {α} [FromArg α]
-    (spec : OptSpec α) (st : State) : True :=
-  trivial
+/-- `option` with arity `.some` never returns an empty list. -/
+theorem option_some_nonempty
+    {α} [FromArg α] (spec : OptSpec α) (st st' : State)
+    (values : List α) :
+    spec.arity = .some → option spec st = .ok values st' → values ≠ [] := by
+  intro harity hres
+  subst harity
+  unfold option at hres
+  cases hcollect : collectOptionValues spec st with
+  | error err =>
+      simp [hcollect] at hres
+  | ok result =>
+      cases result with
+      | intro vs stAfter =>
+          cases vs with
+          | nil =>
+              simp [hcollect] at hres
+          | cons x xs =>
+              simp [hcollect] at hres
+              cases hres
+              intro hnil
+              cases hnil
 
 end ArgParse.Proofs
