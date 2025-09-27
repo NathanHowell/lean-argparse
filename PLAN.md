@@ -48,6 +48,7 @@
 - 2025-09-27: Removed the legacy `Argparse.Basic`/`Argparse.Native` implementations and stubbed the new module tree in `Argparse.lean`, `Main.lean`, and `Tests/Main.lean`.
 - 2025-09-27: Added normalization pass (`Argparse.Core.Normalize.normalize`) splitting tokens on `--` into the new state record.
 - 2025-09-27: Introduced the `FromArg` class with baseline instances (String, Substring, Nat, Int, Bool) in `Argparse/Core/Value.lean`.
+- 2025-09-27: Added AST scaffolding (`Argparse.Spec.AST`) covering metadata, items, and command tree structures.
 - _Please append future successes and failures here with short rationales._
 
 ## Immediate Next Steps
@@ -58,5 +59,6 @@
 5. ✅ **Legacy cleanup** (2025-09-27): Removed the old `Argparse.Basic`/`Argparse.Native` hierarchies and replaced aggregated imports with SPEC-aligned stubs.
 6. ✅ **Normalization draft** (2025-09-27): Implemented `Argparse.Core.Normalize.normalize` to split tokens on the first `--` and populate the new `State` record.
 7. ✅ **Value parsing scaffold** (2025-09-27): Added the `FromArg` class with baseline instances (String, Substring, Nat, Int, Bool) in `Argparse/Core/Value.lean`.
-8. **Spec AST skeleton**: Outline the command specification tree in `Argparse/Spec/AST.lean`, covering flags, options, positionals, and subcommands.
-9. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
+8. ✅ **Spec AST skeleton** (2025-09-27): Outlined the command specification tree in `Argparse/Spec/AST.lean` covering flags, options, positionals, and subcommands.
+9. **Elaborator scaffold**: Establish the scaffold in `Argparse/Spec/Elab.lean` to translate the AST into runtime parsers.
+10. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
