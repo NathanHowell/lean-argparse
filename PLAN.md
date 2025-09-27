@@ -46,6 +46,7 @@
 - 2025-09-27: Drafted core runtime types (`Tokens`, `State`, `Result`, `Error`, `Expect`, `ErrorKind`) per the spec in `Argparse/Core/Types.lean`.
 - 2025-09-27: Implemented parser core (`Parser` alias plus Functor/Applicative/Alternative instances) in `Argparse/Core/Parser.lean`.
 - 2025-09-27: Removed the legacy `Argparse.Basic`/`Argparse.Native` implementations and stubbed the new module tree in `Argparse.lean`, `Main.lean`, and `Tests/Main.lean`.
+- 2025-09-27: Added normalization pass (`Argparse.Core.Normalize.normalize`) splitting tokens on `--` into the new state record.
 - _Please append future successes and failures here with short rationales._
 
 ## Immediate Next Steps
@@ -54,6 +55,6 @@
 3. ✅ **Core type draft** (2025-09-27): Introduced the spec’s core types (`Tokens`, `State`, `Result`, `Error`, etc.) in `Argparse/Core/Types.lean`, matching the specification and noting diagnostic fields.
 4. ✅ **Parser core** (2025-09-27): Defined `Parser := State → Result` with `pure`/`map`/`seq`/`fail` helpers and `Functor`/`Applicative`/`Alternative` instances.
 5. ✅ **Legacy cleanup** (2025-09-27): Removed the old `Argparse.Basic`/`Argparse.Native` hierarchies and replaced aggregated imports with SPEC-aligned stubs.
-6. **Normalization draft**: Implement `Argparse.Core.Normalize.normalize` to split tokens on the first `--` and populate the new `State` record.
+6. ✅ **Normalization draft** (2025-09-27): Implemented `Argparse.Core.Normalize.normalize` to split tokens on the first `--` and populate the new `State` record.
 7. **Value parsing scaffold**: Define the `FromArg` class with basic instances in `Argparse/Core/Value.lean` to support upcoming option parsers.
 8. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
