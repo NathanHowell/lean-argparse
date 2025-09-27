@@ -37,6 +37,7 @@
 - ✅ Retired low-level cursor consumer tests and replaced them with interpreter-level guards that exercise flag, option, positional, optional, and default behaviours under last-value-wins semantics.
 - ✅ Introduced the `Assigned` partial-field helper and ported flag/option/positional primitives to it, so required-versus-default distinction lives in one reusable abstraction.
 - ❌ Adding an `Alternative` instance for `Interpreter` is currently blocked: the handler fold mutates state destructively, so supporting `<|>` would require a backtracking story (or fresh token folds) we do not have yet. Documented here so future work can revisit once a reversible execution model exists.
+- ❌ Tried to swap the option/positional folds over to `List` to simplify length/progress proofs, but Lean rejected the refactor mid-way (parser issues around the new helper defs), so the change was reverted. Proof work will need to proceed on the existing array-backed implementation for now.
 
 ## Workstreams
 1. **Cursor & Partial Foundations**
