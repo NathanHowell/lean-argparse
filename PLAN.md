@@ -9,7 +9,7 @@
 ## Current Snapshot
 
 - ✅ Typeclass audit resolved:
-  - `Grammar` now exposes `Functor`/`Applicative`/`Alternative` instances so downstream code can lean on `<$>`/`<*>` rather than bespoke helpers (lawfulness proofs still pending below).
+  - `Grammar` now exposes `Functor`/`Applicative`/`Alternative` instances and carries `LawfulFunctor`/`LawfulApplicative` lemmas, unlocking Lean’s rewriting rules for `<$>`/`<*>` without bespoke simplifiers (fresh `Usage.empty_append`/`Usage.append_empty` helpers power the proofs).
   - Native `Result` is an `Except Error` alias, inheriting the standard `Monad`/`Applicative` stack and eliminating the custom wrapper.
   - `Assigned` gained `LawfulMonad` (and therefore `LawfulApplicative`/`LawfulFunctor`) proofs, unlocking Lean’s simplification lemmas for the partial-field helpers.
 - Normalised argv-to-token pass (`ParsedToken`) still splits argv into option tokens and positional strings after the first positional/`--`, feeding the new cursor-based interpreter.
@@ -54,7 +54,6 @@
 
 ## Immediate Next Steps
 
-1. Supply lawful `Functor`/`Applicative` (and, if viable, `Alternative`) proofs for `Grammar` so the interpreter can reuse Lean’s rewriting lemmas without bespoke simplifiers.
-2. Decide whether `Interpreter` should expose an `Alternative` instance—or document why not—once its canonical failure payload is settled.
-3. Reintroduce updater progress/length proofs and lift them through the applicative combinators, recording any stalled approaches.
-4. Extend property tests and docs to explain the updater-based architecture, covering repeated options, sentinel permutations, and partial-state completion results while logging both successful and negative findings.
+1. Decide whether `Interpreter` should expose an `Alternative` instance—or document why not—once its canonical failure payload is settled.
+2. Reintroduce updater progress/length proofs and lift them through the applicative combinators, recording any stalled approaches.
+3. Extend property tests and docs to explain the updater-based architecture, covering repeated options, sentinel permutations, and partial-state completion results while logging both successful and negative findings.

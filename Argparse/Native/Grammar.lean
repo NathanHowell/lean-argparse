@@ -1,4 +1,5 @@
 import Std
+import Init.Control.Lawful
 import Argparse.Basic.Docs
 import Argparse.Native.Error
 import Argparse.Native.FieldUpdater
@@ -10,6 +11,18 @@ namespace Argparse
 namespace Native
 
 open Token
+
+namespace Usage
+
+@[simp] theorem empty_append (u : Usage) : Usage.append Usage.empty u = u := by
+  cases u
+  simp [Usage.append, Usage.empty]
+
+@[simp] theorem append_empty (u : Usage) : Usage.append u Usage.empty = u := by
+  cases u
+  simp [Usage.append, Usage.empty]
+
+end Usage
 
 /-- Result type returned by the native interpreter. -/
 abbrev Result (α : Type) := Except Error α
@@ -64,6 +77,7 @@ end Grammar
 
 instance : Functor Grammar where
   map := Grammar.map
+  mapConst := fun {_ _} _ g => { usage := g.usage }
 
 instance : Pure Grammar := ⟨Grammar.pure⟩
 
@@ -78,6 +92,61 @@ instance : Applicative Grammar where
 instance : Alternative Grammar where
   failure := Grammar.failure
   orElse := Grammar.orElse
+
+instance : LawfulFunctor Grammar where
+  map_const := by
+    intro (_ : Type) (_ : Type); funext _ g; cases g; rfl
+  id_map := by
+    intro (_ : Type) g; cases g; rfl
+  comp_map := by
+    intro (_ : Type) (_ : Type) (_ : Type) g h x; cases x; rfl
+
+instance : LawfulApplicative Grammar where
+  seqLeft_eq := by
+    intro _ _ x y
+    cases x with
+    | mk ux =>
+      cases y with
+      | mk uy =>
+        simp [SeqLeft.seqLeft, Seq.seq, Functor.map, Grammar.seq, Grammar.map, Usage.append]
+  seqRight_eq := by
+    intro _ _ x y
+    cases x with
+    | mk ux =>
+      cases y with
+      | mk uy =>
+        simp [SeqRight.seqRight, Seq.seq, Functor.map, Grammar.seq, Grammar.map, Usage.append]
+  pure_seq := by
+    intro _ _ g x
+    cases x with
+    | mk ux =>
+      have hx : Usage.append (Grammar.pure g).usage ux = ux := by
+        simpa [Grammar.pure, Usage.append] using Usage.empty_append ux
+      simpa [Seq.seq, Grammar.seq, Functor.map, Grammar.map, Grammar.pure, Usage.append, hx]
+  map_pure := by
+    intro _ _ g x
+    change Grammar.map g (Grammar.pure x) = Grammar.pure (g x)
+    simp [Grammar.map, Grammar.pure, Usage.empty]
+  seq_pure := by
+    intro _ _ g x
+    cases g with
+    | mk ug =>
+      have hg : Usage.append ug (Grammar.pure x).usage = ug := by
+        simpa [Grammar.pure, Usage.append] using Usage.append_empty ug
+      simpa [Seq.seq, Grammar.seq, Functor.map, Grammar.map, Grammar.pure, Usage.append, hg]
+  seq_assoc := by
+    intro _ _ _ x g h
+    cases x with
+    | mk ux =>
+      cases g with
+      | mk ug =>
+        cases h with
+        | mk uh =>
+          simp [Seq.seq, Grammar.seq, Functor.map, Grammar.map]
+          cases ux
+          cases ug
+          cases uh
+          simp [Usage.append, List.append_assoc]
 
 private def describe {α : Type} [TokenSpec α] (name : α) : String :=
   TokenSpec.describe name
