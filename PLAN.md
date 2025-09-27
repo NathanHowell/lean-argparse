@@ -7,12 +7,12 @@
 - Maintain an explicit activity log, including failed experiments and reverted approaches, so future agents can learn from them.
 
 ## Current Snapshot
-- Normalised argv-to-token pass (`ParsedToken`) already exists and preserves original spellings while respecting `--`.
-- Interpreter now consumes a `TokenCursor`; the legacy `TokenStream` helpers were deleted after porting positional/flag/value primitives onto the cursor.
-- Regression tests cover the cursor pipeline plus short-option permutations, but structural proofs are presently missing.
+- Normalised argv-to-token pass (`ParsedToken`) now splits argv into option tokens and positional strings after the first positional/`--`, simplifying downstream consumers.
+- Interpreter now consumes a cursor backed by two arrays (`options`, `positionals`); the legacy `TokenStream` helpers were deleted after porting positional/flag/value primitives onto the cursor.
+- Regression tests cover the cursor pipeline plus short-option permutations under the new “first positional locks positional mode” semantics, but structural proofs are presently missing.
 
 ## Architectural Direction (Iterator-Centric)
-- **TokenCursor Core**: represent parser state as `TokenCursor := { data : Array Token, pos : Nat }`, exposing helpers to advance the cursor and certify that `pos ≤ data.size`. We commit to keeping cursor operations array-native (no round-tripping through lists) so proofs reduce to simple arithmetic over `Array.size`/`pos`. Lean’s iterator modules (`Std.Data.Array.Iterator`, `Std.Data.List.Iterator`) remain reference points for cursor-style traversal patterns.
+- **TokenCursor Core**: represent parser state as `TokenCursor := { options : Array ParsedOption, positionals : Array String }`, measuring progress via array lengths instead of list surgery. Cursor operations stay array-native (no round-tripping), so proofs reduce to simple arithmetic over `Array.size`.
 - **Parser Type**: define `Parser α := StateT TokenCursor (Except ParseError)` (or `ExceptT` over `State TokenCursor`). Applicative/Alternative instances come for free; proofs reduce to arithmetic on the cursor index.
 - **Primitives**: reimplement `flag`, `value`, `positional`, etc., as cursor actions. Each primitive carries lemmas of the form `progress : cursor.pos < cursor'.pos` or explicit `consumed` counts.
 - **Derived Combinators**: rebuild `many`, `some`, optional helpers, and higher-level grammar in terms of the primitives. Proofs become simple inductions that compose the primitive progress results.
@@ -24,8 +24,8 @@
 - ✅ Maintained the parsed-token classifier from earlier work; it still serves as the normalisation front-end for the upcoming cursor interpreter.
 - ✅ Added the initial `TokenCursor` scaffold with array-backed storage, cursor helpers, and build coverage so the iterator rewrite has a concrete foundation.
 - ✅ Replaced the `TokenStream` primitives with cursor-based versions, updated the interpreter/tests, and removed the obsolete module.
-- 🔁 Decided against falling back to lists for cursor helpers; upcoming work must push remaining `List` conversions to the classifier boundary and keep runtime/proof code in `Array`.
-- 🔁 Next milestone: restore progress proofs for the cursor primitives before expanding to higher-level combinators, once the list round-trips are gone.
+- ✅ Split classification output into option/positional arrays, rewrote `TokenCursor` to operate on those arrays directly, and refreshed tests/documentation to match the simplified semantics.
+- 🔁 Next milestone: restore progress proofs for the cursor primitives before expanding to higher-level combinators.
 
 ## Workstreams
 1. **Cursor Foundation**
@@ -43,7 +43,6 @@
    - Track any remaining gaps (shell completion, usage rendering) for later phases.
 
 ## Immediate Next Steps
-1. Eliminate list round-trips in the cursor helpers so every primitive exposes purely array-based results (easing later proofs).
-2. Prove the cursor progress lemmas for positional/flag/value primitives so incremental progress properties are restored quickly.
-3. Refresh combinator proofs and interpreter-level invariants using the new cursor lemmas.
-4. Extend tests and docs alongside each milestone, capturing both successful and negative results.
+1. Prove the cursor progress lemmas for positional/flag/value primitives so incremental progress properties are restored quickly.
+2. Refresh combinator proofs and interpreter-level invariants using the new cursor lemmas.
+3. Extend tests and docs alongside each milestone, capturing both successful and negative results.

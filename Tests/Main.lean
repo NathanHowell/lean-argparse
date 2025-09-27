@@ -11,49 +11,69 @@ open Argparse.Native.Interpreter
 
 namespace ArgparseTests
 
-#guard (Argparse.Native.classify ["--verbose"] =
-  [ParsedToken.option { name := ParsedName.long "verbose", original := "--verbose", inlineValue? := none }])
+open ParsedName
 
-#guard (Argparse.Native.classify ["-n=3"] =
-  [ParsedToken.option { name := ParsedName.short 'n', original := "-n=3", inlineValue? := some "3" }])
+#guard (
+  let classified := Argparse.Native.classify ["--verbose"]
+  classified.options.toList =
+    [{ name := ParsedName.long "verbose", original := "--verbose", inlineValue? := none }]
+    ∧ classified.positionals.isEmpty)
 
-#guard (Argparse.Native.classify ["--", "--count"] =
-  [ParsedToken.positional "--count"])
+#guard (
+  let classified := Argparse.Native.classify ["-n=3"]
+  classified.options.toList =
+    [{ name := ParsedName.short 'n', original := "-n=3", inlineValue? := some "3" }]
+    ∧ classified.positionals.isEmpty)
 
-#guard (Argparse.Native.classify ["-n5", "FILE"] =
-  [ParsedToken.option { name := ParsedName.short 'n', original := "-n5", inlineValue? := some "5" },
-   ParsedToken.positional "FILE"])
+#guard (
+  let classified := Argparse.Native.classify ["--", "--count"]
+  classified.options.isEmpty ∧ classified.positionals.toList = ["--count"])
+
+#guard (
+  let classified := Argparse.Native.classify ["-n5", "FILE"]
+  classified.options.toList =
+    [{ name := ParsedName.short 'n', original := "-n5", inlineValue? := some "5" }]
+    ∧ classified.positionals.toList = ["FILE"])
 
 #guard
-  let tokens := Argparse.Native.classify ["-n", "FILE"]
-  let expected := Argparse.Native.classify ["-n"]
-  match TokenCursor.takePositional? (TokenCursor.ofList tokens) with
-  | Option.some (value, rest) => value = "FILE" ∧ rest.toList = expected
+  let cursor := TokenCursor.fromArgv ["-n", "FILE"]
+  let expected := TokenCursor.fromArgv ["-n"]
+  match TokenCursor.takePositional? cursor with
+  | Option.some (value, rest) =>
+      value = "FILE"
+        ∧ rest.options.toList = expected.options.toList
+        ∧ rest.positionals.toList = expected.positionals.toList
   | Option.none => False
 
 #guard
-  let tokens := Argparse.Native.classify ["--verbose", "-x", "FILE"]
-  let expected := Argparse.Native.classify ["-x", "FILE"]
-  match TokenCursor.consumeFlag "verbose" (TokenCursor.ofList tokens) with
-  | .ok (present, rest) => present && rest.toList = expected
+  let cursor := TokenCursor.fromArgv ["--verbose", "-x", "FILE"]
+  let expected := TokenCursor.fromArgv ["-x", "FILE"]
+  match TokenCursor.consumeFlag "verbose" cursor with
+  | .ok (present, rest) =>
+      present
+        ∧ rest.options.toList = expected.options.toList
+        ∧ rest.positionals.toList = expected.positionals.toList
   | _ => False
 
 #guard
-  let tokens := Argparse.Native.classify ["--verbose=1"]
-  match TokenCursor.consumeFlag "verbose" (TokenCursor.ofList tokens) with
+  let cursor := TokenCursor.fromArgv ["--verbose=1"]
+  match TokenCursor.consumeFlag "verbose" cursor with
   | .error err => err.code = ErrorCode.invalid
   | _ => False
 
 #guard
-  let tokens := Argparse.Native.classify ["--count=1", "--count", "3", "FILE"]
-  let expected := Argparse.Native.classify ["FILE"]
-  match TokenCursor.consumeValue "count" (TokenCursor.ofList tokens) with
-  | .ok (Option.some value, rest) => value = "3" ∧ rest.toList = expected
+  let cursor := TokenCursor.fromArgv ["--count=1", "--count", "3", "FILE"]
+  let expected := TokenCursor.fromArgv ["FILE"]
+  match TokenCursor.consumeValue "count" cursor with
+  | .ok (Option.some value, rest) =>
+      value = "3"
+        ∧ rest.options.toList = expected.options.toList
+        ∧ rest.positionals.toList = expected.positionals.toList
   | _ => False
 
 #guard
-  let tokens := Argparse.Native.classify ["--count", "--other"]
-  match TokenCursor.consumeValue "count" (TokenCursor.ofList tokens) with
+  let cursor := TokenCursor.fromArgv ["--count", "--other"]
+  match TokenCursor.consumeValue "count" cursor with
   | .error err => err.code = ErrorCode.missing
   | _ => False
 
@@ -70,6 +90,9 @@ private def containsSubstring (haystack needle : String) : Bool :=
           else
             loop rest
     loop haystack.data
+
+private def cursorDone (cursor : TokenCursor) : Bool :=
+  cursor.options.isEmpty && cursor.positionals.isEmpty
 
 private structure ExampleCfg where
   verbose : Bool
@@ -145,19 +168,19 @@ private def nativeExample : Interpreter ExampleCfg :=
     <*> name
 
 private def tokensOf (args : List String) : TokenCursor :=
-  TokenCursor.ofList (Argparse.Native.classify args)
+  TokenCursor.fromArgv args
 
 private def evalNative {α} (parser : Interpreter α) (args : List String) : Result α :=
   Interpreter.eval parser (tokensOf args)
 
 #guard (match evalNative nativeExample ["Alice"] with
-  | .ok cfg rest => cfg = { verbose := false, count := 1, name := "Alice" }
-      ∧ rest.toList = []
+  | .ok cfg rest => decide (cfg = { verbose := false, count := 1, name := "Alice" })
+      && cursorDone rest
   | _ => False)
 
 #guard (match evalNative nativeExample ["--verbose", "-n", "3", "Bob"] with
-  | .ok cfg rest => cfg = { verbose := true, count := 3, name := "Bob" }
-      ∧ rest.toList = []
+  | .ok cfg rest => decide (cfg = { verbose := true, count := 3, name := "Bob" })
+      && cursorDone rest
   | _ => False)
 
 #guard (match evalNative nativeExample ["--count", "five", "Bob"] with
@@ -170,7 +193,7 @@ private def evalNative {α} (parser : Interpreter α) (args : List String) : Res
   | _ => False)
 
 #guard (match evalNative (Interpreter.positional { metavar := "NAME", help? := none, required := true }) ["Grace"] with
-  | .ok name rest => name = "Grace" ∧ rest.toList = []
+  | .ok name rest => decide (name = "Grace") && cursorDone rest
   | _ => False)
 
 #guard (match evalNative (Interpreter.positional { metavar := "NAME", help? := none, required := true }) [] with
@@ -178,19 +201,19 @@ private def evalNative {α} (parser : Interpreter α) (args : List String) : Res
   | _ => False)
 
 #guard (match evalNative (Interpreter.flag verboseDoc "verbose") ["--verbose", "--verbose"] with
-  | .ok present rest => present ∧ rest.toList = []
+  | .ok present rest => decide (present = true) && cursorDone rest
   | _ => False)
 
 #guard (match evalNative (Interpreter.option countDoc "count") ["--count=9", "--count", "7"] with
-  | .ok (Option.some value) rest => value = "7" ∧ rest.toList = []
+  | .ok (Option.some value) rest => decide (value = "7") && cursorDone rest
   | _ => False)
 
 #guard (match evalNative (Interpreter.option countDoc "count") [] with
-  | .ok Option.none rest => rest.toList = []
+  | .ok Option.none rest => cursorDone rest
   | _ => False)
 
 #guard (match evalNative (Interpreter.many (Interpreter.positional { metavar := "ITEM", help? := none, required := false })) ["one", "two"] with
-  | .ok values rest => values = ["one", "two"] ∧ rest.toList = []
+  | .ok values rest => decide (values = ["one", "two"]) && cursorDone rest
   | _ => False)
 
 #guard (match evalNative (Interpreter.some (Interpreter.positional { metavar := "ITEM", help? := none, required := false })) [] with
@@ -198,7 +221,7 @@ private def evalNative {α} (parser : Interpreter α) (args : List String) : Res
   | _ => False)
 
 #guard (match evalNative (Interpreter.optional (Interpreter.positional { metavar := "ITEM", help? := none, required := false })) [] with
-  | .ok Option.none rest => rest.toList = []
+  | .ok Option.none rest => cursorDone rest
   | _ => False)
 
 private def exampleParser : Parser ExampleCfg :=
