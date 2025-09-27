@@ -36,6 +36,7 @@
 - ✅ Integrated the handler bundle with the interpreter: `HandlerBundle.run` plus `PartialSpec` now power all native primitives, giving an explicit folding surface for upcoming proofs.
 - ✅ Retired low-level cursor consumer tests and replaced them with interpreter-level guards that exercise flag, option, positional, optional, and default behaviours under last-value-wins semantics.
 - ✅ Introduced the `Assigned` partial-field helper and ported flag/option/positional primitives to it, so required-versus-default distinction lives in one reusable abstraction.
+- ❌ Adding an `Alternative` instance for `Interpreter` is currently blocked: the handler fold mutates state destructively, so supporting `<|>` would require a backtracking story (or fresh token folds) we do not have yet. Documented here so future work can revisit once a reversible execution model exists.
 
 ## Workstreams
 1. **Cursor & Partial Foundations**
@@ -54,6 +55,5 @@
 
 ## Immediate Next Steps
 
-1. Decide whether `Interpreter` should expose an `Alternative` instance—or document why not—once its canonical failure payload is settled.
-2. Reintroduce updater progress/length proofs and lift them through the applicative combinators, recording any stalled approaches.
-3. Extend property tests and docs to explain the updater-based architecture, covering repeated options, sentinel permutations, and partial-state completion results while logging both successful and negative findings.
+1. Reintroduce updater progress/length proofs and lift them through the applicative combinators, recording any stalled approaches.
+2. Extend property tests and docs to explain the updater-based architecture, covering repeated options, sentinel permutations, and partial-state completion results while logging both successful and negative findings.
