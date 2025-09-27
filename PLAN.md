@@ -54,4 +54,6 @@
 3. ✅ **Core type draft** (2025-09-27): Introduced the spec’s core types (`Tokens`, `State`, `Result`, `Error`, etc.) in `Argparse/Core/Types.lean`, matching the specification and noting diagnostic fields.
 4. ✅ **Parser core** (2025-09-27): Defined `Parser := State → Result` with `pure`/`map`/`seq`/`fail` helpers and `Functor`/`Applicative`/`Alternative` instances.
 5. ✅ **Legacy cleanup** (2025-09-27): Removed the old `Argparse.Basic`/`Argparse.Native` hierarchies and replaced aggregated imports with SPEC-aligned stubs.
-6. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
+6. **Normalization draft**: Implement `Argparse.Core.Normalize.normalize` to split tokens on the first `--` and populate the new `State` record.
+7. **Value parsing scaffold**: Define the `FromArg` class with basic instances in `Argparse/Core/Value.lean` to support upcoming option parsers.
+8. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
