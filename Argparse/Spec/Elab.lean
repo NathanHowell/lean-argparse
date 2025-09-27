@@ -49,12 +49,22 @@ def interpretFlag (spec : FlagSpec) : Parser (Partial → Partial) :=
   flag spec |>.map fun enabled => fun p =>
     Partial.addFlag spec.meta.name enabled p
 
-/-- Interpret a single-valued option (arity `.one`). -/
+/-- Interpret an option according to its arity, recording values. -/
 def interpretOption (spec : OptSpec String) : Parser (Partial → Partial) :=
-  option spec |>.map fun value? => fun p =>
-    match value? with
-    | some value => Partial.addOption spec.meta.name value p
-    | none => p
+  match spec.arity with
+  | .zero =>
+      option spec |>.map (fun _ => id)
+  | .one =>
+      option spec |>.map fun value? => fun p =>
+        match value? with
+        | some value => Partial.addOption spec.meta.name value p
+        | none => p
+  | .many =>
+      option spec |>.map fun values =>
+        fun p => values.foldl (fun acc value => Partial.addOption spec.meta.name value acc) p
+  | .some =>
+      option spec |>.map fun values =>
+        fun p => values.foldl (fun acc value => Partial.addOption spec.meta.name value acc) p
 
 /-- Interpret a positional value and record it. -/
 def interpretPositional (spec : PosSpec String) : Parser (Partial → Partial) :=

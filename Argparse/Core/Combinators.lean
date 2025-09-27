@@ -56,6 +56,9 @@ private def missingValueError (token : String) (expect : Expect) : Error :=
 private def invalidValueError (token msg : String) (expect : Expect) : Error :=
   { kind := .custom, context := [token], expect := [expect] }
 
+private def missingOptionError (spec : OptSpec α) : Error :=
+  { kind := .missingValue, context := [], expect := [expectOption spec] }
+
 /-- Determine whether the token matches the flag specification. -/
 inductive FlagMatch
   | none
@@ -121,75 +124,119 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
           .ok true st'
   | [] => .ok false st
 
-/-- Attempt to pull an option value when the current token matches the long form. -/
-private def parseLongOption
-    {α} [FromArg α] (spec : OptSpec α) (token : String) (st : State) :
+private def takeOptionValue?
+    {α} [FromArg α] (spec : OptSpec α) (st : State) :
     Except Error (Option α × State) :=
-  match spec.long? with
-  | none => .ok (none, st)
-  | some name =>
-      let prefix := longLexeme name
+  match st.pre with
+  | [] => .ok (none, st)
+  | token :: rest =>
       let expect := expectOption spec
-      if token = prefix then
-        match State.consumePre? st with
-        | some (valueTok, st') =>
-            match FromArg.run valueTok with
-            | .ok value => .ok (some value, st')
-            | .error msg => .error (invalidValueError valueTok msg expect)
-        | none => .error (missingValueError token expect)
-      else if spec.eqVal? then
-        let eqPrefix := prefix ++ "="
-        if token.startsWith eqPrefix then
-          let raw := token.drop eqPrefix.length
-          match FromArg.run raw with
-          | .ok value => .ok (some value, { st with cursor := st.cursor + 1 })
-          | .error msg => .error (invalidValueError raw msg expect)
-        else
-          .ok (none, st)
-      else
-        .ok (none, st)
+      match spec.long? with
+      | some name =>
+          let prefix := longLexeme name
+          let stAfter := { st with pre := rest, cursor := st.cursor + 1 }
+          let eqPrefix := prefix ++ "="
+          if spec.eqVal? ∧ token.startsWith eqPrefix then
+            let raw := token.drop eqPrefix.length
+            if raw.isEmpty then
+              .error (missingValueError token expect)
+            else
+              match FromArg.run raw with
+              | .ok value => .ok (some value, stAfter)
+              | .error msg => .error (invalidValueError raw msg expect)
+          else if token = prefix then
+            match rest with
+            | valueTok :: restTail =>
+                match FromArg.run valueTok with
+                | .ok value =>
+                    let st' : State := { st with pre := restTail, cursor := st.cursor + 2 }
+                    .ok (some value, st')
+                | .error msg => .error (invalidValueError valueTok msg expect)
+            | [] => .error (missingValueError token expect)
+          else
+            -- fall through to short handling
+            match spec.short? with
+            | some short =>
+                let prefixShort := shortLexeme short
+                if token = prefixShort then
+                  match rest with
+                  | valueTok :: restTail =>
+                      match FromArg.run valueTok with
+                      | .ok value =>
+                          let st' : State := { st with pre := restTail, cursor := st.cursor + 2 }
+                          .ok (some value, st')
+                      | .error msg => .error (invalidValueError valueTok msg expect)
+                  | [] => .error (missingValueError token expect)
+                else if spec.concatVal? ∧ token.startsWith prefixShort then
+                  let raw := token.drop prefixShort.length
+                  if raw.isEmpty then
+                    .error (missingValueError token expect)
+                  else
+                    match FromArg.run raw with
+                    | .ok value => .ok (some value, stAfter)
+                    | .error msg => .error (invalidValueError raw msg expect)
+                else
+                  .ok (none, st)
+            | none => .ok (none, st)
+      | none =>
+          match spec.short? with
+          | some short =>
+              let prefix := shortLexeme short
+              let stAfter := { st with pre := rest, cursor := st.cursor + 1 }
+              if token = prefix then
+                match rest with
+                | valueTok :: restTail =>
+                    match FromArg.run valueTok with
+                    | .ok value =>
+                        let st' : State := { st with pre := restTail, cursor := st.cursor + 2 }
+                        .ok (some value, st')
+                    | .error msg => .error (invalidValueError valueTok msg expect)
+                | [] => .error (missingValueError token expect)
+              else if spec.concatVal? ∧ token.startsWith prefix then
+                let raw := token.drop prefix.length
+                if raw.isEmpty then
+                  .error (missingValueError token expect)
+                else
+                  match FromArg.run raw with
+                  | .ok value => .ok (some value, stAfter)
+                  | .error msg => .error (invalidValueError raw msg expect)
+              else
+                .ok (none, st)
+          | none => .ok (none, st)
 
-/-- Attempt to pull an option value when the current token matches the short form. -/
-private def parseShortOption
-    {α} [FromArg α] (spec : OptSpec α) (token : String) (st : State) :
-    Except Error (Option α × State) :=
-  match spec.short? with
-  | none => .ok (none, st)
-  | some short =>
-      let prefix := shortLexeme short
-      let expect := expectOption spec
-      if token = prefix then
-        match State.consumePre? st with
-        | some (valueTok, st') =>
-            match FromArg.run valueTok with
-            | .ok value => .ok (some value, st')
-            | .error msg => .error (invalidValueError valueTok msg expect)
-        | none => .error (missingValueError token expect)
-      else if spec.concatVal? ∧ token.startsWith prefix then
-        let raw := token.drop prefix.length
-        match FromArg.run raw with
-        | .ok value => .ok (some value, { st with cursor := st.cursor + 1 })
-        | .error msg => .error (invalidValueError raw msg expect)
-      else
-        .ok (none, st)
+private def collectOptionValues
+    {α} [FromArg α] (spec : OptSpec α) (st : State) : Except Error (List α × State) :=
+  let rec loop (acc : List α) (curr : State) : Except Error (List α × State) :=
+    match takeOptionValue? spec curr with
+    | .error err => .error err
+    | .ok (some value, nextState) => loop (value :: acc) nextState
+    | .ok (none, nextState) => .ok (acc.reverse, nextState)
+  loop [] st
 
-/-- Parser for single-valued options. Returns `some` when the next token matches; otherwise `none`. -/
-def option {α} [FromArg α] (spec : OptSpec α) : Parser (Option α) := fun st =>
-  match State.consumePre? st with
-  | none => .ok none st
-  | some (token, stAfterFlag) =>
-      let attemptLong := parseLongOption spec token stAfterFlag
-      match attemptLong with
-      | .ok (some value, st') => .ok (some value) st'
-      | .ok (none, st') =>
-          -- Long form did not match; attempt short form without consuming additional tokens.
-          match parseShortOption spec token stAfterFlag with
-          | .ok (some value, st'') => .ok (some value) st''
-          | .ok (none, _) =>
-              -- Token did not match option spec; restore original state.
-              .ok none st
-          | .error err => .err err
+/-- Parser for options supporting `.one`/`.many`/`.some` arities. -/
+def option {α} [FromArg α] (spec : OptSpec α) :
+    Parser (match spec.arity with
+      | .zero => PUnit
+      | .one  => Option α
+      | .many => List α
+      | .some => List α) := fun st =>
+  match spec.arity with
+  | .zero => .ok PUnit.unit st
+  | .one =>
+      match takeOptionValue? spec st with
       | .error err => .err err
+      | .ok (value?, st') => .ok value? st'
+  | .many =>
+      match collectOptionValues spec st with
+      | .error err => .err err
+      | .ok (values, st') => .ok values st'
+  | .some =>
+      match collectOptionValues spec st with
+      | .error err => .err err
+      | .ok (values, st') =>
+          match values with
+          | [] => .err (missingOptionError spec)
+          | _ => .ok values st'
 
 /-- Parser for positional arguments: consumes from `pre` first, then `post`. -/
 def positional {α} [FromArg α] (spec : PosSpec α) : Parser (Option α) := fun st =>

@@ -60,6 +60,20 @@ private def countSpec : OptSpec Nat :=
   | .ok (.some n) st => n = 3 ∧ st.pre = []
   | _ => False)
 
+private def includeSpec : OptSpec String :=
+  { long? := some "include", meta := { name := "include" }, arity := .many }
+
+#guard (match option includeSpec (mkState ["--include", "a", "--include", "b"] []) with
+  | .ok values st => values = ["a", "b"] ∧ st.pre = []
+  | _ => False)
+
+private def requiredSpec : OptSpec String :=
+  { long? := some "path", meta := { name := "path" }, arity := .some }
+
+#guard (match option requiredSpec (mkState [] []) with
+  | .err err => err.kind = .missingValue
+  | _ => False)
+
 private def nameSpec : PosSpec String :=
   { meta := { name := "NAME" } }
 
