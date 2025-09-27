@@ -1,11 +1,18 @@
 /-!
 # ArgParse.Tests.Golden
 
-Placeholder for golden tests covering docs and CLI output.
+Placeholder golden tests for rendering helpers.
 -/
+
+import Argparse.CLI.Print
+import Argparse.Examples.GitLike
 
 namespace ArgParse.Tests
 
--- TODO: add golden tests per SPEC.md.
+open ArgParse.CLI
+open ArgParse.Examples
+
+#guard (renderMan GitLike.spec |>.isEmpty = false)
+#guard (renderCompletions GitLike.spec |>.isEmpty = false)
 
 end ArgParse.Tests
