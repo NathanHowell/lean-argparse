@@ -17,10 +17,12 @@ open ArgParse.Core
 structure Partial where
   flags : List (String × Bool) := []
   options : List (String × String) := []
-  positionals : List String := []
+  positionals : List (String × String) := []
 deriving Repr
 
 namespace Partial
+
+@[simp] def empty : Partial := {}
 
 @[simp] def addFlag (name : String) (value : Bool) (p : Partial) : Partial :=
   { p with flags := (name, value) :: p.flags }
@@ -30,6 +32,15 @@ namespace Partial
 
 @[simp] def addPositional (name : String) (value : String) (p : Partial) : Partial :=
   { p with positionals := (name, value) :: p.positionals }
+
+def flagValue? (p : Partial) (name : String) : Option Bool :=
+  (p.flags.find? (fun entry => entry.fst = name)).map (·.snd)
+
+def optionValues (p : Partial) (name : String) : List String :=
+  p.options.filterMap (fun entry => if entry.fst = name then some entry.snd else none)
+
+def positionalValues (p : Partial) (name : String) : List String :=
+  p.positionals.filterMap (fun entry => if entry.fst = name then some entry.snd else none)
 
 end Partial
 

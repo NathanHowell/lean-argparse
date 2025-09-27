@@ -59,6 +59,7 @@
 - 2025-09-27: Updated the placeholder executable to print help for the git-style example.
 - 2025-09-27: Implemented baseline flag/option/positional parsers in `Argparse/Core/Combinators` (front-of-stream only; no bundling yet).
 - 2025-09-27: Rewired `Argparse.Spec.Elab` to compose the new core combinators into a `Partial` record capturing flags/options/positionals (arity/bundling work still pending).
+- 2025-09-27: Updated doc renderers (help/man/completions) to accept optional `Partial` annotations via `render*With` helpers.
 - _Please append future successes and failures here with short rationales._
 
 ## Immediate Next Steps
@@ -80,5 +81,6 @@
 16. ✅ **Main executable placeholder** (2025-09-27): Pointed `Main.lean` at the git-like example help output.
 17. ✅ **Parser primitive implementation** (2025-09-27): Replaced placeholders in `Argparse/Core/Combinators.lean` with baseline flag/option/positional parsers (currently front-of-stream only; no bundles or repeated arities yet).
 18. ✅ **Elaborator integration** (2025-09-27): `Argparse/Spec/Elab` now folds core combinators into a `Partial` record capturing flags/options/positionals (multi-arity/bundling still TODO).
-19. **Documentation alignment**: Ensure `Argparse/Doc` helpers (help/man/completions) consume richer runtime data (e.g., `Partial`) as parsing semantics solidify.
-20. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
+19. ✅ **Documentation alignment** (2025-09-27): Doc helpers now accept optional `Partial` annotations through `render*With`, surfacing runtime values alongside spec entries.
+20. **Option bundling & repeat arities**: Extend core combinators (and elaboration) to support concatenated short options, repeated values, and `.many`/`.some` arities while keeping proofs manageable.
+21. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.

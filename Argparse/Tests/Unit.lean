@@ -4,6 +4,7 @@ import Argparse.Core.Types
 import Argparse.Examples.GitLike
 import Argparse.Examples.Xargs0
 import Argparse.Spec.AST
+import Argparse.Spec.Elab
 
 /-!
 # ArgParse.Tests.Unit
@@ -54,6 +55,15 @@ private def nameSpec : PosSpec String :=
 #guard (match positional nameSpec (mkState [] ["alice"]) with
   | .ok (.some name) st => name = "alice" ∧ st.post = []
   | _ => False)
+
+private def samplePartial : Spec.Partial :=
+  Partial.empty
+    |> Partial.addFlag "--verbose" true
+    |> Partial.addOption "count" "5"
+    |> Partial.addPositional "NAME" "carol"
+
+#guard (ArgParse.CLI.renderHelpWith GitLike.spec (some samplePartial) |>.contains "git-like")
+#guard (ArgParse.CLI.renderManWith GitLike.spec (some samplePartial) |>.contains "git-like")
 
 end Basics
 

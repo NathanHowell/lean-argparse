@@ -14,16 +14,28 @@ open ArgParse
 open ArgParse.Doc
 open ArgParse.Spec
 
-/-- Render `--help` output for an application spec. -/
+/-- Render `--help` output, optionally annotated with runtime `Partial` data. -/
+def renderHelpWith (spec : Spec.AppSpec) (partial? : Option Spec.Partial := none) : String :=
+  Doc.renderHelpWith spec partial?
+
+/-- Render `--help` without runtime annotations. -/
 def renderHelp (spec : Spec.AppSpec) : String :=
-  Doc.renderHelp spec
+  renderHelpWith spec none
 
-/-- Render `--man` output for an application spec. -/
+/-- Render `--man` output, optionally annotated with runtime `Partial` data. -/
+def renderManWith (spec : Spec.AppSpec) (partial? : Option Spec.Partial := none) : String :=
+  Doc.renderManWith spec partial?
+
+/-- Render `--man` without runtime annotations. -/
 def renderMan (spec : Spec.AppSpec) : String :=
-  Doc.renderMan spec
+  renderManWith spec none
 
-/-- Render `--generate-completions` output for an application spec. -/
+/-- Render completion script output, optionally including runtime data. -/
+def renderCompletionsWith (spec : Spec.AppSpec) (partial? : Option Spec.Partial := none) : String :=
+  Doc.renderCompletionWith spec partial?
+
+/-- Render completion output without runtime annotations. -/
 def renderCompletions (spec : Spec.AppSpec) : String :=
-  Doc.renderCompletion spec
+  renderCompletionsWith spec none
 
 end ArgParse.CLI
