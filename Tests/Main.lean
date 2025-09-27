@@ -243,12 +243,75 @@ private def expectedLongValue (name : String) (tokens : List String)
             go (tok :: processed) rest
   go [] front
 
-/-- Base tokens used to synthesise randomised flag/value scenarios. -/
-private def frontAlphabet : List String := ["foo", "bar", "--other", "-q"]
+/-- Does the front section contain `-name=<value>` or `-name<value>`? -/
+private def hasInlineShortValue (name : Char) : List String → Bool
+  | [] => false
+  | tok :: rest =>
+      match parseShort? tok with
+      | Option.some (found, Option.some _) =>
+          if found = name then true else hasInlineShortValue name rest
+      | _ => hasInlineShortValue name rest
 
-private def tailAlphabet : List String := ["tail", "extra", "--verbose", "--count", "value"]
+/-- Remove the first occurrence of `-name` (without an inline value) from the front tokens. -/
+private def removeShortFlag (name : Char) : List String → Bool × List String
+  | [] => (false, [])
+  | tok :: rest =>
+      match parseShort? tok with
+      | Option.some (found, Option.none) =>
+          if found = name then
+            (true, rest)
+          else
+            let (present, remainder) := removeShortFlag name rest
+            (present, tok :: remainder)
+      | _ =>
+          let (present, remainder) := removeShortFlag name rest
+          (present, tok :: remainder)
+
+/-- Expected outcome for consuming `-name` with a value from the front/tail. -/
+private def expectedShortValue (name : Char) (tokens : List String)
+    : Except Error (Option String × List String) :=
+  let (front, tail) := splitArgs tokens
+  let rec go (processed : List String) : List String → Except Error (Option String × List String)
+    | [] =>
+        let newFront := processed.reverse
+        .ok (Option.none, assembleArgs newFront tail)
+    | tok :: rest =>
+        match parseShort? tok with
+        | Option.some (found, value?) =>
+            if found = name then
+              match value? with
+              | Option.some value =>
+                  let newFront := processed.reverse ++ rest
+                  .ok (Option.some value, assembleArgs newFront tail)
+              | Option.none =>
+                  match rest with
+                  | next :: restTail =>
+                      let newFront := processed.reverse ++ restTail
+                      .ok (Option.some next, assembleArgs newFront tail)
+                  | [] =>
+                      match tail with
+                      | next :: tailRest =>
+                          let newFront := processed.reverse
+                          .ok (Option.some next, assembleArgs newFront tailRest)
+                      | [] =>
+                          .error {
+                            code := .missing
+                            , subject? := some s!"-{String.mk [name]}"
+                          }
+            else
+              go (tok :: processed) rest
+        | Option.none =>
+            go (tok :: processed) rest
+  go [] front
+
+/-- Base tokens used to synthesise randomised flag/value scenarios. -/
+private def frontAlphabet : List String := ["foo", "bar", "--other", "-q", "13"]
+
+private def tailAlphabet : List String := ["tail", "extra", "--verbose", "--count", "value", "13"]
 
 private def lengthChoices : List Nat := [0, 1, 2]
+
+private def lengthChoicesSmall : List Nat := [0, 1]
 
 private def frontScenarios : List (List String) :=
   concatMap lengthChoices fun len => sequences frontAlphabet len
@@ -256,19 +319,66 @@ private def frontScenarios : List (List String) :=
 private def tailScenarios : List (List String) :=
   concatMap lengthChoices fun len => sequences tailAlphabet len
 
-private def synthesizeScenarios (primary inline : String) : List (List String) :=
+private def insertSequence (base : List String) (tokens : List String) : List (List String) :=
+  tokens.foldl
+    (fun variants tok => concatMap variants fun seq => insertEverywhere tok seq)
+    [base]
+
+private def subsetsUpTo {α} : List α → Nat → List (List α)
+  | _, 0 => [[]]
+  | [], _ => [[]]
+  | x :: xs, Nat.succ k =>
+      let without := subsetsUpTo xs (Nat.succ k)
+      let withSubsets := (subsetsUpTo xs k).map (List.cons x)
+      without ++ withSubsets
+
+private def synthesizeScenariosUpTo (tokens : List String) (maxInsert : Nat) : List (List String) :=
   concatMap frontScenarios fun base =>
-    let withPrimary := insertEverywhere primary base
-    let withInline := insertEverywhere inline base
-    base :: (withPrimary ++ withInline)
+    concatMap (subsetsUpTo tokens maxInsert) fun selection => insertSequence base selection
+
+private def synthesizeScenarios (tokens : List String) : List (List String) :=
+  synthesizeScenariosUpTo tokens 1
+
+private def flagTokens : List String :=
+  ["--verbose", "--verbose=value", "-v", "-v=on", "-v1"]
+
+private def optionTokens : List String :=
+  ["--count", "--count=13", "-n", "-n13", "-n=13"]
+
+private def mixedFlagValueTokens : List String :=
+  ["--verbose", "-v", "--count", "-n", "--count=13"]
+
+private def mixedFrontScenarios : List (List String) :=
+  concatMap lengthChoicesSmall fun len => sequences frontAlphabet len
+
+private def mixedTailScenarios : List (List String) :=
+  concatMap lengthChoicesSmall fun len => sequences tailAlphabet len
 
 private def flagInputs : List (List String) :=
-  concatMap (synthesizeScenarios "--verbose" "--verbose=value") fun front =>
+  concatMap (synthesizeScenarios flagTokens) fun front =>
     tailScenarios.map fun tail => assembleArgs front tail
 
 private def optionInputs : List (List String) :=
-  concatMap (synthesizeScenarios "--count" "--count=13") fun front =>
+  concatMap (synthesizeScenarios optionTokens) fun front =>
     tailScenarios.map fun tail => assembleArgs front tail
+
+private def mixedFlagValueInputs : List (List String) :=
+  let raw :=
+    concatMap mixedFrontScenarios fun base =>
+      let variants :=
+        concatMap (subsetsUpTo mixedFlagValueTokens 2) fun selection => insertSequence base selection
+      concatMap variants fun front =>
+        mixedTailScenarios.map fun tail => assembleArgs front tail
+  raw.filter fun tokens =>
+    let (front, tail) := splitArgs tokens
+    let frontHas := front.any fun tok => !isOptionLike tok
+    let tailHas := ¬ tail.isEmpty
+    frontHas || tailHas
+
+private def errorKindToCode : ParseErrorKind → ErrorCode
+  | .missing => ErrorCode.missing
+  | .invalid => ErrorCode.invalid
+  | .unexpected => ErrorCode.unexpected
 
 private def positionalInputs : List (List String) :=
   concatMap frontScenarios fun front =>
@@ -292,6 +402,20 @@ private def positionalInputs : List (List String) :=
         let expectedTokens := assembleArgs newFront tail
         decide (present = expectedPresent ∧ ArgStream.remaining restStream = expectedTokens))
 
+#guard (flagInputs.all fun tokens =>
+  let stream := ArgStream.ofList tokens
+  let (front, tail) := splitArgs tokens
+  let inline := hasInlineShortValue 'v' front
+  match Consumer.consumeShortFlag 'v' stream with
+  | .error err => decide (inline ∧ err.code = ErrorCode.invalid)
+  | .ok (present, restStream) =>
+      if inline then
+        False
+      else
+        let (expectedPresent, newFront) := removeShortFlag 'v' front
+        let expectedTokens := assembleArgs newFront tail
+        decide (present = expectedPresent ∧ ArgStream.remaining restStream = expectedTokens))
+
 #guard (optionInputs.all fun tokens =>
   let expected := expectedLongValue "count" tokens
   let actual := Consumer.consumeLongValue "count" (ArgStream.ofList tokens)
@@ -299,6 +423,97 @@ private def positionalInputs : List (List String) :=
   | .ok (expectedValue, expectedTokens), .ok (value, restStream) =>
       decide (value = expectedValue ∧ ArgStream.remaining restStream = expectedTokens)
   | .error expectedErr, .error actualErr => decide (actualErr.code = expectedErr.code)
+  | _, _ => False)
+
+#guard (optionInputs.all fun tokens =>
+  let expected := expectedShortValue 'n' tokens
+  let actual := Consumer.consumeShortValue 'n' (ArgStream.ofList tokens)
+  match expected, actual with
+  | .ok (expectedValue, expectedTokens), .ok (value, restStream) =>
+      decide (value = expectedValue ∧ ArgStream.remaining restStream = expectedTokens)
+  | .error expectedErr, .error actualErr => decide (actualErr.code = expectedErr.code)
+  | _, _ => False)
+
+private def missingCountError : Error :=
+  { code := .missing, subject? := optionSubject countDoc }
+
+private def expectedLongThenShort (tokens : List String)
+    : Except Error (Option String × List String) :=
+  match expectedLongValue "count" tokens with
+  | .error err => .error err
+  | .ok (longValue?, tokensAfterLong) =>
+      match expectedShortValue 'n' tokensAfterLong with
+      | .error err => .error err
+      | .ok (shortValue?, tokensAfterShort) =>
+          let value? := shortValue?.orElse fun _ => longValue?
+          match value? with
+          | Option.some value => .ok (Option.some value, tokensAfterShort)
+          | Option.none => .error missingCountError
+
+private def expectedShortThenLong (tokens : List String)
+    : Except Error (Option String × List String) :=
+  match expectedShortValue 'n' tokens with
+  | .error err => .error err
+  | .ok (shortValue?, tokensAfterShort) =>
+      match expectedLongValue "count" tokensAfterShort with
+      | .error err => .error err
+      | .ok (longValue?, tokensAfterLong) =>
+          let value? := shortValue?.orElse fun _ => longValue?
+          match value? with
+          | Option.some value => .ok (Option.some value, tokensAfterLong)
+          | Option.none => .error missingCountError
+
+private def expectedOptionValue (tokens : List String)
+    : Except Error (Option String × List String) :=
+  match expectedLongThenShort tokens with
+  | .ok result => .ok result
+  | .error _ => expectedShortThenLong tokens
+
+private def expectedOptionNat (tokens : List String)
+    : Except Error (Nat × List String) :=
+  match expectedOptionValue tokens with
+  | .error err => .error err
+  | .ok (value?, tokensAfter) =>
+      match value? with
+      | Option.some raw =>
+          match raw.toNat? with
+          | Option.some n => .ok (n, tokensAfter)
+          | Option.none =>
+              .error {
+                code := .invalid,
+                subject? := some "--count",
+                detail? := some s!"Expected a natural number for count, got '{raw}'"
+              }
+      | Option.none => .error missingCountError
+
+private def expectedFlagResult (tokens : List String)
+    : Except Error (Bool × List String × List String) :=
+  let (front, tail) := splitArgs tokens
+  if hasInlineLongValue "verbose" front then
+    .error { code := .invalid, subject? := some "--verbose" }
+  else if hasInlineShortValue 'v' front then
+    .error { code := .invalid, subject? := some "-v" }
+  else
+    let (longPresent, front') := removeLongFlag "verbose" front
+    let (shortPresent, front'') := removeShortFlag 'v' front'
+    .ok (longPresent || shortPresent, front'', tail)
+
+#guard (mixedFlagValueInputs.all fun tokens =>
+  let stream := ArgStream.ofList tokens
+  let flagEval := Interpreter.eval (flagLongShort "verbose" 'v' verboseDoc) stream
+  match expectedFlagResult tokens, flagEval with
+  | .error expectedErr, .error actualErr => decide (actualErr.code = expectedErr.code)
+  | .error _, _ => False
+  | .ok (expectedFlag, frontAfterFlag, tailAfterFlag), .ok actualFlag streamAfterFlag =>
+      let expectedStreamTokens := assembleArgs frontAfterFlag tailAfterFlag
+      if decide (actualFlag = expectedFlag ∧ ArgStream.remaining streamAfterFlag = expectedStreamTokens) then
+        match expectedOptionNat expectedStreamTokens, Interpreter.eval (optionLongShortNat "count" 'n' countDoc) streamAfterFlag with
+        | .error expectedErr, .error actualErr => decide (actualErr.code = expectedErr.code)
+        | .ok (expectedCount, remainingTokens), .ok actualCount streamAfterOption =>
+            decide (actualCount = expectedCount ∧ ArgStream.remaining streamAfterOption = remainingTokens)
+        | _, _ => False
+      else
+        False
   | _, _ => False)
 
 private def propertyItemDoc : PositionalDoc :=
