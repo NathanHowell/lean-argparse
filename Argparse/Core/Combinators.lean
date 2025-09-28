@@ -47,20 +47,20 @@ private def longLexeme (name : String) : String :=
 private def expectFlag (spec : FlagSpec) : Expect :=
   .flag (spec.short?.map (·.c)) spec.long?
 
-private def expectOption (spec : OptSpec α) : Expect :=
-  .optionVal spec.meta.name
+private def expectOption {α} [FromArg α] (spec : OptSpec α) : Expect :=
+  .optionVal spec.«meta».name
 
 private def missingValueError (token : String) (expect : Expect) : Error :=
   { kind := .missingValue, context := [token], expect := [expect] }
 
-private def invalidValueError (token msg : String) (expect : Expect) : Error :=
+private def invalidValueError (token _msg : String) (expect : Expect) : Error :=
   { kind := .custom, context := [token], expect := [expect] }
 
-private def missingOptionError (spec : OptSpec α) : Error :=
+private def missingOptionError {α} [FromArg α] (spec : OptSpec α) : Error :=
   { kind := .missingValue, context := [], expect := [expectOption spec] }
 
-private def expectPositional (spec : PosSpec α) : Expect :=
-  .positional spec.meta.name
+private def expectPositional {α} [FromArg α] (spec : PosSpec α) : Expect :=
+  .positional spec.«meta».name
 
 structure OptionStep (α) where
   value? : Option α
@@ -88,12 +88,12 @@ structure CollectResult (α) where
   let rec loop : List Nat → Option (α × String)
     | [] => none
     | idx :: rest =>
-        let prefix := stringTake raw idx
+        let head := stringTake raw idx
         let suffix := stringDrop raw idx
         if suffix.isEmpty then
           loop rest
         else
-          match FromArg.run prefix with
+          match FromArg.run head with
           | .ok value => some (value, suffix)
           | .error _ => loop rest
   loop candidates
@@ -113,11 +113,11 @@ private def matchFlagToken (spec : FlagSpec) (token : String) : FlagMatch :=
       else
         match spec.short? with
         | some short =>
-            let prefix := shortLexeme short
-            if token = prefix then
+            let shortLex := shortLexeme short
+            if token = shortLex then
               FlagMatch.short
-            else if token.startsWith prefix then
-              let rest := token.drop prefix.length
+            else if token.startsWith shortLex then
+              let rest := token.drop shortLex.length
               if rest.isEmpty then
                 FlagMatch.short
               else if token.startsWith "--" then
@@ -130,11 +130,11 @@ private def matchFlagToken (spec : FlagSpec) (token : String) : FlagMatch :=
   | none =>
       match spec.short? with
       | some short =>
-          let prefix := shortLexeme short
-          if token = prefix then
+          let shortLex := shortLexeme short
+          if token = shortLex then
             FlagMatch.short
-          else if token.startsWith prefix then
-            let rest := token.drop prefix.length
+          else if token.startsWith shortLex then
+            let rest := token.drop shortLex.length
             if rest.isEmpty then
               FlagMatch.short
             else if token.startsWith "--" then
@@ -164,7 +164,7 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
   | [] => .ok false st
 
 @[inline] def parseConcatValue
-    {α} [FromArg α] (spec : OptSpec α) (token raw : String)
+    {α} [FromArg α] (_spec : OptSpec α) (token raw : String)
     (pending : List String) (st : State) (expect : Expect) :
     Except Error (Option α × State) :=
   if raw = "" then
@@ -190,14 +190,14 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
       let expect := expectOption spec
       match spec.long? with
       | some name =>
-          let prefix := longLexeme name
-          let eqPrefix := prefix ++ "="
+          let longLex := longLexeme name
+          let eqPrefix := longLex ++ "="
           if spec.eqVal? ∧ token.startsWith eqPrefix then
             let raw := token.drop eqPrefix.length
             match parseConcatValue spec token raw rest st expect with
             | .ok (value?, st') => .ok { value? := value?, state := st', consumed := 1 }
             | .error err => .error err
-          else if token = prefix then
+          else if token = longLex then
             match rest with
             | valueTok :: restTail =>
                 match FromArg.run valueTok with
@@ -209,8 +209,8 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
           else
             match spec.short? with
             | some short =>
-                let prefixShort := shortLexeme short
-                if token = prefixShort then
+                let shortLex := shortLexeme short
+                if token = shortLex then
                   match rest with
                   | valueTok :: restTail =>
                       match FromArg.run valueTok with
@@ -219,8 +219,8 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
                           .ok { value? := some value, state := st', consumed := 2 }
                       | .error msg => .error (invalidValueError valueTok msg expect)
                   | [] => .error (missingValueError token expect)
-                else if spec.concatVal? ∧ token.startsWith prefixShort then
-                  let raw := token.drop prefixShort.length
+                else if spec.concatVal? ∧ token.startsWith shortLex then
+                  let raw := token.drop shortLex.length
                   match parseConcatValue spec token raw rest st expect with
                   | .ok (value?, st') => .ok { value? := value?, state := st', consumed := 1 }
                   | .error err => .error err
@@ -230,8 +230,8 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
       | none =>
           match spec.short? with
           | some short =>
-              let prefix := shortLexeme short
-              if token = prefix then
+              let shortLex := shortLexeme short
+              if token = shortLex then
                 match rest with
                 | valueTok :: restTail =>
                     match FromArg.run valueTok with
@@ -240,8 +240,8 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
                         .ok { value? := some value, state := st', consumed := 2 }
                     | .error msg => .error (invalidValueError valueTok msg expect)
                 | [] => .error (missingValueError token expect)
-              else if spec.concatVal? ∧ token.startsWith prefix then
-                let raw := token.drop prefix.length
+              else if spec.concatVal? ∧ token.startsWith shortLex then
+                let raw := token.drop shortLex.length
                 match parseConcatValue spec token raw rest st expect with
                 | .ok (value?, st') => .ok { value? := value?, state := st', consumed := 1 }
                 | .error err => .error err
