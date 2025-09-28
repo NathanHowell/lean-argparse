@@ -22,21 +22,21 @@ def map (f : α → β) (p : Parser α) : Parser β := fun st =>
   | .ok a st' => .ok (f a) st'
   | .err e => .err e
 
-/-- Apply a parsed function to a parsed value. -/
-def seq (pf : Parser (α → β)) (pa : Parser α) : Parser β := fun st =>
+/-- Apply a parsed function to a lazily supplied parsed value. -/
+def seq (pf : Parser (α → β)) (pa : Unit → Parser α) : Parser β := fun st =>
   match pf st with
   | .ok f st' =>
-      match pa st' with
+      match pa () st' with
       | .ok a st'' => .ok (f a) st''
       | .err e => .err e
   | .err e => .err e
 
 /-- Left sequencing helper. -/
-def seqLeft (pa : Parser α) (pb : Parser β) : Parser α :=
+def seqLeft (pa : Parser α) (pb : Unit → Parser β) : Parser α :=
   seq (map (fun a => fun (_ : β) => a) pa) pb
 
 /-- Right sequencing helper. -/
-def seqRight (pa : Parser α) (pb : Parser β) : Parser β :=
+def seqRight (pa : Parser α) (pb : Unit → Parser β) : Parser β :=
   seq (map (fun (_ : α) => id) pa) pb
 
 /-- Fail with a supplied structured error. -/
@@ -46,11 +46,11 @@ def fail (err : Error) : Parser α := fun _ => .err err
 def emptyError : Error :=
   { kind := .custom, context := [], expect := [] }
 
-/-- Prefer the first successful parser, falling back to the second on error. -/
-def orElse (pa pb : Parser α) : Parser α := fun st =>
+/-- Prefer the first successful parser, falling back to the (lazy) second on error. -/
+def orElse (pa : Parser α) (pb : Unit → Parser α) : Parser α := fun st =>
   match pa st with
   | .ok a st' => .ok a st'
-  | .err _ => pb st
+  | .err _ => pb () st
 
 end Parser
 
