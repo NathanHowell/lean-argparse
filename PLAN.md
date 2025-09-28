@@ -76,6 +76,7 @@
 - 2025-09-27: Lifted the collector proofs to `collect*Values` and the `.many`/`.some` branches of `option`/`positional`, yielding cursor-delta lemmas ready for applicative combinators.
 - 2025-09-27: Propagated optional (`.one`) progress/rollback lemmas so `option`/`positional` now document both consumption and preservation behaviour for present/absent values.
 - 2025-09-27: Threaded the new option/positional progress lemmas through `Spec.Elab` interpreters (`interpretOption`/`interpretPositional`), confirming the builder transformers inherit cursor guarantees.
+- 2025-09-27: Proved progress for `elaborateItem`, `foldItems`, and `elaborateCommand`, establishing that builder-level sequencing preserves the cursor delta from primitive interpreters.
 - _Please append future successes and failures here with short rationales._
 
 ## Immediate Next Steps
@@ -105,5 +106,6 @@
 24. ✅ **Many/some progress lemmas** (2025-09-27): Extended the collector proofs to `collect*Values` and lifted them into the `.many`/`.some` branches of `option`/`positional`, exposing cursor-delta facts for higher-level combinators.
 25. ✅ **Applicative propagation** (2025-09-27): Added `.one` optional progress/preservation lemmas for `option`/`positional`, completing the trio of `optional`/`many`/`some` proofs needed by downstream combinators.
 26. ✅ **Elaboration threading** (2025-09-27): Lifted the cursor lemmas to `interpretOption`/`interpretPositional`, so builder transformers mirror the primitive progress properties.
-27. **Command folding proofs**: Extend the progress facts to `foldItems`/`elaborateCommand`, preparing to reason about subcommands and whole-app parsers.
-28. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
+27. ✅ **Command folding proofs** (2025-09-27): Extended progress lemmas to `elaborateItem`, `foldItems`, and `elaborateCommand`, so builder sequencing now carries explicit cursor deltas.
+28. **Subcommand progress**: Lift the cursor guarantees through subcommand selection (`elaborateCommand` for child nodes) and document any obstacles before moving to whole-app proofs.
+29. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.

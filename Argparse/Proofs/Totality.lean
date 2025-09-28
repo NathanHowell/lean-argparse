@@ -1,6 +1,7 @@
 import Argparse.Core.Parser
 import Argparse.Core.Combinators
 import Argparse.Spec.AST
+import Argparse.Spec.Elab
 
 /-!
 # ArgParse.Proofs.Totality
@@ -905,5 +906,202 @@ theorem option_some_nonempty
               cases hres
               intro hnil
               cases hnil
+
+/-- Flag interpreters either consume one token or leave the state untouched. -/
+lemma interpretFlag_progress
+    (spec : FlagSpec) (st st' : State)
+    (updater : Spec.Partial → Spec.Partial) :
+    interpretFlag spec st = .ok updater st' →
+    st' = st ∨ st'.cursor = st.cursor + 1 := by
+  intro hres
+  classical
+  unfold Spec.interpretFlag at hres
+  simp [Parser.map] at hres
+  cases hop : flag spec st with
+  | err => simp [hop] at hres
+  | ok result =>
+      rcases result with ⟨enabled, stAfter⟩
+      simp [hop] at hres
+      cases hres
+      cases enabled with
+      | false =>
+          have := flag_false_preserves_state
+            (spec := spec) (st := st) (st' := stAfter) (by simpa [hop])
+          exact Or.inl (by simpa [this])
+      | true =>
+          have := flag_true_progress
+            (spec := spec) (st := st) (st' := stAfter) (by simpa [hop])
+          exact Or.inr (by simpa using this)
+
+/-- Flag interpreters expose their cursor delta as a natural number. -/
+lemma interpretFlag_progress_consumed
+    (spec : FlagSpec) (st st' : State)
+    (updater : Spec.Partial → Spec.Partial) :
+    interpretFlag spec st = .ok updater st' →
+    ∃ consumed, st'.cursor = st.cursor + consumed := by
+  intro hres
+  have h := interpretFlag_progress (spec := spec) (st := st) (st' := st')
+    (updater := updater) hres
+  refine h.elim ?zero ?one
+  · intro hstate; exact ⟨0, by simpa [hstate]⟩
+  · intro hstep; exact ⟨1, hstep⟩
+
+/-- Zero-arity options leave the cursor unchanged. -/
+lemma interpretOption_zero_progress
+    {α} [FromArg α] (spec : OptSpec α) (st st' : State)
+    (updater : Spec.Partial → Spec.Partial) :
+    spec.arity = .zero →
+    interpretOption (spec := spec) st = .ok updater st' →
+    st' = st := by
+  intro harity hres
+  subst harity
+  classical
+  unfold Spec.interpretOption at hres
+  simp [Parser.map, option] at hres
+
+/-- Optional options consume at most two tokens. -/
+lemma interpretOption_one_progress_consumed
+    {α} [FromArg α] (spec : OptSpec α) (st st' : State)
+    (updater : Spec.Partial → Spec.Partial) :
+    spec.arity = .one →
+    interpretOption (spec := spec) st = .ok updater st' →
+    ∃ consumed, st'.cursor = st.cursor + consumed := by
+  intro harity hres
+  have h := interpretOption_one_progress
+    (spec := spec) (st := st) (st' := st') (updater := updater) harity hres
+  refine h.elim ?zero ?pos
+  · intro hstate; exact ⟨0, by simpa [hstate]⟩
+  · intro hcons
+    cases hcons with
+    | inl h1 => exact ⟨1, h1⟩
+    | inr h2 => exact ⟨2, h2⟩
+
+/-- Zero-arity positionals leave the cursor unchanged. -/
+lemma interpretPositional_zero_progress
+    {α} [FromArg α] (spec : PosSpec α) (st st' : State)
+    (updater : Spec.Partial → Spec.Partial) :
+    spec.arity = .zero →
+    interpretPositional (spec := spec) st = .ok updater st' →
+    st' = st := by
+  intro harity hres
+  subst harity
+  classical
+  unfold Spec.interpretPositional at hres
+  simp [Parser.map, positional] at hres
+
+/-- Optional positionals consume at most one token. -/
+lemma interpretPositional_one_progress_consumed
+    {α} [FromArg α] (spec : PosSpec α) (st st' : State)
+    (updater : Spec.Partial → Spec.Partial) :
+    spec.arity = .one →
+    interpretPositional (spec := spec) st = .ok updater st' →
+    ∃ consumed, st'.cursor = st.cursor + consumed := by
+  intro harity hres
+  have h := interpretPositional_one_progress
+    (spec := spec) (st := st) (st' := st') (updater := updater) harity hres
+  refine h.elim ?zero ?one
+  · intro hstate; exact ⟨0, by simpa [hstate]⟩
+  · intro hstep; exact ⟨1, hstep⟩
+
+/-- Individual command items inherit cursor progress from their primitives. -/
+lemma elaborateItem_progress
+    (item : ItemSpec) :
+    ∀ {st st' transformer},
+      Spec.elaborateItem item st = .ok transformer st' →
+      ∃ consumed, st'.cursor = st.cursor + consumed := by
+  classical
+  cases item with
+  | flag spec =>
+      intro st st' transformer h
+      simpa [Spec.elaborateItem] using
+        interpretFlag_progress_consumed (spec := spec) (st := st) (st' := st')
+          (updater := transformer) h
+  | opt spec =>
+      intro st st' transformer h
+      dsimp [Spec.elaborateItem] at h
+      cases harity : spec.arity with
+      | zero =>
+          have hstate := interpretOption_zero_progress
+            (spec := spec) (st := st) (st' := st') (updater := transformer)
+            harity h
+          exact ⟨0, by simpa [hstate]⟩
+      | one =>
+          exact interpretOption_one_progress_consumed
+            (spec := spec) (st := st) (st' := st') (updater := transformer)
+            harity h
+      | many =>
+          exact interpretOption_many_progress
+            (spec := spec) (st := st) (st' := st') (updater := transformer)
+            harity h
+      | some =>
+          exact interpretOption_some_progress
+            (spec := spec) (st := st) (st' := st') (updater := transformer)
+            harity h
+  | pos spec =>
+      intro st st' transformer h
+      dsimp [Spec.elaborateItem] at h
+      cases harity : spec.arity with
+      | zero =>
+          have hstate := interpretPositional_zero_progress
+            (spec := spec) (st := st) (st' := st') (updater := transformer)
+            harity h
+          exact ⟨0, by simpa [hstate]⟩
+      | one =>
+          exact interpretPositional_one_progress_consumed
+            (spec := spec) (st := st) (st' := st') (updater := transformer)
+            harity h
+      | many =>
+          exact interpretPositional_many_progress
+            (spec := spec) (st := st) (st' := st') (updater := transformer)
+            harity h
+      | some =>
+          exact interpretPositional_some_progress
+            (spec := spec) (st := st) (st' := st') (updater := transformer)
+            harity h
+
+/-- Folding command items accumulates cursor consumption. -/
+lemma foldItems_progress
+    : ∀ items {st st' transformer},
+        Spec.foldItems items st = .ok transformer st' →
+        ∃ consumed, st'.cursor = st.cursor + consumed := by
+  classical
+  intro items
+  induction items with
+  | nil =>
+      intro st st' transformer h
+      simp [Spec.foldItems] at h
+      cases h
+      exact ⟨0, rfl⟩
+  | cons item rest ih =>
+      intro st st' transformer h
+      unfold Spec.foldItems at h
+      simp [Spec.foldItems, Parser.seq, Parser.map] at h
+      rcases hitem : Spec.elaborateItem item st with
+      | err err => simp [hitem] at h
+      | ok transformerHead st1 =>
+          rcases hrest : Spec.foldItems rest st1 with
+          | err err => simp [hitem, hrest] at h
+          | ok transformerTail st2 =>
+              rcases h with ⟨hval, hstate⟩
+              have ⟨cHead, hHead⟩ :=
+                elaborateItem_progress item (st := st) (st' := st1)
+                  (transformer := transformerHead) hitem
+              have ⟨cTail, hTail⟩ := ih (st := st1) (st' := st2)
+                (transformer := transformerTail) hrest
+              subst hstate
+              refine ⟨cHead + cTail, ?_⟩
+              simp [hHead, hTail, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc]
+
+/-- Elaborated commands accumulate cursor consumption from their items. -/
+lemma elaborateCommand_progress
+    (cmd : CmdSpec) {st st' payload} :
+    Spec.elaborateCommand cmd st = .ok payload st' →
+    ∃ consumed, st'.cursor = st.cursor + consumed := by
+  classical
+  intro h
+  unfold Spec.elaborateCommand at h
+  simp [Parser.map] at h
+  rcases h with ⟨transformer, hfold, rfl⟩
+  exact foldItems_progress cmd.args hfold
 
 end ArgParse.Proofs
