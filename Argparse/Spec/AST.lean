@@ -6,6 +6,8 @@ import Argparse.Core.Value
 Single-source-of-truth specification AST following `SPEC.md`.
 -/
 
+universe u
+
 namespace ArgParse.Spec
 
 open ArgParse
@@ -14,7 +16,7 @@ open ArgParse
 structure Short where
   c  : Char
   ok : c ≠ '-' ∧ c.toNat < 128
-deriving DecidableEq
+deriving DecidableEq, Repr
 
 /-- Common metadata shared by flags, options, and positionals. -/
 structure Meta where
@@ -38,16 +40,16 @@ deriving Repr, DecidableEq
 structure FlagSpec where
   short?     : Option Short := none
   long?      : Option String := none
-  meta       : Meta
+  «meta»     : Meta
   exclusive? : Bool := false
   hidden?    : Bool := false
 deriving Repr, DecidableEq
 
 /-- Declarative description of an option that consumes values. -/
-structure OptSpec (α : Type) [FromArg α] where
+structure OptSpec (α : Type u) [FromArg α] where
   short?     : Option Short := none
   long?      : Option String := none
-  meta       : Meta
+  «meta»     : Meta
   arity      : Arity := .one
   concatVal? : Bool := true
   eqVal?     : Bool := true
@@ -55,24 +57,23 @@ structure OptSpec (α : Type) [FromArg α] where
 deriving Repr
 
 /-- Declarative description of positional arguments. -/
-structure PosSpec (α : Type) [FromArg α] where
-  meta  : Meta
+structure PosSpec (α : Type u) [FromArg α] where
+  «meta» : Meta
   arity : Arity := .one
 deriving Repr
 
 /-- Items that may appear inside a command specification. -/
-inductive ItemSpec : Type where
+inductive ItemSpec : Type (u + 1) where
   | flag (spec : FlagSpec)
-  | opt {α : Type} [FromArg α] (spec : OptSpec α)
-  | pos {α : Type} [FromArg α] (spec : PosSpec α)
+  | opt {α : Type u} [FromArg α] (spec : OptSpec α)
+  | pos {α : Type u} [FromArg α] (spec : PosSpec α)
 
 /-- Command tree: a node consists of local items and potential subcommands. -/
 structure CmdSpec where
   name : String
-  meta : Meta
+  «meta» : Meta
   args : List ItemSpec := []
   subs : List CmdSpec := []
-deriving Repr
 
 /-- Application-level descriptor built from the command tree. -/
 structure AppSpec where
@@ -81,6 +82,5 @@ structure AppSpec where
   about?   : Option String := none
   epilog?  : Option String := none
   root     : CmdSpec
-deriving Repr
 
 end ArgParse.Spec
