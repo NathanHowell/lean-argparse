@@ -31,29 +31,30 @@ private def messageMeta : Meta :=
 private def pathMeta : Meta :=
   { name := "PATH", help? := some "Path to initialise." }
 
+private def pathPos : PosSpec String :=
+  { «meta» := pathMeta, arity := .one }
+
+private def messageOpt : OptSpec String :=
+  { short? := some shortM
+    long? := some "message"
+    «meta» := messageMeta
+    arity := .one }
+
 private def initCmd : CmdSpec :=
   { name := "init"
-    meta := initMeta
-    args := [ItemSpec.pos {
-      meta := pathMeta
-      arity := .one
-    }]
+    «meta» := initMeta
+    args := [ItemSpec.pos pathPos]
   }
 
 private def commitCmd : CmdSpec :=
   { name := "commit"
-    meta := commitMeta
-    args := [ItemSpec.opt {
-      short? := some shortM
-      long? := some "message"
-      meta := messageMeta
-      arity := .one
-    }]
+    «meta» := commitMeta
+    args := [ItemSpec.opt messageOpt]
   }
 
 private def rootCmd : CmdSpec :=
   { name := "git-like"
-    meta := rootMeta
+    «meta» := rootMeta
     subs := [initCmd, commitCmd]
   }
 

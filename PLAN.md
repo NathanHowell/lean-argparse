@@ -147,20 +147,21 @@
 - 2025-09-28: Removed the nameless namespace from `Argparse/Doc/Help.lean` and reopened `Spec.EntryKind`, clearing the `open` syntax errors.
 - 2025-09-28: Removed the nameless namespace from `Argparse/Doc/Help.lean` and reopened `Spec.EntryKind`, clearing the `open` syntax errors.
 - 2025-09-28: Mirrored the namespace cleanup in `Argparse/Doc/Man.lean`, keeping the manpage helpers consistent with the updated help renderer.
+- 2025-09-28: Mirrored the namespace cleanup in `Argparse/Doc/Man.lean`, keeping the manpage helpers consistent with the updated help renderer.
+- 2025-09-28: Refreshed `Argparse/Examples/GitLike.lean` to use the new `PosSpec`/`OptSpec` records (with `«meta»` fields) so the example builds.
 - 2025-09-28: Proved that summary-aware renderers (`renderHelpWithSummary`, `renderManWithSummary`, `renderCompletionsWithSummary`) agree with the original partial-based helpers when fed `Partial.toSummary`.
 
 ## Build Fix Backlog (2025-09-28)
 Order the following tasks sequentially; after addressing each file, rerun `lake env lean --root=.<file>` and commit before progressing. Notes capture any blockers discovered while attempting earlier items.
-1. `Argparse/Examples/GitLike.lean`: fails at line 17 where `Short` record fields (`c`/`ok`) no longer exist; rebuild example specs using the current AST constructors.
-2. `Argparse/Examples/Xargs0.lean`: fails at line 18 with identical `Short` field errors; align with revised spec helpers.
-3. `Argparse/Proofs/Laws.lean`: fails at line 19 (`Parser.pure` sequencing expects lazy continuations); update proofs to the new combinator signatures.
-4. `Argparse/Proofs/Soundness.lean`: fails at line 21 (`unexpected identifier`); replace placeholder text with theorem statements aligned to the new runtime.
-5. `Argparse/Proofs/Soundness/Summary.lean`: fails at line 22 (`unexpected identifier`); restate summary theorems using the current summary types.
-6. `Argparse/Proofs/Totality.lean`: fails at line 24 (`unexpected identifier` plus stale helper names); reintroduce the totality lemma skeleton.
-7. `Argparse/Spec/Describe.lean`: fails at line 23 (`Inhabited` derivation and `entryOfMeta` usage); adapt describer to the new AST layout.
-8. `Argparse/Spec/Elab.lean`: fails at line 45 (unexpected identifier, stale recursion); refactor elaborator with current parser API.
-9. `Argparse/Tests/Golden.lean`: fails at line 34 (tuple syntax and missing example spec exports); update golden harness to new example modules.
-10. `Argparse/Tests/Unit.lean`: fails at line 23 (unknown identifiers and outdated specs); rewrite unit tests for the rebuilt combinators.
-11. `Main.lean`: fails at line 10 (`GitLike.spec` missing due to example failure); update executable once examples compile.
-12. `Argparse.lean`: currently fails because dependent proofs (`Argparse/Proofs/Soundness/Summary`) do not compile; rerun once upstream files are fixed.
-13. `lakefile.lean`: Lean DSL commands fail to elaborate (line 4); revisit Lake configuration after core modules compile.
+1. `Argparse/Examples/Xargs0.lean`: fails at line 18 with identical `Short` field errors; align with revised spec helpers.
+2. `Argparse/Proofs/Laws.lean`: fails at line 19 (`Parser.pure` sequencing expects lazy continuations); update proofs to the new combinator signatures.
+3. `Argparse/Proofs/Soundness.lean`: fails at line 21 (`unexpected identifier`); replace placeholder text with theorem statements aligned to the new runtime.
+4. `Argparse/Proofs/Soundness/Summary.lean`: fails at line 22 (`unexpected identifier`); restate summary theorems using the current summary types.
+5. `Argparse/Proofs/Totality.lean`: fails at line 24 (`unexpected identifier` plus stale helper names); reintroduce the totality lemma skeleton.
+6. `Argparse/Spec/Describe.lean`: fails at line 23 (`Inhabited` derivation and `entryOfMeta` usage); adapt describer to the new AST layout.
+7. `Argparse/Spec/Elab.lean`: fails at line 45 (unexpected identifier, stale recursion); refactor elaborator with current parser API.
+8. `Argparse/Tests/Golden.lean`: fails at line 34 (tuple syntax and missing example spec exports); update golden harness to new example modules.
+9. `Argparse/Tests/Unit.lean`: fails at line 23 (unknown identifiers and outdated specs); rewrite unit tests for the rebuilt combinators.
+10. `Main.lean`: fails at line 10 (`GitLike.spec` missing due to example failure); update executable once examples compile.
+11. `Argparse.lean`: currently fails because dependent proofs (`Argparse/Proofs/Soundness/Summary`) do not compile; rerun once upstream files are fixed.
+12. `lakefile.lean`: Lean DSL commands fail to elaborate (line 4); revisit Lake configuration after core modules compile.
