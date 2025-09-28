@@ -37,7 +37,7 @@
    - Populate `Tests/Unit.lean`, `Tests/Golden.lean`, and example apps (`Examples/Xargs0.lean`, `Examples/GitLike.lean`).
    - Maintain property tests for option permutations, sentinel handling, and positional overflow.
 9. **M8 – Polish & Docs**
-   - Finalize docstrings, README, migration guidance, and ensure CI (`lake build`, `lake test`) covers all milestones.
+   - Finalize docstrings, README, migration guidance, and ensure CI (`lake build; lake test; lake lint`) covers all milestones.
 
 ## Activity Log
 - 2025-09-28: Ran `lake env lean --root=.` against every project-controlled `.lean` file; catalogued individual compilation failures to stage a per-file fix backlog.
