@@ -16,7 +16,7 @@ theorem parser_map_id_placeholder {α} (p : Parser α) : p = p := by
 
 /-- Placeholder: parser `pure` is left identity for `seq`. -/
 theorem parser_seq_pure_placeholder {α β} (f : α → β) (pa : Parser α) :
-    Parser.seq (Parser.pure f) pa = Parser.map f pa := by
+    Parser.seq (Parser.pure f) (fun _ => pa) = Parser.map f pa := by
   rfl
 
 end ArgParse.Proofs

@@ -151,18 +151,19 @@
 - 2025-09-28: Refreshed `Argparse/Examples/GitLike.lean` to use the new `PosSpec`/`OptSpec` records (with `«meta»` fields) so the example builds.
 - 2025-09-28: Refreshed `Argparse/Examples/GitLike.lean` to use the new `PosSpec`/`OptSpec` records (with `«meta»` fields) so the example builds.
 - 2025-09-28: Ported `Argparse/Examples/Xargs0.lean` onto the updated flag/positional specs, keeping the docs examples compiling.
+- 2025-09-28: Ported `Argparse/Examples/Xargs0.lean` onto the updated flag/positional specs, keeping the docs examples compiling.
+- 2025-09-28: Adjusted the `Parser.seq` placeholder in `Argparse/Proofs/Laws.lean` to the new lazy continuation signature.
 - 2025-09-28: Proved that summary-aware renderers (`renderHelpWithSummary`, `renderManWithSummary`, `renderCompletionsWithSummary`) agree with the original partial-based helpers when fed `Partial.toSummary`.
 
 ## Build Fix Backlog (2025-09-28)
 Order the following tasks sequentially; after addressing each file, rerun `lake env lean --root=.<file>` and commit before progressing. Notes capture any blockers discovered while attempting earlier items.
-1. `Argparse/Proofs/Laws.lean`: fails at line 19 (`Parser.pure` sequencing expects lazy continuations); update proofs to the new combinator signatures.
-2. `Argparse/Proofs/Soundness.lean`: fails at line 21 (`unexpected identifier`); replace placeholder text with theorem statements aligned to the new runtime.
-3. `Argparse/Proofs/Soundness/Summary.lean`: fails at line 22 (`unexpected identifier`); restate summary theorems using the current summary types.
-4. `Argparse/Proofs/Totality.lean`: fails at line 24 (`unexpected identifier` plus stale helper names); reintroduce the totality lemma skeleton.
-5. `Argparse/Spec/Describe.lean`: fails at line 23 (`Inhabited` derivation and `entryOfMeta` usage); adapt describer to the new AST layout.
-6. `Argparse/Spec/Elab.lean`: fails at line 45 (unexpected identifier, stale recursion); refactor elaborator with current parser API.
-7. `Argparse/Tests/Golden.lean`: fails at line 34 (tuple syntax and missing example spec exports); update golden harness to new example modules.
-8. `Argparse/Tests/Unit.lean`: fails at line 23 (unknown identifiers and outdated specs); rewrite unit tests for the rebuilt combinators.
-9. `Main.lean`: fails at line 10 (`GitLike.spec` missing due to example failure); update executable once examples compile.
-10. `Argparse.lean`: currently fails because dependent proofs (`Argparse/Proofs/Soundness/Summary`) do not compile; rerun once upstream files are fixed.
-11. `lakefile.lean`: Lean DSL commands fail to elaborate (line 4); revisit Lake configuration after core modules compile.
+1. `Argparse/Proofs/Soundness.lean`: fails at line 21 (`unexpected identifier`); replace placeholder text with theorem statements aligned to the new runtime.
+2. `Argparse/Proofs/Soundness/Summary.lean`: fails at line 22 (`unexpected identifier`); restate summary theorems using the current summary types.
+3. `Argparse/Proofs/Totality.lean`: fails at line 24 (`unexpected identifier` plus stale helper names); reintroduce the totality lemma skeleton.
+4. `Argparse/Spec/Describe.lean`: fails at line 23 (`Inhabited` derivation and `entryOfMeta` usage); adapt describer to the new AST layout.
+5. `Argparse/Spec/Elab.lean`: fails at line 45 (unexpected identifier, stale recursion); refactor elaborator with current parser API.
+6. `Argparse/Tests/Golden.lean`: fails at line 34 (tuple syntax and missing example spec exports); update golden harness to new example modules.
+7. `Argparse/Tests/Unit.lean`: fails at line 23 (unknown identifiers and outdated specs); rewrite unit tests for the rebuilt combinators.
+8. `Main.lean`: fails at line 10 (`GitLike.spec` missing due to example failure); update executable once examples compile.
+9. `Argparse.lean`: currently fails because dependent proofs (`Argparse/Proofs/Soundness/Summary`) do not compile; rerun once upstream files are fixed.
+10. `lakefile.lean`: Lean DSL commands fail to elaborate (line 4); revisit Lake configuration after core modules compile.
