@@ -11,9 +11,7 @@ namespace ArgParse.Doc
 
 open ArgParse.Spec
 
-namespace
-
-open EntryKind
+open ArgParse.Spec.EntryKind
 
 def runtimeParagraphs (summary? : Option Spec.Partial.Summary) (entry : DocEntry) :
     List String :=
@@ -35,8 +33,6 @@ def runtimeParagraphs (summary? : Option Spec.Partial.Summary) (entry : DocEntry
           if values.isEmpty then []
           else [s!".Pp current: {String.intercalate ", " values}"]
       | .command => []
-
-end
 
 /-- Render a minimal mdoc-style section for a documentation entry. -/
 def renderSectionWithSummary (entry : DocEntry)
