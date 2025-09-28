@@ -130,3 +130,5 @@
 - 2025-09-27: Introduced runner summary helpers (`runSummary`, `runNormalizedSummary`) and unit guards covering summary flag/option behaviour.
 - 2025-09-27: Threaded `Partial.Summary` through help/man/completion renderers and CLI wrappers, adding unit guards to verify summary-driven output.
 - 2025-09-27: Documented the summary-based workflow in `README.md`, highlighting `runSummary` and the new CLI render helpers.
+- 2025-09-27: Extended the GitLike/Xargs0 examples with sample summaries and summary-aware help/man/completion renderers.
+- 2025-09-27: Updated the README payload summary section to point at the example helpers.

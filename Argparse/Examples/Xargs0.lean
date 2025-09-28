@@ -1,5 +1,6 @@
 import Argparse.CLI.Print
 import Argparse.Spec.AST
+import Argparse.Spec.Elab
 
 /-!
 # ArgParse.Examples.Xargs0
@@ -45,8 +46,30 @@ def spec : AppSpec :=
     }
   }
 
+/-- Sample runtime payload for documentation previews. -/
+private def samplePartial : Spec.Partial :=
+  Spec.Partial.empty
+    |> Spec.Partial.addFlag "-0" true
+    |> Spec.Partial.addPositional "FILE" "input.txt"
+
+/-- Sample summary derived from the runtime payload. -/
+def sampleSummary : Spec.Partial.Summary :=
+  Spec.Partial.toSummary samplePartial
+
 /-- Render provisional help text for the example. -/
 def help : String :=
   renderHelp spec
+
+/-- Render help text annotated with the sample runtime summary. -/
+def helpWithSummary : String :=
+  renderHelpWithSummary spec (some sampleSummary)
+
+/-- Render a minimal manpage annotated with the sample runtime summary. -/
+def manWithSummary : String :=
+  renderManWithSummary spec (some sampleSummary)
+
+/-- Render completions annotated with the sample runtime summary. -/
+def completionsWithSummary : String :=
+  renderCompletionsWithSummary spec (some sampleSummary)
 
 end ArgParse.Examples

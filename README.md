@@ -91,7 +91,9 @@ last-seen flag values and the latest-first lists for options and positionals, wh
 remaining stable under future refactors. Summary-aware helpers are available across
 the CLI modules (`renderHelpWithSummary`, `renderManWithSummary`,
 `renderCompletionsWithSummary`), so downstream tools can surface the same runtime
-state without manipulating the internal lists directly.
+state without manipulating the internal lists directly. See
+`ArgParse.Examples.GitLike.helpWithSummary` (and the `Xargs0` companion) for a
+complete example of feeding a summary into the renderers.
 
 ## Development
 
