@@ -40,6 +40,7 @@
    - Finalize docstrings, README, migration guidance, and ensure CI (`lake build`, `lake test`) covers all milestones.
 
 ## Activity Log
+- 2025-09-28: Ran `lake env lean --root=.` against every project-controlled `.lean` file; catalogued individual compilation failures to stage a per-file fix backlog.
 - 2025-09-27: Re-read `SPEC.md`/`KNOWLEDGE.md`; prepared to align plan accordingly.
 - 2025-09-27: Scaffolding audit complete — inventoried legacy modules under `Argparse/Basic` and `Argparse/Native`; marked them for removal during migration to the `ArgParse/` hierarchy.
 - 2025-09-27: Created SPEC-aligned module skeleton under `ArgParse/` (Core, Spec, Doc, Proofs, CLI, Examples, Tests).
@@ -134,3 +135,26 @@
 - 2025-09-27: Updated the README payload summary section to point at the example helpers.
 - 2025-09-27: Added `Partial.Summary` soundness lemmas ensuring flag/option/positional folds agree with the underlying `Partial` accumulators.
 - 2025-09-27: Proved that summary-aware renderers (`renderHelpWithSummary`, `renderManWithSummary`, `renderCompletionsWithSummary`) agree with the original partial-based helpers when fed `Partial.toSummary`.
+- 2025-09-28: Proved that summary-aware renderers (`renderHelpWithSummary`, `renderManWithSummary`, `renderCompletionsWithSummary`) agree with the original partial-based helpers when fed `Partial.toSummary`.
+
+## Build Fix Backlog (2025-09-28)
+Order the following tasks sequentially; after addressing each file, rerun `lake env lean --root=.<file>` and commit before progressing.
+1. `Argparse/Core/Combinators.lean`: fails at line 42 with `Invalid field 'c'` on `Short`; unblock short-flag structure usage.
+2. `Argparse/Core/Runner.lean`: fails at line 83 due to the `partial` keyword in pattern matches; rephrase definitions without forbidden syntax.
+3. `Argparse/Doc/Completion.lean`: fails at line 23 because `List.bind` is referenced; reconcile list traversals with Lean’s standard combinators.
+4. `Argparse/Doc/Help.lean`: fails at line 14 (`unexpected token 'open'`); restore module header/import structure.
+5. `Argparse/Doc/Man.lean`: fails at line 14 with the same `open` parsing issue; mirror the Help fix.
+6. `Argparse/Examples/GitLike.lean`: fails at line 17 where `Short` record fields (`c`/`ok`) no longer exist; rebuild example specs using the current AST constructors.
+7. `Argparse/Examples/Xargs0.lean`: fails at line 18 with identical `Short` field errors; align with revised spec helpers.
+8. `Argparse/Proofs/Laws.lean`: fails at line 19 (`Parser.pure` sequencing expects lazy continuations); update proofs to the new combinator signatures.
+9. `Argparse/Proofs/Soundness.lean`: fails at line 21 (`unexpected identifier`); replace placeholder text with theorem statements aligned to the new runtime.
+10. `Argparse/Proofs/Soundness/Summary.lean`: fails at line 22 (`unexpected identifier`); restate summary theorems using the current summary types.
+11. `Argparse/Proofs/Totality.lean`: fails at line 24 (`unexpected identifier` plus stale helper names); reintroduce the totality lemma skeleton.
+12. `Argparse/Spec/AST.lean`: fails beginning at line 41 (structure/instance syntax and universe levels); rebuild the AST definitions per SPEC.
+13. `Argparse/Spec/Describe.lean`: fails at line 23 (`Inhabited` derivation and `entryOfMeta` usage); adapt describer to the new AST layout.
+14. `Argparse/Spec/Elab.lean`: fails at line 45 (unexpected identifier, stale recursion); refactor elaborator with current parser API.
+15. `Argparse/Tests/Golden.lean`: fails at line 34 (tuple syntax and missing example spec exports); update golden harness to new example modules.
+16. `Argparse/Tests/Unit.lean`: fails at line 23 (unknown identifiers and outdated specs); rewrite unit tests for the rebuilt combinators.
+17. `Main.lean`: fails at line 10 (`GitLike.spec` missing due to example failure); update executable once examples compile.
+18. `Argparse.lean`: currently fails because dependent proofs (`Argparse/Proofs/Soundness/Summary`) do not compile; rerun once upstream files are fixed.
+19. `lakefile.lean`: Lean DSL commands fail to elaborate (line 4); revisit Lake configuration after core modules compile.
