@@ -46,7 +46,7 @@ namespace RunOutcome
 end RunOutcome
 
 /-- Detect runner built-ins (`--help`, `--man`, `--generate-completions`). -/
-private def builtinOutcome? (app : AppSpec) (st : State) : Option (RunOutcome Partial) :=
+@[inline] def builtinOutcome? (app : AppSpec) (st : State) : Option (RunOutcome α) :=
   match st.pre with
   | "--help" :: _ =>
       some { result := .help (renderHelp app), state := st }
@@ -56,17 +56,25 @@ private def builtinOutcome? (app : AppSpec) (st : State) : Option (RunOutcome Pa
       some { result := .completions (renderCompletions app), state := st }
   | _ => none
 
-/-- Run the elaborated parser against a normalized state. -/
-def runNormalized (app : AppSpec) (st : State) : RunOutcome Partial :=
-  match builtinOutcome? app st with
+/-- Run the elaborated parser against a normalized state, folding the collected `Partial`. -/
+def runNormalized (app : AppSpec) (fold : Spec.Partial → α) (st : State) : RunOutcome α :=
+  match builtinOutcome? (α := α) app st with
   | some outcome => outcome
   | none =>
       match Spec.elaborateApp app st with
-      | .ok payload st' => RunOutcome.ok payload st'
+      | .ok payload st' => RunOutcome.ok (fold payload) st'
       | .err error => RunOutcome.err error st
 
-/-- Run the application parser against raw argv tokens. -/
-def run (app : AppSpec) (tokens : Tokens) : RunOutcome Partial :=
-  runNormalized app (Core.normalize tokens)
+/-- Run the application parser against raw argv tokens, folding the collected `Partial`. -/
+def run (app : AppSpec) (fold : Spec.Partial → α) (tokens : Tokens) : RunOutcome α :=
+  runNormalized app fold (Core.normalize tokens)
+
+/-- Convenience alias returning the raw `Partial` payload. -/
+@[inline] def runNormalizedRaw (app : AppSpec) (st : State) : RunOutcome Spec.Partial :=
+  runNormalized app id st
+
+/-- Convenience alias returning the raw `Partial` payload from token input. -/
+@[inline] def runRaw (app : AppSpec) (tokens : Tokens) : RunOutcome Spec.Partial :=
+  run app id tokens
 
 end ArgParse

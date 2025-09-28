@@ -84,6 +84,7 @@
 - 2025-09-27: Extended unit tests with runner coverage, asserting successful flag parsing advances the cursor and preserves collected values.
 - 2025-09-27: Intercepted `--help`/`--man`/`--generate-completions` in the runner, returning the appropriate `RunResult` with zero-state change and documenting lemmas for the preservation behaviour.
 - 2025-09-27: Added regression tests for the built-ins to confirm the rendered output matches `CLI.Print` helpers and that runner state remains unchanged.
+- 2025-09-27: Introduced payload folding hooks (`runNormalized/run` accept `Partial → α`), added aliases for raw access, proved the updated progress lemmas, and extended tests to cover a non-trivial fold.
 - _Please append future successes and failures here with short rationales._
 
 ## Immediate Next Steps
@@ -118,5 +119,6 @@
 29. ✅ **Whole-app progress** (2025-09-27): Proved `elaborateApp_progress`, confirming the application-level parser preserves cursor deltas established by command progress.
 30. ✅ **Runner progress** (2025-09-27): Added runner wrappers plus `runNormalized_ok_progress`, ensuring cursor guarantees persist through the convenience API.
 31. ✅ **Runner built-ins** (2025-09-27): Hooked `--help`/`--man`/`--generate-completions` into `runNormalized`/`run`, proved the state-preservation lemmas, and backfilled tests.
-32. **Runner payload folding**: Introduce a user-facing hook to translate `Partial` into the final application payload (and update proofs/tests) so `RunResult.ok` carries the spec-derived value instead of raw partials.
-33. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
+32. ✅ **Runner payload folding** (2025-09-27): Generalised `runNormalized`/`run` to accept a folding function, exposed raw aliases, refreshed progress lemmas, and added regression tests for folded payloads.
+33. **Payload soundness**: Specify and prove properties for common folds (e.g., uniqueness of flag entries, deterministic option ordering) so downstream runners can rely on structured invariants.
+34. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.

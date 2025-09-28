@@ -1216,44 +1216,51 @@ lemma elaborateApp_progress
 
 /-- Runner convenience wrapper preserves the cursor progress proof. -/
 lemma runNormalized_ok_progress
-    (app : AppSpec) {st st' : State} {payload : Spec.Partial} :
-    ArgParse.runNormalized app st = RunOutcome.ok payload st' →
+    (app : AppSpec) (fold : Spec.Partial → α)
+    {st st' : State} {payload : α} :
+    ArgParse.runNormalized app fold st = RunOutcome.ok payload st' →
     ∃ consumed, st'.cursor = st.cursor + consumed := by
   classical
   intro h
   unfold ArgParse.runNormalized at h
-  cases hEval : Spec.elaborateApp app st with
-  | err error =>
-      simp [hEval, RunOutcome.err] at h
-  | ok payload0 st0 =>
-      simp [hEval, RunOutcome.ok] at h
-      rcases h with ⟨rfl, rfl⟩
-      exact elaborateApp_progress (app := app) (st := st) (st' := st0)
-        (payload := payload0) hEval
+  cases hBuiltin : builtinOutcome? (α := α) app st with
+  | some outcome =>
+      cases' outcome with result st0
+      cases result <;> simp [hBuiltin, RunOutcome.err, RunOutcome.ok] at h
+  | none =>
+      have hb : builtinOutcome? (α := α) app st = none := hBuiltin
+      cases hEval : Spec.elaborateApp app st with
+      | err error =>
+          simp [hb, hEval, RunOutcome.err] at h
+      | ok partial st0 =>
+          simp [hb, hEval, RunOutcome.ok] at h
+          rcases h with ⟨rfl, rfl⟩
+          exact elaborateApp_progress (app := app) (st := st) (st' := st0)
+            (payload := partial) hEval
 
 /-- Built-in `--help` responses leave the parser state unchanged. -/
 lemma runNormalized_help_preserves_state
-    (app : AppSpec) {st : State} {txt : String} :
-    ArgParse.runNormalized app st = { result := RunResult.help txt, state := st } →
-    (ArgParse.runNormalized app st).state = st := by
+    (app : AppSpec) (fold : Spec.Partial → α) {st : State} {txt : String} :
+    ArgParse.runNormalized app fold st = { result := RunResult.help txt, state := st } →
+    (ArgParse.runNormalized app fold st).state = st := by
   intro h
   cases h
   rfl
 
 /-- Built-in `--man` responses leave the parser state unchanged. -/
 lemma runNormalized_man_preserves_state
-    (app : AppSpec) {st : State} {txt : String} :
-    ArgParse.runNormalized app st = { result := RunResult.man txt, state := st } →
-    (ArgParse.runNormalized app st).state = st := by
+    (app : AppSpec) (fold : Spec.Partial → α) {st : State} {txt : String} :
+    ArgParse.runNormalized app fold st = { result := RunResult.man txt, state := st } →
+    (ArgParse.runNormalized app fold st).state = st := by
   intro h
   cases h
   rfl
 
 /-- Built-in completion responses leave the parser state unchanged. -/
 lemma runNormalized_completions_preserves_state
-    (app : AppSpec) {st : State} {txt : String} :
-    ArgParse.runNormalized app st = { result := RunResult.completions txt, state := st } →
-    (ArgParse.runNormalized app st).state = st := by
+    (app : AppSpec) (fold : Spec.Partial → α) {st : State} {txt : String} :
+    ArgParse.runNormalized app fold st = { result := RunResult.completions txt, state := st } →
+    (ArgParse.runNormalized app fold st).state = st := by
   intro h
   cases h
   rfl

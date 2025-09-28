@@ -133,14 +133,14 @@ private def toolApp : AppSpec :=
 
 #guard (
   let state := ArgParse.Core.normalize ["--verbose"]
-  match ArgParse.runNormalized toolApp state with
+  match ArgParse.runNormalizedRaw toolApp state with
   | { result := .ok partial, state := st } =>
       partial.flagValue? "--verbose" = some true ∧ st.pre = [] ∧ st.post = [] ∧ st.cursor = 1
   | _ => False
 )
 
 #guard (
-  match ArgParse.run toolApp ["--verbose"] with
+  match ArgParse.runRaw toolApp ["--verbose"] with
   | { result := .ok partial, state := st } =>
       partial.flagValue? "--verbose" = some true ∧ st.cursor = 1
   | _ => False
@@ -148,24 +148,32 @@ private def toolApp : AppSpec :=
 
 #guard (
   let state := ArgParse.Core.normalize ["--help"]
-  match ArgParse.runNormalized toolApp state with
+  match ArgParse.runNormalizedRaw toolApp state with
   | { result := .help txt, state := st } =>
       st = state ∧ txt = ArgParse.CLI.renderHelp toolApp
   | _ => False
 )
 
 #guard (
-  match ArgParse.run toolApp ["--man"] with
+  match ArgParse.runRaw toolApp ["--man"] with
   | { result := .man txt, state := st } =>
       st = ArgParse.Core.normalize ["--man"] ∧ txt = ArgParse.CLI.renderMan toolApp
   | _ => False
 )
 
 #guard (
-  match ArgParse.run toolApp ["--generate-completions"] with
+  match ArgParse.runRaw toolApp ["--generate-completions"] with
   | { result := .completions txt, state := st } =>
       st = ArgParse.Core.normalize ["--generate-completions"] ∧
       txt = ArgParse.CLI.renderCompletions toolApp
+  | _ => False
+)
+
+#guard (
+  let state := ArgParse.Core.normalize ["--verbose"]
+  let fold : Spec.Partial → Bool := fun partial => partial.flagValue? "--verbose" |>.getD false
+  match ArgParse.runNormalized toolApp fold state with
+  | { result := .ok enabled, state := st } => enabled ∧ st.cursor = 1
   | _ => False
 )
 
