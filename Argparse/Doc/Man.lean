@@ -13,6 +13,7 @@ open ArgParse.Spec
 
 open ArgParse.Spec.EntryKind
 
+/-- Runtime annotations inserted into the rendered manpage for the entry. -/
 def runtimeParagraphs (summary? : Option Spec.Partial.Summary) (entry : DocEntry) :
     List String :=
   match summary? with
