@@ -14,6 +14,55 @@ namespace ArgParse.Proofs
 open ArgParse
 open ArgParse.Core
 open ArgParse.Spec
+open List
+
+/-- Structural weight for commands used to drive inductions. -/
+private def commandWeight : CmdSpec → Nat
+  | ⟨_, _, _, subs⟩ => 1 + (subs.map commandWeight).sum
+
+private lemma sum_mem_le {xs : List Nat} {n : Nat}
+    (h : n ∈ xs) : n ≤ xs.sum := by
+  induction xs with
+  | nil => cases h
+  | cons x xs ih =>
+      simp [List.sum_cons, add_comm, add_left_comm, add_assoc] at h ⊢
+      cases h with
+      | inl hx =>
+          subst hx
+          exact Nat.le_add_right _ _
+      | inr hx =>
+          have h' := ih hx
+          exact Nat.le_trans h' (Nat.le_add_left _ _)
+
+private lemma commandWeight_child_lt
+    {cmd sub : CmdSpec}
+    (hsub : sub ∈ cmd.subs) :
+    commandWeight sub < commandWeight cmd := by
+  cases cmd with
+  | mk name meta args subs =>
+      dsimp [commandWeight] at *
+      have hsum : commandWeight sub ≤ (subs.map commandWeight).sum := by
+        apply sum_mem_le
+        simpa using List.mem_map.2 ⟨sub, hsub, rfl⟩
+      exact lt_of_le_of_lt hsum (Nat.lt_succ_self _)
+
+private lemma lookupChild?_some
+    {subs : List CmdSpec} {token : String} {parser : Parser Spec.CommandResult}
+    (h : Spec.lookupChild? (subs.map fun sub => (sub.name, Spec.elaborateCommand sub)) token = some parser) :
+    ∃ sub ∈ subs, sub.name = token ∧ parser = Spec.elaborateCommand sub := by
+  classical
+  unfold Spec.lookupChild? at h
+  cases hfind : (subs.map fun sub => (sub.name, Spec.elaborateCommand sub))
+      .find? (fun entry => entry.fst = token) with
+  | none => simp [hfind] at h
+  | some entry =>
+      have hentry := List.find?_eq_some.1 hfind
+      rcases hentry with ⟨hmem, hpred⟩
+      rcases List.mem_map.1 hmem with ⟨sub, hsub, rfl⟩
+      simp [hpred] at h
+      refine ⟨sub, hsub, ?_, ?_⟩
+      · rfl
+      · simpa using (Option.some.inj.mp h).symm
 
 /-- Normalization trivially produces a state. -/
 theorem normalize_total (tokens : Tokens) : True :=
@@ -1092,16 +1141,57 @@ lemma foldItems_progress
               refine ⟨cHead + cTail, ?_⟩
               simp [hHead, hTail, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc]
 
-/-- Elaborated commands accumulate cursor consumption from their items. -/
+/-- Elaborated commands accumulate cursor consumption from their items and any selected subcommand. -/
 lemma elaborateCommand_progress
     (cmd : CmdSpec) {st st' payload} :
     Spec.elaborateCommand cmd st = .ok payload st' →
     ∃ consumed, st'.cursor = st.cursor + consumed := by
   classical
-  intro h
+  revert st st' payload
+  refine (measure_wf commandWeight).induction (p :=
+    fun cmd => ∀ {st st' payload},
+      Spec.elaborateCommand cmd st = .ok payload st' →
+      ∃ consumed, st'.cursor = st.cursor + consumed) ?step cmd
+  intro cmd ih st st' payload h
   unfold Spec.elaborateCommand at h
-  simp [Parser.map] at h
-  rcases h with ⟨transformer, hfold, rfl⟩
-  exact foldItems_progress cmd.args hfold
+  cases hfold : Spec.foldItems cmd.args st with
+  | err err => simp [hfold] at h
+  | ok transformer st1 =>
+      have ⟨cItems, hItems⟩ := foldItems_progress cmd.args hfold
+      set partial := transformer Spec.Partial.empty
+      set children := cmd.subs.map fun sub => (sub.name, Spec.elaborateCommand sub)
+      cases hpre : st1.pre with
+      | nil =>
+          simp [hfold, hpre, partial, children] at h
+          rcases h with ⟨rfl, rfl⟩
+          refine ⟨cItems, ?_⟩
+          simpa using hItems
+      | cons token rest =>
+          cases hchild : Spec.lookupChild? children token with
+          | none =>
+              simp [hfold, hpre, hchild, partial, children] at h
+              rcases h with ⟨rfl, rfl⟩
+              refine ⟨cItems, ?_⟩
+              simpa using hItems
+          | some parser =>
+              simp [hfold, hpre, hchild, partial, children] at h
+              rcases h with ⟨childResult, hParserEq, rfl, rfl⟩
+              let stAfter : State := { st1 with pre := rest, cursor := st1.cursor + 1 }
+              have ⟨sub, hsub, hname, hparserEq⟩ :=
+                lookupChild?_some (subs := cmd.subs) (token := token)
+                  (parser := parser) (by simpa [children] using hchild)
+              have hlt : commandWeight sub < commandWeight cmd :=
+                commandWeight_child_lt hsub
+              have hChildEval : Spec.elaborateCommand sub stAfter = .ok childResult st' := by
+                simpa [stAfter, hparserEq] using hParserEq
+              have hchild := ih hlt (st := stAfter) (st' := st')
+                (payload := childResult) hChildEval
+              rcases hchild with ⟨cChild, hCursorChild⟩
+              refine ⟨cItems + 1 + cChild, ?_⟩
+              have hCursorAfter : stAfter.cursor = st1.cursor + 1 := by
+                simp [stAfter]
+              have hCursorChild' := hCursorChild
+              simp [hCursorAfter, hItems, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] at hCursorChild'
+              simpa [Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] using hCursorChild'
 
 end ArgParse.Proofs

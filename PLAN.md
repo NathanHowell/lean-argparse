@@ -77,6 +77,7 @@
 - 2025-09-27: Propagated optional (`.one`) progress/rollback lemmas so `option`/`positional` now document both consumption and preservation behaviour for present/absent values.
 - 2025-09-27: Threaded the new option/positional progress lemmas through `Spec.Elab` interpreters (`interpretOption`/`interpretPositional`), confirming the builder transformers inherit cursor guarantees.
 - 2025-09-27: Proved progress for `elaborateItem`, `foldItems`, and `elaborateCommand`, establishing that builder-level sequencing preserves the cursor delta from primitive interpreters.
+- 2025-09-27: Introduced `Spec.CommandResult`, rewrote `elaborateCommand` to select subcommands via cached child parsers, and proved the accompanying progress lemma using a `commandWeight` induction measure.
 - _Please append future successes and failures here with short rationales._
 
 ## Immediate Next Steps
@@ -107,5 +108,6 @@
 25. ✅ **Applicative propagation** (2025-09-27): Added `.one` optional progress/preservation lemmas for `option`/`positional`, completing the trio of `optional`/`many`/`some` proofs needed by downstream combinators.
 26. ✅ **Elaboration threading** (2025-09-27): Lifted the cursor lemmas to `interpretOption`/`interpretPositional`, so builder transformers mirror the primitive progress properties.
 27. ✅ **Command folding proofs** (2025-09-27): Extended progress lemmas to `elaborateItem`, `foldItems`, and `elaborateCommand`, so builder sequencing now carries explicit cursor deltas.
-28. **Subcommand progress**: Lift the cursor guarantees through subcommand selection (`elaborateCommand` for child nodes) and document any obstacles before moving to whole-app proofs.
-29. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
+28. ✅ **Subcommand progress** (2025-09-27): Reworked `elaborateCommand` to recurse over cached child parsers, proved subcommand cursor bounds via the new `commandWeight` measure, and confirmed tests remain green.
+29. **Whole-app progress**: Extend the progress reasoning to the application level (`elaborateApp` and eventual runner wrappers), then document any remaining blockers before moving on to soundness.
+30. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.

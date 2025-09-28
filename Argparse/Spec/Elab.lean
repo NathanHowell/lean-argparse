@@ -44,6 +44,18 @@ def positionalValues (p : Partial) (name : String) : List String :=
 
 end Partial
 
+/-- Result of elaborating a command, optionally paired with a selected subcommand. -/
+structure CommandResult where
+  self   : Partial := Partial.empty
+  child? : Option (String × CommandResult) := none
+deriving Repr
+
+namespace CommandResult
+
+@[simp] def empty : CommandResult := {}
+
+end CommandResult
+
 /-- Interpret a flag spec and record the boolean result. -/
 def interpretFlag (spec : FlagSpec) : Parser (Partial → Partial) :=
   flag spec |>.map fun enabled => fun p =>
@@ -99,12 +111,36 @@ private def foldItems : List ItemSpec → Parser (Partial → Partial)
         (Parser.map (fun f g => fun p => g (f p)) (elaborateItem item))
         (foldItems rest)
 
-/-- Elaborate a command by folding its items; subcommands unimplemented. -/
-def elaborateCommand (cmd : CmdSpec) : Parser Partial :=
-  Parser.map (fun t => t Partial.mk) (foldItems cmd.args)
+private def lookupChild?
+    (entries : List (String × Parser CommandResult))
+    (token : String) : Option (Parser CommandResult) :=
+  (entries.find? (fun entry => entry.fst = token)).map (·.snd)
+
+/-- Elaborate a command, folding local items before descending into a child subcommand. -/
+def elaborateCommand (cmd : CmdSpec) : Parser CommandResult :=
+  fun st =>
+    match foldItems cmd.args st with
+    | .err err => .err err
+    | .ok transformer st' =>
+        let partial := transformer Partial.empty
+        let children := cmd.subs.map fun sub => (sub.name, elaborateCommand sub)
+        match st'.pre with
+        | [] => .ok { self := partial } st'
+        | token :: rest =>
+            match lookupChild? children token with
+            | none => .ok { self := partial } st'
+            | some parser =>
+                let stAfter : State := { st' with pre := rest, cursor := st'.cursor + 1 }
+                match parser stAfter with
+                | .ok childResult st'' =>
+                    .ok { self := partial, child? := some (token, childResult) } st''
+                | .err err => .err err
 
 /-- Entry point: elaborate the root application spec. -/
 def elaborateApp (app : AppSpec) : Parser Partial :=
-  elaborateCommand app.root
+  fun st =>
+    match elaborateCommand app.root st with
+    | .ok result st' => .ok result.self st'
+    | .err err => .err err
 
 end ArgParse.Spec
