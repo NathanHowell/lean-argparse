@@ -296,6 +296,25 @@ lemma collectOptionValues_progress
         (st := st) (result := result) hcollect
 
 /-- `takeOptionValue?` advances the cursor by one or two tokens on success. -/
+lemma takeOptionValue_none_preserves_state
+    {α} [FromArg α] (spec : OptSpec α) (st st' : State) :
+    takeOptionValue? spec st = .ok (none, st') → st' = st := by
+  intro h
+  unfold takeOptionValue? at h
+  classical
+  cases hstep : takeOptionStep? spec st with
+  | error err => simp [hstep] at h
+  | ok step =>
+      rcases step with ⟨value?, state', consumed⟩
+      cases hvalue : value? with
+      | none =>
+          simp [hstep, hvalue] at h
+          cases h with
+          | intro _ hstate =>
+              simpa using hstate
+      | some value =>
+          simp [hstep, hvalue] at h
+
 theorem takeOptionValue_some_progress
     {α} [FromArg α] (spec : OptSpec α) (st st' : State) (value : α) :
     takeOptionValue? spec st = .ok (some value, st') →
@@ -320,6 +339,57 @@ theorem takeOptionValue_some_progress
           cases hprogress with
           | inl h1 => exact Or.inl h1.2
           | inr h2 => exact Or.inr h2.2
+
+/-- Optional option success moves the cursor when a value is present. -/
+theorem option_one_some_progress
+    {α} [FromArg α] (spec : OptSpec α) (st st' : State) (value : α) :
+    spec.arity = .one →
+    option spec st = .ok (some value) st' →
+    st'.cursor = st.cursor + 1 ∨ st'.cursor = st.cursor + 2 := by
+  intro harity hres
+  subst harity
+  unfold option at hres
+  classical
+  cases htake : takeOptionValue? spec st with
+  | error err => simp [htake] at hres
+  | ok result =>
+      rcases result with ⟨value?, stAfter⟩
+      cases hvalue : value? with
+      | none => simp [htake, hvalue] at hres
+      | some parsed =>
+          have hpair : (some value, st') = (some parsed, stAfter) := by
+            simpa [htake, hvalue] using hres
+          cases hpair with
+          | intro hval hstate =>
+              cases hval
+              exact takeOptionValue_some_progress
+                (spec := spec) (st := st) (st' := st') (value := value)
+                (by simpa [htake, hvalue])
+
+/-- Optional option absence leaves the state untouched. -/
+theorem option_one_none_preserves_state
+    {α} [FromArg α] (spec : OptSpec α) (st st' : State) :
+    spec.arity = .one →
+    option spec st = .ok none st' → st' = st := by
+  intro harity hres
+  subst harity
+  unfold option at hres
+  classical
+  cases htake : takeOptionValue? spec st with
+  | error err => simp [htake] at hres
+  | ok result =>
+      rcases result with ⟨value?, stAfter⟩
+      cases hvalue : value? with
+      | none =>
+          have hpair : (none, st') = (none, stAfter) := by
+            simpa [htake, hvalue] using hres
+          cases hpair with
+          | intro _ hstate =>
+              have hstate' := takeOptionValue_none_preserves_state
+                (spec := spec) (st := st) (st' := stAfter)
+                (by simpa [htake, hvalue])
+              simpa [hstate'] using hstate
+      | some parsed => simp [htake, hvalue] at hres
 
 /-- Successful `.many` option parsing advances by the collector delta. -/
 theorem option_many_progress
@@ -414,6 +484,25 @@ lemma takePositionalStep_some_progress
       | error msg => simp [hrun] at h
 
 /-- `takePositionalValue?` advances the cursor on success. -/
+lemma takePositionalValue_none_preserves_state
+    {α} [FromArg α] (spec : PosSpec α) (st st' : State) :
+    takePositionalValue? spec st = .ok (none, st') → st' = st := by
+  intro h
+  unfold takePositionalValue? at h
+  classical
+  cases hstep : takePositionalStep? spec st with
+  | error err => simp [hstep] at h
+  | ok step =>
+      rcases step with ⟨value?, state', consumed⟩
+      cases hvalue : value? with
+      | none =>
+          simp [hstep, hvalue] at h
+          cases h with
+          | intro _ hstate =>
+              simpa using hstate
+      | some value =>
+          simp [hstep, hvalue] at h
+
 theorem takePositionalValue_some_progress
     {α} [FromArg α] (spec : PosSpec α) (st st' : State)
     (value : α) :
@@ -437,6 +526,57 @@ theorem takePositionalValue_some_progress
             (spec := spec) (st := st) (st' := state')
             (value := value) (c := consumed) hstep
           exact hprogress.2
+
+/-- Optional positional success advances the cursor. -/
+theorem positional_one_some_progress
+    {α} [FromArg α] (spec : PosSpec α) (st st' : State) (value : α) :
+    spec.arity = .one →
+    positional spec st = .ok (some value) st' →
+    st'.cursor = st.cursor + 1 := by
+  intro harity hres
+  subst harity
+  unfold positional at hres
+  classical
+  cases htake : takePositionalValue? spec st with
+  | error err => simp [htake] at hres
+  | ok result =>
+      rcases result with ⟨value?, stAfter⟩
+      cases hvalue : value? with
+      | none => simp [htake, hvalue] at hres
+      | some parsed =>
+          have hpair : (some value, st') = (some parsed, stAfter) := by
+            simpa [htake, hvalue] using hres
+          cases hpair with
+          | intro hval hstate =>
+              cases hval
+              exact takePositionalValue_some_progress
+                (spec := spec) (st := st) (st' := st') (value := value)
+                (by simpa [htake, hvalue])
+
+/-- Optional positional absence leaves the state untouched. -/
+theorem positional_one_none_preserves_state
+    {α} [FromArg α] (spec : PosSpec α) (st st' : State) :
+    spec.arity = .one →
+    positional spec st = .ok none st' → st' = st := by
+  intro harity hres
+  subst harity
+  unfold positional at hres
+  classical
+  cases htake : takePositionalValue? spec st with
+  | error err => simp [htake] at hres
+  | ok result =>
+      rcases result with ⟨value?, stAfter⟩
+      cases hvalue : value? with
+      | none =>
+          have hpair : (none, st') = (none, stAfter) := by
+            simpa [htake, hvalue] using hres
+          cases hpair with
+          | intro _ hstate =>
+              have hstate' := takePositionalValue_none_preserves_state
+                (spec := spec) (st := st) (st' := stAfter)
+                (by simpa [htake, hvalue])
+              simpa [hstate'] using hstate
+      | some parsed => simp [htake, hvalue] at hres
 
 lemma collectPositionalStepsLoop_progress
     {α} [FromArg α] (spec : PosSpec α) :

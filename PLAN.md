@@ -74,6 +74,7 @@
 - 2025-09-27: Exposed `findConcatSplit?` for proofs and added `parseConcatValue_split_state` to confirm short-bundle leftovers are requeued for arbitrary `FromArg` payloads.
 - 2025-09-27: Replaced the collectors with fuelled loops, then proved cursor-delta lemmas (`collectOptionSteps_progress`, `collectPositionalSteps_progress`) in `Argparse/Proofs/Totality.lean`.
 - 2025-09-27: Lifted the collector proofs to `collect*Values` and the `.many`/`.some` branches of `option`/`positional`, yielding cursor-delta lemmas ready for applicative combinators.
+- 2025-09-27: Propagated optional (`.one`) progress/rollback lemmas so `option`/`positional` now document both consumption and preservation behaviour for present/absent values.
 - _Please append future successes and failures here with short rationales._
 
 ## Immediate Next Steps
@@ -101,5 +102,6 @@
 22. ✅ **Inline short bundle proofs & generalisation** (2025-09-27): Proved `parseConcatValue_split_state` and surfaced the helper so bundle splitting requeues leftovers for any `FromArg` payload.
 23. ✅ **Step-result refactor** (2025-09-27): Reworked option/positional collectors to track consumption via `CollectResult`, paving the way for aggregate progress proofs.
 24. ✅ **Many/some progress lemmas** (2025-09-27): Extended the collector proofs to `collect*Values` and lifted them into the `.many`/`.some` branches of `option`/`positional`, exposing cursor-delta facts for higher-level combinators.
-25. **Applicative propagation**: Thread the new cursor lemmas through downstream combinators (`many`, `some`, `optional`) and record any gaps that surface.
-26. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
+25. ✅ **Applicative propagation** (2025-09-27): Added `.one` optional progress/preservation lemmas for `option`/`positional`, completing the trio of `optional`/`many`/`some` proofs needed by downstream combinators.
+26. **Elaboration threading**: Push the new option/positional lemmas through `Spec.Elab` (builder transformers), noting any additional invariants required for subcommand support.
+27. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
