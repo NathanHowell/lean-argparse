@@ -73,6 +73,7 @@
 - 2025-09-27: Spike to drive `collectPositionalStepsAux_progress` via an induction on a `positionalMeasure` count ran aground—the recursive branch reinstates tokens and the resulting arithmetic required heavier refactors than planned. Changes reverted; collector progress lemmas remain open.
 - 2025-09-27: Exposed `findConcatSplit?` for proofs and added `parseConcatValue_split_state` to confirm short-bundle leftovers are requeued for arbitrary `FromArg` payloads.
 - 2025-09-27: Replaced the collectors with fuelled loops, then proved cursor-delta lemmas (`collectOptionSteps_progress`, `collectPositionalSteps_progress`) in `Argparse/Proofs/Totality.lean`.
+- 2025-09-27: Lifted the collector proofs to `collect*Values` and the `.many`/`.some` branches of `option`/`positional`, yielding cursor-delta lemmas ready for applicative combinators.
 - _Please append future successes and failures here with short rationales._
 
 ## Immediate Next Steps
@@ -99,5 +100,6 @@
 21. ✅ **Positional arities** (2025-09-27): Positional combinators now support `.many`/`.some` with corresponding elaboration/storage across pre/post streams.
 22. ✅ **Inline short bundle proofs & generalisation** (2025-09-27): Proved `parseConcatValue_split_state` and surfaced the helper so bundle splitting requeues leftovers for any `FromArg` payload.
 23. ✅ **Step-result refactor** (2025-09-27): Reworked option/positional collectors to track consumption via `CollectResult`, paving the way for aggregate progress proofs.
-24. **Many/some progress lemmas**: Lift the new step-wise cursor bounds through `collectOptionSteps`/`collectPositionalSteps` so `.many`/`.some` combinators expose structural progress facts. _Status_: collectors now expose cursor deltas via `collectOptionSteps_progress` and `collectPositionalSteps_progress`; next action is to push those facts into the applicative combinators.
-25. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
+24. ✅ **Many/some progress lemmas** (2025-09-27): Extended the collector proofs to `collect*Values` and lifted them into the `.many`/`.some` branches of `option`/`positional`, exposing cursor-delta facts for higher-level combinators.
+25. **Applicative propagation**: Thread the new cursor lemmas through downstream combinators (`many`, `some`, `optional`) and record any gaps that surface.
+26. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.

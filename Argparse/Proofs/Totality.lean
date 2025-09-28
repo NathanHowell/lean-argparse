@@ -276,6 +276,25 @@ theorem collectOptionSteps_progress
   have : result.consumed = δ := by simpa using hconsumed
   simpa [this]
 
+/-- Cursor delta for `collectOptionValues`. -/
+lemma collectOptionValues_progress
+    {α} [FromArg α] (spec : OptSpec α) (st st' : State) (values : List α) :
+    collectOptionValues (spec := spec) st = .ok (values, st') →
+    ∃ consumed, st'.cursor = st.cursor + consumed := by
+  intro h
+  unfold collectOptionValues at h
+  classical
+  cases hcollect : collectOptionSteps spec st with
+  | error err => simp [hcollect] at h
+  | ok result =>
+      simp [hcollect] at h
+      have hpair : (values, st') = (result.values, result.state) := by
+        simpa using h
+      cases hpair
+      refine ⟨result.consumed, ?_⟩
+      simpa using collectOptionSteps_progress (spec := spec)
+        (st := st) (result := result) hcollect
+
 /-- `takeOptionValue?` advances the cursor by one or two tokens on success. -/
 theorem takeOptionValue_some_progress
     {α} [FromArg α] (spec : OptSpec α) (st st' : State) (value : α) :
@@ -301,6 +320,51 @@ theorem takeOptionValue_some_progress
           cases hprogress with
           | inl h1 => exact Or.inl h1.2
           | inr h2 => exact Or.inr h2.2
+
+/-- Successful `.many` option parsing advances by the collector delta. -/
+theorem option_many_progress
+    {α} [FromArg α] (spec : OptSpec α) (st st' : State)
+    (values : List α) :
+    spec.arity = .many →
+    option spec st = .ok values st' →
+    ∃ consumed, st'.cursor = st.cursor + consumed := by
+  intro harity hres
+  subst harity
+  unfold option at hres
+  classical
+  cases hcollect : collectOptionValues spec st with
+  | error err => simp [hcollect] at hres
+  | ok result =>
+      have hvalues : collectOptionValues spec st = .ok (values, st') := by
+        simpa [hcollect] using hres
+      exact collectOptionValues_progress (spec := spec)
+        (st := st) (st' := st') (values := values) hvalues
+
+/-- Successful `.some` option parsing advances by the collector delta. -/
+theorem option_some_progress
+    {α} [FromArg α] (spec : OptSpec α) (st st' : State)
+    (values : List α) :
+    spec.arity = .some →
+    option spec st = .ok values st' →
+    ∃ consumed, st'.cursor = st.cursor + consumed := by
+  intro harity hres
+  subst harity
+  unfold option at hres
+  classical
+  cases hcollect : collectOptionValues spec st with
+  | error err => simp [hcollect] at hres
+  | ok result =>
+      rcases result with ⟨valuesRaw, stRaw⟩
+      cases hlist : valuesRaw with
+      | nil => simp [hcollect, hlist] at hres
+      | cons head tail =>
+          have hpair : (values, st') = (head :: tail, stRaw) := by
+            simpa [hcollect, hlist] using hres
+          cases hpair
+          have hvalues : collectOptionValues spec st = .ok (values, st') := by
+            simpa [hcollect, hlist]
+          exact collectOptionValues_progress (spec := spec)
+            (st := st) (st' := st') (values := values) hvalues
 
 /-- `takePositionalStep?` consumes exactly one token whenever it succeeds. -/
 lemma takePositionalStep_some_progress
@@ -374,7 +438,6 @@ theorem takePositionalValue_some_progress
             (value := value) (c := consumed) hstep
           exact hprogress.2
 
-/-- `takePositionalStep?` consumes exactly one token whenever it succeeds. -/
 lemma collectPositionalStepsLoop_progress
     {α} [FromArg α] (spec : PosSpec α) :
     ∀ fuel acc consumed st (result : CollectResult α),
@@ -446,6 +509,70 @@ theorem collectPositionalSteps_progress
   rcases hloop with ⟨δ, hconsumed, hcursor⟩
   have : result.consumed = δ := by simpa using hconsumed
   simpa [this]
+
+/-- Cursor delta for `collectPositionalValues`. -/
+lemma collectPositionalValues_progress
+    {α} [FromArg α] (spec : PosSpec α) (st st' : State) (values : List α) :
+    collectPositionalValues (spec := spec) st = .ok (values, st') →
+    ∃ consumed, st'.cursor = st.cursor + consumed := by
+  intro h
+  unfold collectPositionalValues at h
+  classical
+  cases hcollect : collectPositionalSteps spec st with
+  | error err => simp [hcollect] at h
+  | ok result =>
+      simp [hcollect] at h
+      have hpair : (values, st') = (result.values, result.state) := by
+        simpa using h
+      cases hpair
+      refine ⟨result.consumed, ?_⟩
+      simpa using collectPositionalSteps_progress (spec := spec)
+        (st := st) (result := result) hcollect
+
+/-- Successful `.many` positional parsing advances by the collector delta. -/
+theorem positional_many_progress
+    {α} [FromArg α] (spec : PosSpec α) (st st' : State)
+    (values : List α) :
+    spec.arity = .many →
+    positional spec st = .ok values st' →
+    ∃ consumed, st'.cursor = st.cursor + consumed := by
+  intro harity hres
+  subst harity
+  unfold positional at hres
+  classical
+  cases hcollect : collectPositionalValues spec st with
+  | error err => simp [hcollect] at hres
+  | ok result =>
+      have hvalues : collectPositionalValues spec st = .ok (values, st') := by
+        simpa [hcollect] using hres
+      exact collectPositionalValues_progress (spec := spec)
+        (st := st) (st' := st') (values := values) hvalues
+
+/-- Successful `.some` positional parsing advances by the collector delta. -/
+theorem positional_some_progress
+    {α} [FromArg α] (spec : PosSpec α) (st st' : State)
+    (values : List α) :
+    spec.arity = .some →
+    positional spec st = .ok values st' →
+    ∃ consumed, st'.cursor = st.cursor + consumed := by
+  intro harity hres
+  subst harity
+  unfold positional at hres
+  classical
+  cases hcollect : collectPositionalValues spec st with
+  | error err => simp [hcollect] at hres
+  | ok result =>
+      rcases result with ⟨valuesRaw, stRaw⟩
+      cases hlist : valuesRaw with
+      | nil => simp [hcollect, hlist] at hres
+      | cons head tail =>
+          have hpair : (values, st') = (head :: tail, stRaw) := by
+            simpa [hcollect, hlist] using hres
+          cases hpair
+          have hvalues : collectPositionalValues spec st = .ok (values, st') := by
+            simpa [hcollect, hlist]
+          exact collectPositionalValues_progress (spec := spec)
+            (st := st) (st' := st') (values := values) hvalues
 
 /-- `positional` with arity `.some` never returns an empty list. -/
 theorem positional_some_nonempty
