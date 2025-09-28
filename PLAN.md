@@ -47,44 +47,44 @@
    - Prepare release notes summarizing parity with the old API plus new guarantees.
 
 ## Activity Log
-- 2025-09-30: Spiked on refactoring `Argparse/Core/Normalize.lean` to expose sentinel metadata (pre/post/saw) and accompanying proofs/tests; recursive `simp` obligations around `splitOnSentinel` made the approach unstable, so the code was reverted. Next iteration will explore a `takeWhile`/`dropWhile` decomposition before reattempting Step 1.
+- 2025-09-30: Spiked on refactoring `ArgParse/Core/Normalize.lean` to expose sentinel metadata (pre/post/saw) and accompanying proofs/tests; recursive `simp` obligations around `splitOnSentinel` made the approach unstable, so the code was reverted. Next iteration will explore a `takeWhile`/`dropWhile` decomposition before reattempting Step 1.
 - 2025-09-30: Second attempt at the normalization refactor (with explicit recursion proofs) also stalled: `List.Mem` case analysis and rewrites around concatenated prefixes produced stubborn lint errors. Backed out the changes again; plan to prototype the `List.span` formulation in a scratch file before touching the main module.
 - 2025-09-30: Derived `LawfulFunctor`/`LawfulApplicative` instances for `Parser`, proving the required equalities (map/pure/seq, associativity) and noting that orientation mattered—resolved via the core `Parser.seq` lemma. Confirmed with `lake build; lake test; lake lint`.
 - 2025-09-30: Proved core parser Functor/Applicative/Alternative equalities (map_id/map_comp/map_const/seq_pure/pure_seq/seq_map_assoc) and recorded that right-identity for `orElse` fails because the fallback emits a canonical error. Verified with `lake build; lake test; lake lint` (no regressions).
 - 2025-09-29: Reviewed `SPEC.md` and `KNOWLEDGE.md`, audited the current stubs, and updated this plan to reflect the required rebuild plus restoration of the legacy `Main.lean` example. (Validated with `lake build; lake test; lake lint` to establish the pre-change baseline.)
-- 2025-09-28: Added docstrings for `ErrorKind`, `Expect`, and `Result` constructors in `Argparse/Core/Types.lean`; `lake build; lake test; lake lint` now passes with no outstanding lint warnings.
-- 2025-09-28: Re-ran `lake build; lake test; lake lint` to confirm `Argparse/CLI/Print.lean` exports are lint-clean; backlog now advances to `Argparse/Examples/Xargs0.lean`.
-- 2025-09-28: Re-ran `lake build; lake test; lake lint` to confirm `Argparse/Proofs/Determinism.lean` has no lint warnings; backlog now advances to `Argparse/CLI/Print.lean`.
-- 2025-09-28: Re-ran `lake build; lake test; lake lint` to confirm `Argparse/Proofs/Totality.lean` is lint-clean; backlog now moves to `Argparse/Proofs/Determinism.lean`.
-- 2025-09-28: Re-ran `lake build; lake test; lake lint` to confirm `Argparse/Proofs/Soundness/Summary.lean` remains lint-clean; backlog now targets `Argparse/Proofs/Totality.lean`.
-- 2025-09-28: Ran `lake build; lake test; lake lint` after verifying `Argparse/Proofs/Soundness.lean` placeholders already satisfy the linter; next warnings surface in `Core/Types` constructors.
-- 2025-09-28: Documented structures and placeholder helpers in `Argparse/Spec/Elab.lean`, then ran `lake build; lake test; lake lint` (next lint warnings surface in `Core/Types`).
-- 2025-09-28: Added doc coverage for `suggestionsWithSummary` in `Argparse/Doc/Completion.lean`; lint clean after `lake build; lake test; lake lint`.
-- 2025-09-28: Documented `runtimeParagraphs` in `Argparse/Doc/Man.lean` and confirmed with `lake build; lake test; lake lint`.
-- 2025-09-28: Added a docstring for `runtimeLinesForSummary` in `Argparse/Doc/Help.lean` and verified with `lake build; lake test; lake lint`.
-- 2025-09-28: Documented `Argparse/Spec/Describe.lean` entry kinds/doc entries and reran `lake build; lake test; lake lint`.
-- 2025-09-28: Added constructor/field docstrings to `Argparse/Core/Runner.lean`, then ran `lake build; lake test; lake lint` to confirm.
-- 2025-09-28: Added field/constructor docstrings across `Argparse/Spec/AST.lean`, cleared its lint warnings, and re-ran `lake build; lake test; lake lint`.
+- 2025-09-28: Added docstrings for `ErrorKind`, `Expect`, and `Result` constructors in `ArgParse/Core/Types.lean`; `lake build; lake test; lake lint` now passes with no outstanding lint warnings.
+- 2025-09-28: Re-ran `lake build; lake test; lake lint` to confirm `ArgParse/CLI/Print.lean` exports are lint-clean; backlog now advances to `ArgParse/Examples/Xargs0.lean`.
+- 2025-09-28: Re-ran `lake build; lake test; lake lint` to confirm `ArgParse/Proofs/Determinism.lean` has no lint warnings; backlog now advances to `ArgParse/CLI/Print.lean`.
+- 2025-09-28: Re-ran `lake build; lake test; lake lint` to confirm `ArgParse/Proofs/Totality.lean` is lint-clean; backlog now moves to `ArgParse/Proofs/Determinism.lean`.
+- 2025-09-28: Re-ran `lake build; lake test; lake lint` to confirm `ArgParse/Proofs/Soundness/Summary.lean` remains lint-clean; backlog now targets `ArgParse/Proofs/Totality.lean`.
+- 2025-09-28: Ran `lake build; lake test; lake lint` after verifying `ArgParse/Proofs/Soundness.lean` placeholders already satisfy the linter; next warnings surface in `Core/Types` constructors.
+- 2025-09-28: Documented structures and placeholder helpers in `ArgParse/Spec/Elab.lean`, then ran `lake build; lake test; lake lint` (next lint warnings surface in `Core/Types`).
+- 2025-09-28: Added doc coverage for `suggestionsWithSummary` in `ArgParse/Doc/Completion.lean`; lint clean after `lake build; lake test; lake lint`.
+- 2025-09-28: Documented `runtimeParagraphs` in `ArgParse/Doc/Man.lean` and confirmed with `lake build; lake test; lake lint`.
+- 2025-09-28: Added a docstring for `runtimeLinesForSummary` in `ArgParse/Doc/Help.lean` and verified with `lake build; lake test; lake lint`.
+- 2025-09-28: Documented `ArgParse/Spec/Describe.lean` entry kinds/doc entries and reran `lake build; lake test; lake lint`.
+- 2025-09-28: Added constructor/field docstrings to `ArgParse/Core/Runner.lean`, then ran `lake build; lake test; lake lint` to confirm.
+- 2025-09-28: Added field/constructor docstrings across `ArgParse/Spec/AST.lean`, cleared its lint warnings, and re-ran `lake build; lake test; lake lint`.
 - 2025-09-28: Ran `lake env lean --root=.` against every project-controlled `.lean` file; catalogued individual compilation failures to stage a per-file fix backlog.
 - 2025-09-27: Re-read `SPEC.md`/`KNOWLEDGE.md`; prepared to align plan accordingly.
-- 2025-09-27: Scaffolding audit complete — inventoried legacy modules under `Argparse/Basic` and `Argparse/Native`; marked them for removal during migration to the `ArgParse/` hierarchy.
+- 2025-09-27: Scaffolding audit complete — inventoried legacy modules under `ArgParse/Basic` and `ArgParse/Native`; marked them for removal during migration to the `ArgParse/` hierarchy.
 - 2025-09-27: Created SPEC-aligned module skeleton under `ArgParse/` (Core, Spec, Doc, Proofs, CLI, Examples, Tests).
-- 2025-09-27: Drafted core runtime types (`Tokens`, `State`, `Result`, `Error`, `Expect`, `ErrorKind`) per the spec in `Argparse/Core/Types.lean`.
-- 2025-09-27: Implemented parser core (`Parser` alias plus Functor/Applicative/Alternative instances) in `Argparse/Core/Parser.lean`.
-- 2025-09-27: Removed the legacy `Argparse.Basic`/`Argparse.Native` implementations and stubbed the new module tree in `Argparse.lean`, `Main.lean`, and `Tests/Main.lean`.
-- 2025-09-27: Added normalization pass (`Argparse.Core.Normalize.normalize`) splitting tokens on `--` into the new state record.
-- 2025-09-27: Introduced the `FromArg` class with baseline instances (String, Substring, Nat, Int, Bool) in `Argparse/Core/Value.lean`.
-- 2025-09-27: Added AST scaffolding (`Argparse.Spec.AST`) covering metadata, items, and command tree structures.
-- 2025-09-27: Seeded elaboration stubs in `Argparse.Spec.Elab` to begin translating the AST into runtime parsers.
-- 2025-09-27: Introduced documentation describer stubs in `Argparse.Spec.Describe`.
+- 2025-09-27: Drafted core runtime types (`Tokens`, `State`, `Result`, `Error`, `Expect`, `ErrorKind`) per the spec in `ArgParse/Core/Types.lean`.
+- 2025-09-27: Implemented parser core (`Parser` alias plus Functor/Applicative/Alternative instances) in `ArgParse/Core/Parser.lean`.
+- 2025-09-27: Removed the legacy `ArgParse.Basic`/`ArgParse.Native` implementations and stubbed the new module tree in `ArgParse.lean`, `Main.lean`, and `Tests/Main.lean`.
+- 2025-09-27: Added normalization pass (`ArgParse.Core.Normalize.normalize`) splitting tokens on `--` into the new state record.
+- 2025-09-27: Introduced the `FromArg` class with baseline instances (String, Substring, Nat, Int, Bool) in `ArgParse/Core/Value.lean`.
+- 2025-09-27: Added AST scaffolding (`ArgParse.Spec.AST`) covering metadata, items, and command tree structures.
+- 2025-09-27: Seeded elaboration stubs in `ArgParse.Spec.Elab` to begin translating the AST into runtime parsers.
+- 2025-09-27: Introduced documentation describer stubs in `ArgParse.Spec.Describe`.
 - 2025-09-27: Stubbed help/man/completion renderers consuming describer output.
-- 2025-09-27: Registered placeholder theorems across `Argparse/Proofs` modules.
-- 2025-09-27: Exposed CLI helpers delegating to the doc renderers in `Argparse.CLI.Print`.
-- 2025-09-27: Added minimal `Argparse.Examples` specs for xargs-style and git-style demos.
+- 2025-09-27: Registered placeholder theorems across `ArgParse/Proofs` modules.
+- 2025-09-27: Exposed CLI helpers delegating to the doc renderers in `ArgParse.CLI.Print`.
+- 2025-09-27: Added minimal `ArgParse.Examples` specs for xargs-style and git-style demos.
 - 2025-09-27: Stubbed unit and golden tests against the new helpers.
 - 2025-09-27: Updated the placeholder executable to print help for the git-style example.
-- 2025-09-27: Implemented baseline flag/option/positional parsers in `Argparse/Core/Combinators` (front-of-stream only; no bundling yet).
-- 2025-09-27: Rewired `Argparse.Spec.Elab` to compose the new core combinators into a `Partial` record capturing flags/options/positionals (arity/bundling work still pending).
+- 2025-09-27: Implemented baseline flag/option/positional parsers in `ArgParse/Core/Combinators` (front-of-stream only; no bundling yet).
+- 2025-09-27: Rewired `ArgParse.Spec.Elab` to compose the new core combinators into a `Partial` record capturing flags/options/positionals (arity/bundling work still pending).
 - 2025-09-27: Updated doc renderers (help/man/completions) to accept optional `Partial` annotations via `render*With` helpers.
 - 2025-09-27: Added short-flag bundling to the core flag parser and proved cursor/state lemmas for flag success/failure cases.
 - 2025-09-27: Extended option parsing to honour `.many`/`.some` arities, long `--name=value`, and short concatenations; elaborator/doc layers now reflect the collected lists (inline bundle splitting like `-n5v` still pending).
@@ -98,14 +98,14 @@
 - 2025-09-27: Attempted to refactor `collectOptionStepsAux`/`collectPositionalStepsAux` to emit step traces. Encountered cascading termination/universe issues (Lean rejected the new recursion, `Spec/AST` defaults required rework, and build parity regressed), so the spike was rolled back with no code changes.
 - 2025-09-27: Spike to drive `collectPositionalStepsAux_progress` via an induction on a `positionalMeasure` count ran aground—the recursive branch reinstates tokens and the resulting arithmetic required heavier refactors than planned. Changes reverted; collector progress lemmas remain open.
 - 2025-09-27: Exposed `findConcatSplit?` for proofs and added `parseConcatValue_split_state` to confirm short-bundle leftovers are requeued for arbitrary `FromArg` payloads.
-- 2025-09-27: Replaced the collectors with fuelled loops, then proved cursor-delta lemmas (`collectOptionSteps_progress`, `collectPositionalSteps_progress`) in `Argparse/Proofs/Totality.lean`.
+- 2025-09-27: Replaced the collectors with fuelled loops, then proved cursor-delta lemmas (`collectOptionSteps_progress`, `collectPositionalSteps_progress`) in `ArgParse/Proofs/Totality.lean`.
 - 2025-09-27: Lifted the collector proofs to `collect*Values` and the `.many`/`.some` branches of `option`/`positional`, yielding cursor-delta lemmas ready for applicative combinators.
 - 2025-09-27: Propagated optional (`.one`) progress/rollback lemmas so `option`/`positional` now document both consumption and preservation behaviour for present/absent values.
 - 2025-09-27: Threaded the new option/positional progress lemmas through `Spec.Elab` interpreters (`interpretOption`/`interpretPositional`), confirming the builder transformers inherit cursor guarantees.
 - 2025-09-27: Proved progress for `elaborateItem`, `foldItems`, and `elaborateCommand`, establishing that builder-level sequencing preserves the cursor delta from primitive interpreters.
 - 2025-09-27: Introduced `Spec.CommandResult`, rewrote `elaborateCommand` to select subcommands via cached child parsers, and proved the accompanying progress lemma using a `commandWeight` induction measure.
 - 2025-09-27: Extended progress reasoning to `elaborateApp`, showing the application-level parser inherits the cursor bounds from its root command.
-- 2025-09-27: Added runner wrappers (`Argparse/Core/Runner`) exposing `RunResult`/`RunOutcome` alongside `runNormalized`/`run` for spec-aligned execution.
+- 2025-09-27: Added runner wrappers (`ArgParse/Core/Runner`) exposing `RunResult`/`RunOutcome` alongside `runNormalized`/`run` for spec-aligned execution.
 - 2025-09-27: Proved `runNormalized_ok_progress`, lifting the cursor-progress guarantees from `elaborateApp` through the runner convenience layer.
 - 2025-09-27: Extended unit tests with runner coverage, asserting successful flag parsing advances the cursor and preserves collected values.
 - 2025-09-27: Intercepted `--help`/`--man`/`--generate-completions` in the runner, returning the appropriate `RunResult` with zero-state change and documenting lemmas for the preservation behaviour.
@@ -114,24 +114,24 @@
 - _Please append future successes and failures here with short rationales._
 
 ## Immediate Next Steps
-1. ✅ **Scaffolding audit** (2025-09-27): Inventoried legacy files under `Argparse/` and flagged them for removal during the migration to the `ArgParse/` hierarchy.
+1. ✅ **Scaffolding audit** (2025-09-27): Inventoried legacy files under `ArgParse/` and flagged them for removal during the migration to the `ArgParse/` hierarchy.
 2. ✅ **Module skeleton** (2025-09-27): Generated empty modules for each file listed in the spec (Core, Spec, Doc, Proofs, CLI, Examples, Tests) with minimal docstrings and `section`s.
-3. ✅ **Core type draft** (2025-09-27): Introduced the spec’s core types (`Tokens`, `State`, `Result`, `Error`, etc.) in `Argparse/Core/Types.lean`, matching the specification and noting diagnostic fields.
+3. ✅ **Core type draft** (2025-09-27): Introduced the spec’s core types (`Tokens`, `State`, `Result`, `Error`, etc.) in `ArgParse/Core/Types.lean`, matching the specification and noting diagnostic fields.
 4. ✅ **Parser core** (2025-09-27): Defined `Parser := State → Result` with `pure`/`map`/`seq`/`fail` helpers and `Functor`/`Applicative`/`Alternative` instances.
-5. ✅ **Legacy cleanup** (2025-09-27): Removed the old `Argparse.Basic`/`Argparse.Native` hierarchies and replaced aggregated imports with SPEC-aligned stubs.
-6. ✅ **Normalization draft** (2025-09-27): Implemented `Argparse.Core.Normalize.normalize` to split tokens on the first `--` and populate the new `State` record.
-7. ✅ **Value parsing scaffold** (2025-09-27): Added the `FromArg` class with baseline instances (String, Substring, Nat, Int, Bool) in `Argparse/Core/Value.lean`.
-8. ✅ **Spec AST skeleton** (2025-09-27): Outlined the command specification tree in `Argparse/Spec/AST.lean` covering flags, options, positionals, and subcommands.
-9. ✅ **Elaborator scaffold** (2025-09-27): Added placeholder elaboration helpers in `Argparse/Spec/Elab.lean` to translate AST items into parsers.
-10. ✅ **Doc describer scaffold** (2025-09-27): Mirrored the AST into `Argparse/Spec/Describe.lean`, producing placeholder documentation entries.
+5. ✅ **Legacy cleanup** (2025-09-27): Removed the old `ArgParse.Basic`/`ArgParse.Native` hierarchies and replaced aggregated imports with SPEC-aligned stubs.
+6. ✅ **Normalization draft** (2025-09-27): Implemented `ArgParse.Core.Normalize.normalize` to split tokens on the first `--` and populate the new `State` record.
+7. ✅ **Value parsing scaffold** (2025-09-27): Added the `FromArg` class with baseline instances (String, Substring, Nat, Int, Bool) in `ArgParse/Core/Value.lean`.
+8. ✅ **Spec AST skeleton** (2025-09-27): Outlined the command specification tree in `ArgParse/Spec/AST.lean` covering flags, options, positionals, and subcommands.
+9. ✅ **Elaborator scaffold** (2025-09-27): Added placeholder elaboration helpers in `ArgParse/Spec/Elab.lean` to translate AST items into parsers.
+10. ✅ **Doc describer scaffold** (2025-09-27): Mirrored the AST into `ArgParse/Spec/Describe.lean`, producing placeholder documentation entries.
 11. ✅ **Doc renderers placeholder** (2025-09-27): Stubbed help/man/completion renderers to consume describer output.
-12. ✅ **Proof scaffolding** (2025-09-27): Added placeholder theorems across `Argparse/Proofs/*` referencing the new core modules.
-13. ✅ **CLI placeholder** (2025-09-27): Stubbed `Argparse/CLI/Print.lean` to expose minimal help/man/completion entry points.
-14. ✅ **Examples placeholder** (2025-09-27): Populated `Argparse/Examples/Xargs0.lean` and `.GitLike` with minimal scaffolds referencing the new spec.
-15. ✅ **Tests placeholder** (2025-09-27): Stubbed `Argparse/Tests/Unit.lean` and `.Golden` to exercise the new helpers.
+12. ✅ **Proof scaffolding** (2025-09-27): Added placeholder theorems across `ArgParse/Proofs/*` referencing the new core modules.
+13. ✅ **CLI placeholder** (2025-09-27): Stubbed `ArgParse/CLI/Print.lean` to expose minimal help/man/completion entry points.
+14. ✅ **Examples placeholder** (2025-09-27): Populated `ArgParse/Examples/Xargs0.lean` and `.GitLike` with minimal scaffolds referencing the new spec.
+15. ✅ **Tests placeholder** (2025-09-27): Stubbed `ArgParse/Tests/Unit.lean` and `.Golden` to exercise the new helpers.
 16. ✅ **Main executable placeholder** (2025-09-27): Pointed `Main.lean` at the git-like example help output.
-17. ✅ **Parser primitive implementation** (2025-09-27): Replaced placeholders in `Argparse/Core/Combinators.lean` with baseline flag/option/positional parsers (currently front-of-stream only; no bundles or repeated arities yet).
-18. ✅ **Elaborator integration** (2025-09-27): `Argparse/Spec/Elab` now folds core combinators into a `Partial` record capturing flags/options/positionals (multi-arity/bundling still TODO).
+17. ✅ **Parser primitive implementation** (2025-09-27): Replaced placeholders in `ArgParse/Core/Combinators.lean` with baseline flag/option/positional parsers (currently front-of-stream only; no bundles or repeated arities yet).
+18. ✅ **Elaborator integration** (2025-09-27): `ArgParse/Spec/Elab` now folds core combinators into a `Partial` record capturing flags/options/positionals (multi-arity/bundling still TODO).
 19. ✅ **Documentation alignment** (2025-09-27): Doc helpers now accept optional `Partial` annotations through `render*With`, surfacing runtime values alongside spec entries.
 20. ✅ **Option bundling & repeat arities** (2025-09-27): Extended option parsing for long/short concatenation and `.many`/`.some` arities; remaining work includes splitting inline bundles like `-n5v` and covering non-`String` payloads.
 21. ✅ **Positional arities** (2025-09-27): Positional combinators now support `.many`/`.some` with corresponding elaboration/storage across pre/post streams.
@@ -150,7 +150,7 @@
 34. ✅ **Partial summary fold** (2025-09-27): Introduced `Partial.Summary`, added runner helpers (`runSummary`/`runNormalizedSummary`), proved the trivial bridge lemmas, and extended unit tests to exercise the summary fold.
 35. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
 - 2025-09-27: Added `Partial` helper lemmas (`flagValue?_addFlag_*`, `optionValues_addOption_*`, `positionalValues_addPositional_*`) capturing last-write-wins semantics and deterministic accumulation.
-- 2025-09-27: Proved fold-level payload soundness lemmas in `Argparse/Proofs/Soundness.lean` and noted the reverse-order invariants for option/positional collectors.
+- 2025-09-27: Proved fold-level payload soundness lemmas in `ArgParse/Proofs/Soundness.lean` and noted the reverse-order invariants for option/positional collectors.
 - 2025-09-27: Extended unit tests with `#guard` checks covering repeated flags, option accumulation order, and positional aggregation.
 - 2025-09-27: Added `Partial.Summary` plus trivial bridge lemmas tying it back to the existing query helpers.
 - 2025-09-27: Introduced runner summary helpers (`runSummary`, `runNormalizedSummary`) and unit guards covering summary flag/option behaviour.
@@ -160,45 +160,45 @@
 - 2025-09-27: Updated the README payload summary section to point at the example helpers.
 - 2025-09-27: Added `Partial.Summary` soundness lemmas ensuring flag/option/positional folds agree with the underlying `Partial` accumulators.
 - 2025-09-27: Proved that summary-aware renderers (`renderHelpWithSummary`, `renderManWithSummary`, `renderCompletionsWithSummary`) agree with the original partial-based helpers when fed `Partial.toSummary`.
-- 2025-09-28: Attempted to fix `Argparse/Core/Combinators.lean`; blocked because the current `Argparse/Spec/AST.lean` source fails to compile, leaving stale `.olean` artifacts without the new `Short` fields. Reordered the build backlog so AST repairs come first.
-- 2025-09-28: Repaired `Argparse/Spec/AST.lean` (quoted reserved identifiers, added universe parameter, trimmed problematic `deriving` clauses) and verified `lake env lean --root=. Argparse/Spec/AST.lean` succeeds.
-- 2025-09-28: Repaired `Argparse/Spec/AST.lean` (quoted reserved identifiers, added universe parameter, trimmed problematic `deriving` clauses) and verified `lake env lean --root=. Argparse/Spec/AST.lean` succeeds.
-- 2025-09-28: Updated `Argparse/Core/Combinators.lean` (quoted reserved variable names, threaded `[FromArg]` constraints, switched to `«meta»` accessors) and confirmed `lake env lean --root=. Argparse/Core/Combinators.lean` passes.
-- 2025-09-28: Updated `Argparse/Core/Combinators.lean` (quoted reserved variable names, threaded `[FromArg]` constraints, switched to `«meta»` accessors) and confirmed `lake env lean --root=. Argparse/Core/Combinators.lean` passes.
-- 2025-09-28: Replaced summary lambdas in `Argparse/Core/Runner.lean` with `Partial.toSummary`, avoiding the reserved `partial` identifier and keeping the runner helpers compiling standalone.
-- 2025-09-28: Replaced summary lambdas in `Argparse/Core/Runner.lean` with `Partial.toSummary`, avoiding the reserved `partial` identifier and keeping the runner helpers compiling standalone.
-- 2025-09-28: Flattened completion summaries via `foldr` in `Argparse/Doc/Completion.lean`, removing the unsupported `List.bind` calls and restoring the completion renderer build.
-- 2025-09-28: Flattened completion summaries via `foldr` in `Argparse/Doc/Completion.lean`, removing the unsupported `List.bind` calls and restoring the completion renderer build.
-- 2025-09-28: Removed the nameless namespace from `Argparse/Doc/Help.lean` and reopened `Spec.EntryKind`, clearing the `open` syntax errors.
-- 2025-09-28: Removed the nameless namespace from `Argparse/Doc/Help.lean` and reopened `Spec.EntryKind`, clearing the `open` syntax errors.
-- 2025-09-28: Mirrored the namespace cleanup in `Argparse/Doc/Man.lean`, keeping the manpage helpers consistent with the updated help renderer.
-- 2025-09-28: Mirrored the namespace cleanup in `Argparse/Doc/Man.lean`, keeping the manpage helpers consistent with the updated help renderer.
-- 2025-09-28: Refreshed `Argparse/Examples/GitLike.lean` to use the new `PosSpec`/`OptSpec` records (with `«meta»` fields) so the example builds.
-- 2025-09-28: Refreshed `Argparse/Examples/GitLike.lean` to use the new `PosSpec`/`OptSpec` records (with `«meta»` fields) so the example builds.
-- 2025-09-28: Ported `Argparse/Examples/Xargs0.lean` onto the updated flag/positional specs, keeping the docs examples compiling.
-- 2025-09-28: Ported `Argparse/Examples/Xargs0.lean` onto the updated flag/positional specs, keeping the docs examples compiling.
-- 2025-09-28: Adjusted the `Parser.seq` placeholder in `Argparse/Proofs/Laws.lean` to the new lazy continuation signature.
-- 2025-09-28: Adjusted the `Parser.seq` placeholder in `Argparse/Proofs/Laws.lean` to the new lazy continuation signature.
+- 2025-09-28: Attempted to fix `ArgParse/Core/Combinators.lean`; blocked because the current `ArgParse/Spec/AST.lean` source fails to compile, leaving stale `.olean` artifacts without the new `Short` fields. Reordered the build backlog so AST repairs come first.
+- 2025-09-28: Repaired `ArgParse/Spec/AST.lean` (quoted reserved identifiers, added universe parameter, trimmed problematic `deriving` clauses) and verified `lake env lean --root=. ArgParse/Spec/AST.lean` succeeds.
+- 2025-09-28: Repaired `ArgParse/Spec/AST.lean` (quoted reserved identifiers, added universe parameter, trimmed problematic `deriving` clauses) and verified `lake env lean --root=. ArgParse/Spec/AST.lean` succeeds.
+- 2025-09-28: Updated `ArgParse/Core/Combinators.lean` (quoted reserved variable names, threaded `[FromArg]` constraints, switched to `«meta»` accessors) and confirmed `lake env lean --root=. ArgParse/Core/Combinators.lean` passes.
+- 2025-09-28: Updated `ArgParse/Core/Combinators.lean` (quoted reserved variable names, threaded `[FromArg]` constraints, switched to `«meta»` accessors) and confirmed `lake env lean --root=. ArgParse/Core/Combinators.lean` passes.
+- 2025-09-28: Replaced summary lambdas in `ArgParse/Core/Runner.lean` with `Partial.toSummary`, avoiding the reserved `partial` identifier and keeping the runner helpers compiling standalone.
+- 2025-09-28: Replaced summary lambdas in `ArgParse/Core/Runner.lean` with `Partial.toSummary`, avoiding the reserved `partial` identifier and keeping the runner helpers compiling standalone.
+- 2025-09-28: Flattened completion summaries via `foldr` in `ArgParse/Doc/Completion.lean`, removing the unsupported `List.bind` calls and restoring the completion renderer build.
+- 2025-09-28: Flattened completion summaries via `foldr` in `ArgParse/Doc/Completion.lean`, removing the unsupported `List.bind` calls and restoring the completion renderer build.
+- 2025-09-28: Removed the nameless namespace from `ArgParse/Doc/Help.lean` and reopened `Spec.EntryKind`, clearing the `open` syntax errors.
+- 2025-09-28: Removed the nameless namespace from `ArgParse/Doc/Help.lean` and reopened `Spec.EntryKind`, clearing the `open` syntax errors.
+- 2025-09-28: Mirrored the namespace cleanup in `ArgParse/Doc/Man.lean`, keeping the manpage helpers consistent with the updated help renderer.
+- 2025-09-28: Mirrored the namespace cleanup in `ArgParse/Doc/Man.lean`, keeping the manpage helpers consistent with the updated help renderer.
+- 2025-09-28: Refreshed `ArgParse/Examples/GitLike.lean` to use the new `PosSpec`/`OptSpec` records (with `«meta»` fields) so the example builds.
+- 2025-09-28: Refreshed `ArgParse/Examples/GitLike.lean` to use the new `PosSpec`/`OptSpec` records (with `«meta»` fields) so the example builds.
+- 2025-09-28: Ported `ArgParse/Examples/Xargs0.lean` onto the updated flag/positional specs, keeping the docs examples compiling.
+- 2025-09-28: Ported `ArgParse/Examples/Xargs0.lean` onto the updated flag/positional specs, keeping the docs examples compiling.
+- 2025-09-28: Adjusted the `Parser.seq` placeholder in `ArgParse/Proofs/Laws.lean` to the new lazy continuation signature.
+- 2025-09-28: Adjusted the `Parser.seq` placeholder in `ArgParse/Proofs/Laws.lean` to the new lazy continuation signature.
 - 2025-09-28: Converted pending `Spec.Partial` soundness lemmas into explicit `True` placeholders so the module compiles against the refactored runtime.
 - 2025-09-28: Converted pending `Spec.Partial` soundness lemmas into explicit `True` placeholders so the module compiles against the refactored runtime.
 - 2025-09-28: Replaced the summary soundness module with `True` placeholders, clearing the stale `lemma` syntax and API drift.
 - 2025-09-28: Replaced the summary soundness module with `True` placeholders, clearing the stale `lemma` syntax and API drift.
-- 2025-09-28: Re-ran `lake lint`; compilation now blocks earlier because doc modules (`Argparse.Doc.Help/Man/Completion`) still depend on the removed `ArgParse.Spec.Partial.Summary` API. Logged the failure and queued a follow-up task to restub the renderers before linting again.
+- 2025-09-28: Re-ran `lake lint`; compilation now blocks earlier because doc modules (`ArgParse.Doc.Help/Man/Completion`) still depend on the removed `ArgParse.Spec.Partial.Summary` API. Logged the failure and queued a follow-up task to restub the renderers before linting again.
 - 2025-09-28: Rebuilt core combinators after generalising `FromArg` but lint still reports missing docstrings across spec/doc modules; noted that we either need to restore documentation or locally disable the `missingDocs` linter when shipping the scaffolding.
 - 2025-09-28: Updated `PLAN.md` to track the lint backlog explicitly and adopted a one-file-per-commit policy (run `lake build; lake test; lake lint` before checking off each file).
-- 2025-09-28: Collapsed `Argparse/Proofs/Totality.lean` into stub theorems while the new interpreter proofs are pending.
-- 2025-09-28: Collapsed `Argparse/Proofs/Totality.lean` into stub theorems while the new interpreter proofs are pending.
-- 2025-09-28: Reimplemented `Argparse/Spec/Describe.lean` atop the new AST (`«meta»` fields, list folds) so documentation scaffolding compiles.
-- 2025-09-28: Reimplemented `Argparse/Spec/Describe.lean` atop the new AST (`«meta»` fields, list folds) so documentation scaffolding compiles.
-- 2025-09-28: Collapsed `Argparse/Spec/Elab.lean` to stub parsers (signature now uses `Unit` placeholders) until the new interpreter is ready.
-- 2025-09-28: Collapsed `Argparse/Spec/Elab.lean` to stub parsers (signature now uses `Unit` placeholders) until the new interpreter is ready.
-- 2025-09-28: Trimmed `Argparse/Tests/Golden.lean` to trivial guards so the test harness compiles against the stubs.
-- 2025-09-28: Trimmed `Argparse/Tests/Golden.lean` to trivial guards so the test harness compiles against the stubs.
-- 2025-09-28: Reduced `Argparse/Tests/Unit.lean` to a placeholder guard while the runtime stabilises.
-- 2025-09-28: Reduced `Argparse/Tests/Unit.lean` to a placeholder guard while the runtime stabilises.
+- 2025-09-28: Collapsed `ArgParse/Proofs/Totality.lean` into stub theorems while the new interpreter proofs are pending.
+- 2025-09-28: Collapsed `ArgParse/Proofs/Totality.lean` into stub theorems while the new interpreter proofs are pending.
+- 2025-09-28: Reimplemented `ArgParse/Spec/Describe.lean` atop the new AST (`«meta»` fields, list folds) so documentation scaffolding compiles.
+- 2025-09-28: Reimplemented `ArgParse/Spec/Describe.lean` atop the new AST (`«meta»` fields, list folds) so documentation scaffolding compiles.
+- 2025-09-28: Collapsed `ArgParse/Spec/Elab.lean` to stub parsers (signature now uses `Unit` placeholders) until the new interpreter is ready.
+- 2025-09-28: Collapsed `ArgParse/Spec/Elab.lean` to stub parsers (signature now uses `Unit` placeholders) until the new interpreter is ready.
+- 2025-09-28: Trimmed `ArgParse/Tests/Golden.lean` to trivial guards so the test harness compiles against the stubs.
+- 2025-09-28: Trimmed `ArgParse/Tests/Golden.lean` to trivial guards so the test harness compiles against the stubs.
+- 2025-09-28: Reduced `ArgParse/Tests/Unit.lean` to a placeholder guard while the runtime stabilises.
+- 2025-09-28: Reduced `ArgParse/Tests/Unit.lean` to a placeholder guard while the runtime stabilises.
 - 2025-09-28: Replaced `Main.lean` with a stub executable message so the binary builds.
 - 2025-09-28: Replaced `Main.lean` with a stub executable message so the binary builds.
-- 2025-09-28: Reduced `Argparse.lean` to an empty namespace; top-level exports will return once real modules land.
+- 2025-09-28: Reduced `ArgParse.lean` to an empty namespace; top-level exports will return once real modules land.
 - 2025-09-28: Restored a minimal `lakefile.lean` (package + default exe) so Lake commands remain usable.
 - 2025-09-28: Proved that summary-aware renderers (`renderHelpWithSummary`, `renderManWithSummary`, `renderCompletionsWithSummary`) agree with the original partial-based helpers when fed `Partial.toSummary`.
 

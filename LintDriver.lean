@@ -6,7 +6,7 @@ open System Lean Std
 namespace LintDriver
 
 private def defaultEntries : List FilePath :=
-  ["Argparse.lean", "Argparse", "Main.lean", "Tests", "LintDriver.lean"].map FilePath.mk
+  ["ArgParse.lean", "ArgParse", "Main.lean", "Tests", "LintDriver.lean"].map FilePath.mk
 
 private def resolvePath (root entry : FilePath) : FilePath :=
   if entry.isAbsolute then entry else root / entry
