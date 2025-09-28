@@ -43,7 +43,7 @@
 The following files still emit lint warnings/errors. Process them strictly in order, fixing one file per branch commit before moving on:
 1. ✅ `Argparse/Core/Combinators.lean`
 2. ✅ `Argparse/Spec/AST.lean`
-3. `Argparse/Core/Runner.lean`
+3. ✅ `Argparse/Core/Runner.lean`
 4. `Argparse/Spec/Describe.lean`
 5. `Argparse/Doc/Help.lean`
 6. `Argparse/Doc/Man.lean`
@@ -62,6 +62,7 @@ The following files still emit lint warnings/errors. Process them strictly in or
 Record outcomes (successes, partial progress, or blockers) in the activity log after each file-specific commit, and run `lake build; lake test; lake lint` before declaring the file complete.
 
 ## Activity Log
+- 2025-09-28: Added constructor/field docstrings to `Argparse/Core/Runner.lean`, then ran `lake build; lake test; lake lint` to confirm.
 - 2025-09-28: Added field/constructor docstrings across `Argparse/Spec/AST.lean`, cleared its lint warnings, and re-ran `lake build; lake test; lake lint`.
 - 2025-09-28: Ran `lake env lean --root=.` against every project-controlled `.lean` file; catalogued individual compilation failures to stage a per-file fix backlog.
 - 2025-09-27: Re-read `SPEC.md`/`KNOWLEDGE.md`; prepared to align plan accordingly.

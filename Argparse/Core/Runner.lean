@@ -20,16 +20,23 @@ open ArgParse.CLI
 
 /-- Result of running an application parser. -/
 inductive RunResult (α : Type) where
+  /-- Successful parse returning the folded payload. -/
   | ok (payload : α)
+  /-- Built-in request for help text (`--help`). -/
   | help (text : String)
+  /-- Built-in request for manpage output (`--man`). -/
   | man (text : String)
+  /-- Built-in request for shell completions (`--generate-completions`). -/
   | completions (text : String)
+  /-- Parser failure packaged with the encountered error. -/
   | err (error : Error)
   deriving Repr, Inhabited
 
 /-- Outcome of invoking a runner, pairing the result with the remaining state. -/
 structure RunOutcome (α : Type) where
+  /-- Final result produced by the runner (success/help/man/etc.). -/
   result : RunResult α
+  /-- Parser state after execution (used for leftover token inspection). -/
   state  : State
   deriving Repr
 
