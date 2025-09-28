@@ -135,22 +135,23 @@
 - 2025-09-27: Updated the README payload summary section to point at the example helpers.
 - 2025-09-27: Added `Partial.Summary` soundness lemmas ensuring flag/option/positional folds agree with the underlying `Partial` accumulators.
 - 2025-09-27: Proved that summary-aware renderers (`renderHelpWithSummary`, `renderManWithSummary`, `renderCompletionsWithSummary`) agree with the original partial-based helpers when fed `Partial.toSummary`.
+- 2025-09-28: Attempted to fix `Argparse/Core/Combinators.lean`; blocked because the current `Argparse/Spec/AST.lean` source fails to compile, leaving stale `.olean` artifacts without the new `Short` fields. Reordered the build backlog so AST repairs come first.
 - 2025-09-28: Proved that summary-aware renderers (`renderHelpWithSummary`, `renderManWithSummary`, `renderCompletionsWithSummary`) agree with the original partial-based helpers when fed `Partial.toSummary`.
 
 ## Build Fix Backlog (2025-09-28)
-Order the following tasks sequentially; after addressing each file, rerun `lake env lean --root=.<file>` and commit before progressing.
-1. `Argparse/Core/Combinators.lean`: fails at line 42 with `Invalid field 'c'` on `Short`; unblock short-flag structure usage.
-2. `Argparse/Core/Runner.lean`: fails at line 83 due to the `partial` keyword in pattern matches; rephrase definitions without forbidden syntax.
-3. `Argparse/Doc/Completion.lean`: fails at line 23 because `List.bind` is referenced; reconcile list traversals with Lean’s standard combinators.
-4. `Argparse/Doc/Help.lean`: fails at line 14 (`unexpected token 'open'`); restore module header/import structure.
-5. `Argparse/Doc/Man.lean`: fails at line 14 with the same `open` parsing issue; mirror the Help fix.
-6. `Argparse/Examples/GitLike.lean`: fails at line 17 where `Short` record fields (`c`/`ok`) no longer exist; rebuild example specs using the current AST constructors.
-7. `Argparse/Examples/Xargs0.lean`: fails at line 18 with identical `Short` field errors; align with revised spec helpers.
-8. `Argparse/Proofs/Laws.lean`: fails at line 19 (`Parser.pure` sequencing expects lazy continuations); update proofs to the new combinator signatures.
-9. `Argparse/Proofs/Soundness.lean`: fails at line 21 (`unexpected identifier`); replace placeholder text with theorem statements aligned to the new runtime.
-10. `Argparse/Proofs/Soundness/Summary.lean`: fails at line 22 (`unexpected identifier`); restate summary theorems using the current summary types.
-11. `Argparse/Proofs/Totality.lean`: fails at line 24 (`unexpected identifier` plus stale helper names); reintroduce the totality lemma skeleton.
-12. `Argparse/Spec/AST.lean`: fails beginning at line 41 (structure/instance syntax and universe levels); rebuild the AST definitions per SPEC.
+Order the following tasks sequentially; after addressing each file, rerun `lake env lean --root=.<file>` and commit before progressing. Notes capture any blockers discovered while attempting earlier items.
+1. `Argparse/Spec/AST.lean`: fails beginning at line 41 (structure/instance syntax and universe levels); rebuild the AST definitions per SPEC. **Blocks**: downstream files referencing `Short.c` until this compiles.
+2. `Argparse/Core/Combinators.lean`: once `Short` is available, tackle line 42 `Invalid field 'c'` and tidy the remaining syntax/FromArg issues.
+3. `Argparse/Core/Runner.lean`: fails at line 83 due to the `partial` keyword in pattern matches; rephrase definitions without forbidden syntax.
+4. `Argparse/Doc/Completion.lean`: fails at line 23 because `List.bind` is referenced; reconcile list traversals with Lean’s standard combinators.
+5. `Argparse/Doc/Help.lean`: fails at line 14 (`unexpected token 'open'`); restore module header/import structure.
+6. `Argparse/Doc/Man.lean`: fails at line 14 with the same `open` parsing issue; mirror the Help fix.
+7. `Argparse/Examples/GitLike.lean`: fails at line 17 where `Short` record fields (`c`/`ok`) no longer exist; rebuild example specs using the current AST constructors.
+8. `Argparse/Examples/Xargs0.lean`: fails at line 18 with identical `Short` field errors; align with revised spec helpers.
+9. `Argparse/Proofs/Laws.lean`: fails at line 19 (`Parser.pure` sequencing expects lazy continuations); update proofs to the new combinator signatures.
+10. `Argparse/Proofs/Soundness.lean`: fails at line 21 (`unexpected identifier`); replace placeholder text with theorem statements aligned to the new runtime.
+11. `Argparse/Proofs/Soundness/Summary.lean`: fails at line 22 (`unexpected identifier`); restate summary theorems using the current summary types.
+12. `Argparse/Proofs/Totality.lean`: fails at line 24 (`unexpected identifier` plus stale helper names); reintroduce the totality lemma skeleton.
 13. `Argparse/Spec/Describe.lean`: fails at line 23 (`Inhabited` derivation and `entryOfMeta` usage); adapt describer to the new AST layout.
 14. `Argparse/Spec/Elab.lean`: fails at line 45 (unexpected identifier, stale recursion); refactor elaborator with current parser API.
 15. `Argparse/Tests/Golden.lean`: fails at line 34 (tuple syntax and missing example spec exports); update golden harness to new example modules.
