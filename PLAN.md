@@ -47,6 +47,8 @@
    - Prepare release notes summarizing parity with the old API plus new guarantees.
 
 ## Activity Log
+- 2025-09-30: Derived `LawfulFunctor`/`LawfulApplicative` instances for `Parser`, proving the required equalities (map/pure/seq, associativity) and noting that orientation mattered—resolved via the core `Parser.seq` lemma. Confirmed with `lake build; lake test; lake lint`.
+- 2025-09-30: Proved core parser Functor/Applicative/Alternative equalities (map_id/map_comp/map_const/seq_pure/pure_seq/seq_map_assoc) and recorded that right-identity for `orElse` fails because the fallback emits a canonical error. Verified with `lake build; lake test; lake lint` (no regressions).
 - 2025-09-29: Reviewed `SPEC.md` and `KNOWLEDGE.md`, audited the current stubs, and updated this plan to reflect the required rebuild plus restoration of the legacy `Main.lean` example. (Validated with `lake build; lake test; lake lint` to establish the pre-change baseline.)
 - 2025-09-28: Added docstrings for `ErrorKind`, `Expect`, and `Result` constructors in `Argparse/Core/Types.lean`; `lake build; lake test; lake lint` now passes with no outstanding lint warnings.
 - 2025-09-28: Re-ran `lake build; lake test; lake lint` to confirm `Argparse/CLI/Print.lean` exports are lint-clean; backlog now advances to `Argparse/Examples/Xargs0.lean`.

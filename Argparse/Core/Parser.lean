@@ -57,6 +57,13 @@ end Parser
 instance : Functor Parser where
   map := Parser.map
 
+instance : Applicative Parser where
+  map := Parser.map
+  pure := Parser.pure
+  seq := Parser.seq
+  seqLeft := Parser.seqLeft
+  seqRight := Parser.seqRight
+
 instance : Pure Parser where
   pure := Parser.pure
 
