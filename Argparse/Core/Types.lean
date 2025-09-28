@@ -21,20 +21,31 @@ deriving Repr, DecidableEq
 
 /-- Error categories surfaced by the parser. -/
 inductive ErrorKind where
+  /-- A short flag was not recognised. -/
   | unknownShort
+  /-- A long flag/option name was not recognised. -/
   | unknownLong
+  /-- An option or positional was missing a required value. -/
   | missingValue
+  /-- Tokens remained after parsing completed. -/
   | leftover
+  /-- Two mutually exclusive flags/options were provided together. -/
   | conflict
+  /-- Catch-all for domain-specific error reporting. -/
   | custom
 deriving Repr, DecidableEq
 
 /-- Expectations carried alongside errors for diagnostics. -/
 inductive Expect where
+  /-- Expect a boolean flag matching one of the provided names. -/
   | flag (short? : Option Char) (long? : Option String)
+  /-- Expect an option value identified by name. -/
   | optionVal (name : String)
+  /-- Expect a positional argument identified by name. -/
   | positional (name : String)
+  /-- Expect a particular subcommand token. -/
   | subcommand (name : String)
+  /-- Expect the end of input stream. -/
   | endOfInput
 deriving Repr, DecidableEq
 
@@ -50,7 +61,9 @@ deriving Repr, DecidableEq
 
 /-- Parser result: either a value with remaining state or a structured error. -/
 inductive Result (α : Type) where
+  /-- Successful parse carrying a value and remaining state. -/
   | ok  : α → State → Result α
+  /-- Failed parse carrying a structured error. -/
   | err : Error → Result α
 deriving Repr, DecidableEq
 
