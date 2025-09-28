@@ -81,6 +81,35 @@ def positionalValues (p : Partial) (name : String) : List String :=
   classical
   simp [positionalValues, addPositional, h.symm]
 
+/-! ### Summaries -/
+
+/-- Canonical summary of the collected payload, exposing query functions without
+leaking the internal storage order. -/
+structure Summary where
+  flagValue? : String → Option Bool
+  optionValues : String → List String
+  positionalValues : String → List String
+deriving Inhabited
+
+/-- Collapse a `Partial` into its queryable summary. -/
+@[simp] def toSummary (p : Partial) : Summary :=
+  { flagValue? := p.flagValue?
+  , optionValues := p.optionValues
+  , positionalValues := p.positionalValues }
+
+namespace Summary
+
+@[simp] lemma flagValue?_toSummary (p : Partial) (name : String) :
+    (toSummary p).flagValue? name = p.flagValue? name := rfl
+
+@[simp] lemma optionValues_toSummary (p : Partial) (name : String) :
+    (toSummary p).optionValues name = p.optionValues name := rfl
+
+@[simp] lemma positionalValues_toSummary (p : Partial) (name : String) :
+    (toSummary p).positionalValues name = p.positionalValues name := rfl
+
+end Summary
+
 end Partial
 
 /-- Result of elaborating a command, optionally paired with a selected subcommand. -/

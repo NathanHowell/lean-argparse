@@ -77,4 +77,14 @@ def run (app : AppSpec) (fold : Spec.Partial → α) (tokens : Tokens) : RunOutc
 @[inline] def runRaw (app : AppSpec) (tokens : Tokens) : RunOutcome Spec.Partial :=
   run app id tokens
 
+/-- Convenience alias returning the payload summary from a normalized state. -/
+@[inline] def runNormalizedSummary (app : AppSpec) (st : State) :
+    RunOutcome Spec.Partial.Summary :=
+  runNormalized app (fun partial => Partial.toSummary partial) st
+
+/-- Convenience alias returning the payload summary from raw tokens. -/
+@[inline] def runSummary (app : AppSpec) (tokens : Tokens) :
+    RunOutcome Spec.Partial.Summary :=
+  run app (fun partial => Partial.toSummary partial) tokens
+
 end ArgParse

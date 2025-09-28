@@ -183,6 +183,20 @@ private def toolApp : AppSpec :=
 )
 
 #guard (
+  match ArgParse.runSummary toolApp ["--verbose"] with
+  | { result := .ok summary, state := st } =>
+      summary.flagValue? "--verbose" = some true ∧ st.cursor = 1
+  | _ => False
+)
+
+#guard (
+  match ArgParse.runSummary toolApp ["--include", "a", "--include", "b"] with
+  | { result := .ok summary, state := st } =>
+      summary.optionValues "--include" = ["b", "a"] ∧ st.cursor = 4
+  | _ => False
+)
+
+#guard (
   let state := ArgParse.Core.normalize ["--help"]
   match ArgParse.runNormalizedRaw toolApp state with
   | { result := .help txt, state := st } =>
