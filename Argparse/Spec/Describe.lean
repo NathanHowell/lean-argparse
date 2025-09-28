@@ -10,15 +10,23 @@ namespace ArgParse.Spec
 
 /-- Simplified documentation entry produced from parts of the spec. -/
 inductive EntryKind
+  /-- Entry describing a command or subcommand. -/
   | command
+  /-- Entry describing a boolean flag. -/
   | flag
+  /-- Entry describing an option that accepts values. -/
   | option
+  /-- Entry describing a positional argument. -/
   | positional
 deriving Repr, DecidableEq, Inhabited
 
+/-- Documentation payload emitted for one spec element. -/
 structure DocEntry where
+  /-- Heading displayed for the entry (name or command title). -/
   heading : String
+  /-- Description lines associated with the entry. -/
   lines   : List String := []
+  /-- The classification of the entry (command/flag/option/positional). -/
   kind    : EntryKind := .command
 deriving Repr, Inhabited
 
