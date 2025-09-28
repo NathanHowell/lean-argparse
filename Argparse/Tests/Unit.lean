@@ -146,6 +146,29 @@ private def toolApp : AppSpec :=
   | _ => False
 )
 
+#guard (
+  let state := ArgParse.Core.normalize ["--help"]
+  match ArgParse.runNormalized toolApp state with
+  | { result := .help txt, state := st } =>
+      st = state ∧ txt = ArgParse.CLI.renderHelp toolApp
+  | _ => False
+)
+
+#guard (
+  match ArgParse.run toolApp ["--man"] with
+  | { result := .man txt, state := st } =>
+      st = ArgParse.Core.normalize ["--man"] ∧ txt = ArgParse.CLI.renderMan toolApp
+  | _ => False
+)
+
+#guard (
+  match ArgParse.run toolApp ["--generate-completions"] with
+  | { result := .completions txt, state := st } =>
+      st = ArgParse.Core.normalize ["--generate-completions"] ∧
+      txt = ArgParse.CLI.renderCompletions toolApp
+  | _ => False
+)
+
 end Runner
 
 end ArgParse.Tests

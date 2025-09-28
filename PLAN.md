@@ -82,6 +82,8 @@
 - 2025-09-27: Added runner wrappers (`Argparse/Core/Runner`) exposing `RunResult`/`RunOutcome` alongside `runNormalized`/`run` for spec-aligned execution.
 - 2025-09-27: Proved `runNormalized_ok_progress`, lifting the cursor-progress guarantees from `elaborateApp` through the runner convenience layer.
 - 2025-09-27: Extended unit tests with runner coverage, asserting successful flag parsing advances the cursor and preserves collected values.
+- 2025-09-27: Intercepted `--help`/`--man`/`--generate-completions` in the runner, returning the appropriate `RunResult` with zero-state change and documenting lemmas for the preservation behaviour.
+- 2025-09-27: Added regression tests for the built-ins to confirm the rendered output matches `CLI.Print` helpers and that runner state remains unchanged.
 - _Please append future successes and failures here with short rationales._
 
 ## Immediate Next Steps
@@ -115,5 +117,6 @@
 28. ✅ **Subcommand progress** (2025-09-27): Reworked `elaborateCommand` to recurse over cached child parsers, proved subcommand cursor bounds via the new `commandWeight` measure, and confirmed tests remain green.
 29. ✅ **Whole-app progress** (2025-09-27): Proved `elaborateApp_progress`, confirming the application-level parser preserves cursor deltas established by command progress.
 30. ✅ **Runner progress** (2025-09-27): Added runner wrappers plus `runNormalized_ok_progress`, ensuring cursor guarantees persist through the convenience API.
-31. **Runner built-ins**: Integrate `--help`/`--man`/`--generate-completions` handling into the runner (producing appropriate `RunResult` cases) and document any outstanding proof obligations about non-consuming paths.
-32. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
+31. ✅ **Runner built-ins** (2025-09-27): Hooked `--help`/`--man`/`--generate-completions` into `runNormalized`/`run`, proved the state-preservation lemmas, and backfilled tests.
+32. **Runner payload folding**: Introduce a user-facing hook to translate `Partial` into the final application payload (and update proofs/tests) so `RunResult.ok` carries the spec-derived value instead of raw partials.
+33. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.

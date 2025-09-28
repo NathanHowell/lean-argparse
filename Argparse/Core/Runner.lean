@@ -1,6 +1,7 @@
 import Argparse.Core.Normalize
 import Argparse.Core.Parser
 import Argparse.Spec.Elab
+import Argparse.CLI.Print
 
 /-!
 # ArgParse.Core.Runner
@@ -15,6 +16,7 @@ namespace ArgParse
 
 open ArgParse.Core
 open ArgParse.Spec
+open ArgParse.CLI
 
 /-- Result of running an application parser. -/
 inductive RunResult (α : Type) where
@@ -43,11 +45,25 @@ namespace RunOutcome
 
 end RunOutcome
 
+/-- Detect runner built-ins (`--help`, `--man`, `--generate-completions`). -/
+private def builtinOutcome? (app : AppSpec) (st : State) : Option (RunOutcome Partial) :=
+  match st.pre with
+  | "--help" :: _ =>
+      some { result := .help (renderHelp app), state := st }
+  | "--man" :: _ =>
+      some { result := .man (renderMan app), state := st }
+  | "--generate-completions" :: _ =>
+      some { result := .completions (renderCompletions app), state := st }
+  | _ => none
+
 /-- Run the elaborated parser against a normalized state. -/
 def runNormalized (app : AppSpec) (st : State) : RunOutcome Partial :=
-  match Spec.elaborateApp app st with
-  | .ok payload st' => RunOutcome.ok payload st'
-  | .err error => RunOutcome.err error st
+  match builtinOutcome? app st with
+  | some outcome => outcome
+  | none =>
+      match Spec.elaborateApp app st with
+      | .ok payload st' => RunOutcome.ok payload st'
+      | .err error => RunOutcome.err error st
 
 /-- Run the application parser against raw argv tokens. -/
 def run (app : AppSpec) (tokens : Tokens) : RunOutcome Partial :=

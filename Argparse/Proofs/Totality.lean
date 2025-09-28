@@ -1231,4 +1231,31 @@ lemma runNormalized_ok_progress
       exact elaborateApp_progress (app := app) (st := st) (st' := st0)
         (payload := payload0) hEval
 
+/-- Built-in `--help` responses leave the parser state unchanged. -/
+lemma runNormalized_help_preserves_state
+    (app : AppSpec) {st : State} {txt : String} :
+    ArgParse.runNormalized app st = { result := RunResult.help txt, state := st } →
+    (ArgParse.runNormalized app st).state = st := by
+  intro h
+  cases h
+  rfl
+
+/-- Built-in `--man` responses leave the parser state unchanged. -/
+lemma runNormalized_man_preserves_state
+    (app : AppSpec) {st : State} {txt : String} :
+    ArgParse.runNormalized app st = { result := RunResult.man txt, state := st } →
+    (ArgParse.runNormalized app st).state = st := by
+  intro h
+  cases h
+  rfl
+
+/-- Built-in completion responses leave the parser state unchanged. -/
+lemma runNormalized_completions_preserves_state
+    (app : AppSpec) {st : State} {txt : String} :
+    ArgParse.runNormalized app st = { result := RunResult.completions txt, state := st } →
+    (ArgParse.runNormalized app st).state = st := by
+  intro h
+  cases h
+  rfl
+
 end ArgParse.Proofs
