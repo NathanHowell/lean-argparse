@@ -78,6 +78,7 @@
 - 2025-09-27: Threaded the new option/positional progress lemmas through `Spec.Elab` interpreters (`interpretOption`/`interpretPositional`), confirming the builder transformers inherit cursor guarantees.
 - 2025-09-27: Proved progress for `elaborateItem`, `foldItems`, and `elaborateCommand`, establishing that builder-level sequencing preserves the cursor delta from primitive interpreters.
 - 2025-09-27: Introduced `Spec.CommandResult`, rewrote `elaborateCommand` to select subcommands via cached child parsers, and proved the accompanying progress lemma using a `commandWeight` induction measure.
+- 2025-09-27: Extended progress reasoning to `elaborateApp`, showing the application-level parser inherits the cursor bounds from its root command.
 - _Please append future successes and failures here with short rationales._
 
 ## Immediate Next Steps
@@ -109,5 +110,6 @@
 26. ✅ **Elaboration threading** (2025-09-27): Lifted the cursor lemmas to `interpretOption`/`interpretPositional`, so builder transformers mirror the primitive progress properties.
 27. ✅ **Command folding proofs** (2025-09-27): Extended progress lemmas to `elaborateItem`, `foldItems`, and `elaborateCommand`, so builder sequencing now carries explicit cursor deltas.
 28. ✅ **Subcommand progress** (2025-09-27): Reworked `elaborateCommand` to recurse over cached child parsers, proved subcommand cursor bounds via the new `commandWeight` measure, and confirmed tests remain green.
-29. **Whole-app progress**: Extend the progress reasoning to the application level (`elaborateApp` and eventual runner wrappers), then document any remaining blockers before moving on to soundness.
-30. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
+29. ✅ **Whole-app progress** (2025-09-27): Proved `elaborateApp_progress`, confirming the application-level parser preserves cursor deltas established by command progress.
+30. **Runner progress**: Lift the progress lemmas through the planned runner convenience wrappers (once implemented), documenting any open issues that block end-to-end soundness proofs.
+31. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.

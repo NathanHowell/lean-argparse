@@ -1194,4 +1194,23 @@ lemma elaborateCommand_progress
               simp [hCursorAfter, hItems, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] at hCursorChild'
               simpa [Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] using hCursorChild'
 
+/-- Elaborated applications inherit cursor progress from their root command. -/
+lemma elaborateApp_progress
+    (app : AppSpec) {st st' payload} :
+    Spec.elaborateApp app st = .ok payload st' →
+    ∃ consumed, st'.cursor = st.cursor + consumed := by
+  classical
+  intro h
+  unfold Spec.elaborateApp at h
+  cases hcmd : Spec.elaborateCommand app.root st with
+  | err err =>
+      simp [hcmd] at h
+  | ok result st1 =>
+      simp [hcmd] at h
+      rcases h with ⟨hpayload, hstate⟩
+      have ⟨c, hcursor⟩ := elaborateCommand_progress (cmd := app.root)
+        (st := st) (st' := st1) (payload := result) hcmd
+      refine ⟨c, ?_⟩
+      simpa [hstate] using hcursor
+
 end ArgParse.Proofs
