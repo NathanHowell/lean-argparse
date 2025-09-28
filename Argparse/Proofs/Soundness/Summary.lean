@@ -1,5 +1,8 @@
 import Argparse.Spec.Elab
 import Argparse.Proofs.Soundness
+import Argparse.Doc.Help
+import Argparse.Doc.Man
+import Argparse.Doc.Completion
 
 /-!
 # ArgParse.Proofs.Soundness.Summary
@@ -11,6 +14,7 @@ namespace ArgParse.Proofs
 
 open ArgParse
 open ArgParse.Spec
+open ArgParse.Doc
 open Classical
 
 namespace Partial.Summary
@@ -134,6 +138,24 @@ lemma runSummary_matches_raw
   set st := ArgParse.Core.normalize tokens
   have h := runNormalizedSummary_matches_raw (app := app) (st := st)
   simpa [ArgParse.runRaw, ArgParse.runSummary, st] using h
+
+/-- Rendering help with a summary derived from `Partial` matches the partial-based renderer. -/
+lemma renderHelpWithSummary_eq_partial
+    (spec : AppSpec) (p : Partial) :
+    renderHelpWithSummary spec (some (Partial.toSummary p)) =
+      renderHelpWith spec (some p) := rfl
+
+/-- Rendering manpages with a summary derived from `Partial` matches the partial-based renderer. -/
+lemma renderManWithSummary_eq_partial
+    (spec : AppSpec) (p : Partial) :
+    renderManWithSummary spec (some (Partial.toSummary p)) =
+      renderManWith spec (some p) := rfl
+
+/-- Rendering completions with a summary derived from `Partial` matches the partial-based renderer. -/
+lemma renderCompletionsWithSummary_eq_partial
+    (spec : AppSpec) (p : Partial) :
+    renderCompletionsWithSummary spec (some (Partial.toSummary p)) =
+      renderCompletionsWith spec (some p) := rfl
 
 end Partial.Summary
 

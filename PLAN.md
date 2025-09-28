@@ -133,3 +133,4 @@
 - 2025-09-27: Extended the GitLike/Xargs0 examples with sample summaries and summary-aware help/man/completion renderers.
 - 2025-09-27: Updated the README payload summary section to point at the example helpers.
 - 2025-09-27: Added `Partial.Summary` soundness lemmas ensuring flag/option/positional folds agree with the underlying `Partial` accumulators.
+- 2025-09-27: Proved that summary-aware renderers (`renderHelpWithSummary`, `renderManWithSummary`, `renderCompletionsWithSummary`) agree with the original partial-based helpers when fed `Partial.toSummary`.
