@@ -39,6 +39,28 @@
 9. **M8 – Polish & Docs**
    - Finalize docstrings, README, migration guidance, and ensure CI (`lake build; lake test; lake lint`) covers all milestones.
 
+## Lint Remediation Backlog (one-file increments)
+The following files still emit lint warnings/errors. Process them strictly in order, fixing one file per branch commit before moving on:
+1. `Argparse/Core/Combinators.lean`
+2. `Argparse/Spec/AST.lean`
+3. `Argparse/Core/Runner.lean`
+4. `Argparse/Spec/Describe.lean`
+5. `Argparse/Doc/Help.lean`
+6. `Argparse/Doc/Man.lean`
+7. `Argparse/Doc/Completion.lean`
+8. `Argparse/Spec/Elab.lean`
+9. `Argparse/Proofs/Soundness.lean`
+10. `Argparse/Proofs/Soundness/Summary.lean`
+11. `Argparse/Proofs/Totality.lean`
+12. `Argparse/Proofs/Determinism.lean`
+13. `Argparse/CLI/Print.lean`
+14. `Argparse/Examples/Xargs0.lean`
+15. `Argparse/Examples/GitLike.lean`
+16. `Argparse/Tests/Unit.lean`
+17. `Argparse/Tests/Golden.lean`
+
+Record outcomes (successes, partial progress, or blockers) in the activity log after each file-specific commit, and run `lake build; lake test; lake lint` before declaring the file complete.
+
 ## Activity Log
 - 2025-09-28: Ran `lake env lean --root=.` against every project-controlled `.lean` file; catalogued individual compilation failures to stage a per-file fix backlog.
 - 2025-09-27: Re-read `SPEC.md`/`KNOWLEDGE.md`; prepared to align plan accordingly.
@@ -158,6 +180,9 @@
 - 2025-09-28: Converted pending `Spec.Partial` soundness lemmas into explicit `True` placeholders so the module compiles against the refactored runtime.
 - 2025-09-28: Replaced the summary soundness module with `True` placeholders, clearing the stale `lemma` syntax and API drift.
 - 2025-09-28: Replaced the summary soundness module with `True` placeholders, clearing the stale `lemma` syntax and API drift.
+- 2025-09-28: Re-ran `lake lint`; compilation now blocks earlier because doc modules (`Argparse.Doc.Help/Man/Completion`) still depend on the removed `ArgParse.Spec.Partial.Summary` API. Logged the failure and queued a follow-up task to restub the renderers before linting again.
+- 2025-09-28: Rebuilt core combinators after generalising `FromArg` but lint still reports missing docstrings across spec/doc modules; noted that we either need to restore documentation or locally disable the `missingDocs` linter when shipping the scaffolding.
+- 2025-09-28: Updated `PLAN.md` to track the lint backlog explicitly and adopted a one-file-per-commit policy (run `lake build; lake test; lake lint` before checking off each file).
 - 2025-09-28: Collapsed `Argparse/Proofs/Totality.lean` into stub theorems while the new interpreter proofs are pending.
 - 2025-09-28: Collapsed `Argparse/Proofs/Totality.lean` into stub theorems while the new interpreter proofs are pending.
 - 2025-09-28: Reimplemented `Argparse/Spec/Describe.lean` atop the new AST (`«meta»` fields, list folds) so documentation scaffolding compiles.
