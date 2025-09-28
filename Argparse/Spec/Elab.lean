@@ -42,6 +42,45 @@ def optionValues (p : Partial) (name : String) : List String :=
 def positionalValues (p : Partial) (name : String) : List String :=
   p.positionals.filterMap (fun entry => if entry.fst = name then some entry.snd else none)
 
+@[simp] lemma flagValue?_addFlag_self
+    (p : Partial) (name : String) (value : Bool) :
+    flagValue? (addFlag name value p) name = some value := by
+  simp [flagValue?, addFlag]
+
+@[simp] lemma flagValue?_addFlag_of_ne
+    (p : Partial) {name name' : String} (value : Bool)
+    (h : name' ≠ name) :
+    flagValue? (addFlag name value p) name' = flagValue? p name' := by
+  simp [flagValue?, addFlag, h.symm]
+
+@[simp] lemma optionValues_addOption_self
+    (p : Partial) (name value : String) :
+    optionValues (addOption name value p) name = value :: optionValues p name := by
+  classical
+  simp [optionValues, addOption]
+
+@[simp] lemma optionValues_addOption_of_ne
+    (p : Partial) {name name' value : String}
+    (h : name' ≠ name) :
+    optionValues (addOption name value p) name' = optionValues p name' := by
+  classical
+  simp [optionValues, addOption, h.symm]
+
+@[simp] lemma positionalValues_addPositional_self
+    (p : Partial) (name value : String) :
+    positionalValues (addPositional name value p) name =
+      value :: positionalValues p name := by
+  classical
+  simp [positionalValues, addPositional]
+
+@[simp] lemma positionalValues_addPositional_of_ne
+    (p : Partial) {name name' value : String}
+    (h : name' ≠ name) :
+    positionalValues (addPositional name value p) name' =
+      positionalValues p name' := by
+  classical
+  simp [positionalValues, addPositional, h.symm]
+
 end Partial
 
 /-- Result of elaborating a command, optionally paired with a selected subcommand. -/

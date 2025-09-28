@@ -120,5 +120,8 @@
 30. ✅ **Runner progress** (2025-09-27): Added runner wrappers plus `runNormalized_ok_progress`, ensuring cursor guarantees persist through the convenience API.
 31. ✅ **Runner built-ins** (2025-09-27): Hooked `--help`/`--man`/`--generate-completions` into `runNormalized`/`run`, proved the state-preservation lemmas, and backfilled tests.
 32. ✅ **Runner payload folding** (2025-09-27): Generalised `runNormalized`/`run` to accept a folding function, exposed raw aliases, refreshed progress lemmas, and added regression tests for folded payloads.
-33. **Payload soundness**: Specify and prove properties for common folds (e.g., uniqueness of flag entries, deterministic option ordering) so downstream runners can rely on structured invariants.
+33. ✅ **Payload soundness** (2025-09-27): Added `Partial` helper lemmas for last-write-wins flags and deterministic option/positional accumulation, proved fold-level invariants, and extended unit tests to cover the behaviour.
 34. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
+- 2025-09-27: Added `Partial` helper lemmas (`flagValue?_addFlag_*`, `optionValues_addOption_*`, `positionalValues_addPositional_*`) capturing last-write-wins semantics and deterministic accumulation.
+- 2025-09-27: Proved fold-level payload soundness lemmas in `Argparse/Proofs/Soundness.lean` and noted the reverse-order invariants for option/positional collectors.
+- 2025-09-27: Extended unit tests with `#guard` checks covering repeated flags, option accumulation order, and positional aggregation.

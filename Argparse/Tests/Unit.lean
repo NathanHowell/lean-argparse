@@ -112,6 +112,42 @@ private def samplePartial : Spec.Partial :=
 #guard (ArgParse.CLI.renderHelpWith GitLike.spec (some samplePartial) |>.contains "git-like")
 #guard (ArgParse.CLI.renderManWith GitLike.spec (some samplePartial) |>.contains "git-like")
 
+#guard (
+  let partial := Partial.empty
+    |> Partial.addFlag "--verbose" false
+    |> Partial.addFlag "--verbose" true
+  Partial.flagValue? partial "--verbose" = some true
+)
+
+#guard (
+  let partial := Partial.empty
+    |> Partial.addFlag "--verbose" false
+    |> Partial.addFlag "--quiet" true
+  Partial.flagValue? partial "--quiet" = some true ∧
+  Partial.flagValue? partial "--verbose" = some false
+)
+
+#guard (
+  let partial := Partial.empty
+    |> Partial.addOption "include" "a"
+    |> Partial.addOption "include" "b"
+  Partial.optionValues partial "include" = ["b", "a"]
+)
+
+#guard (
+  let partial := ["a", "b", "c"].foldl
+      (fun acc value => Partial.addOption "include" value acc)
+      Partial.empty
+  Partial.optionValues partial "include" = ["c", "b", "a"]
+)
+
+#guard (
+  let partial := ["first", "second"].foldl
+      (fun acc value => Partial.addPositional "ITEM" value acc)
+      Partial.empty
+  Partial.positionalValues partial "ITEM" = ["second", "first"]
+)
+
 end Basics
 
 namespace Runner
