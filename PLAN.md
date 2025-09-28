@@ -54,10 +54,11 @@ The following files still emit lint warnings/errors. Process them strictly in or
 11. ✅ `Argparse/Proofs/Totality.lean`
 12. ✅ `Argparse/Proofs/Determinism.lean`
 13. ✅ `Argparse/CLI/Print.lean`
-14. `Argparse/Examples/Xargs0.lean`
-15. `Argparse/Examples/GitLike.lean`
-16. `Argparse/Tests/Unit.lean`
-17. `Argparse/Tests/Golden.lean`
+14. ✅ `Argparse/Examples/Xargs0.lean`
+15. ✅ `Argparse/Examples/GitLike.lean`
+16. ✅ `Argparse/Tests/Unit.lean`
+17. ✅ `Argparse/Tests/Golden.lean`
+18. `Argparse/Core/Types.lean`
 12. ✅ `Argparse/Proofs/Determinism.lean`
 13. ✅ `Argparse/CLI/Print.lean`
 14. `Argparse/Examples/Xargs0.lean`
@@ -67,6 +68,7 @@ The following files still emit lint warnings/errors. Process them strictly in or
 
 Record outcomes (successes, partial progress, or blockers) in the activity log after each file-specific commit, and run `lake build; lake test; lake lint` before declaring the file complete.
 
+- 2025-09-28: Re-ran `lake build; lake test; lake lint` to confirm `Argparse/Examples/Xargs0.lean`, `Examples/GitLike.lean`, and the test suites are already lint-clean; backlog trimmed to focus on `Argparse/Core/Types.lean`.
 - 2025-09-28: Re-ran `lake build; lake test; lake lint` to confirm `Argparse/CLI/Print.lean` exports are lint-clean; backlog now advances to `Argparse/Examples/Xargs0.lean`.
 - 2025-09-28: Re-ran `lake build; lake test; lake lint` to confirm `Argparse/Proofs/Determinism.lean` has no lint warnings; backlog now advances to `Argparse/CLI/Print.lean`.
 - 2025-09-28: Re-ran `lake build; lake test; lake lint` to confirm `Argparse/Proofs/Totality.lean` is lint-clean; backlog now moves to `Argparse/Proofs/Determinism.lean`.
