@@ -1,4 +1,4 @@
-import Argparse.Core.Types
+import ArgParse.Core.Types
 
 /-!
 # ArgParse.Core.Parser

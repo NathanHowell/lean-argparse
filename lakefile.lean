@@ -4,7 +4,7 @@ open Lake DSL System
 package «argparse» where
   version := v!"0.1.0"
 
-lean_lib Argparse
+lean_lib ArgParse
 
 @[default_target]
 lean_exe «argparse» where

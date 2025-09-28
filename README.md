@@ -18,9 +18,9 @@
 The executable bundled with the project demonstrates a small CLI.
 
 ```lean
-import Argparse
+import ArgParse
 
-open Argparse
+open ArgParse
 
 structure Config where
   verbose : Bool
@@ -48,21 +48,21 @@ def info : ParserInfo Config :=
   ]
 
 def main (args : List String) : IO Unit :=
-  match Argparse.ParserInfo.exec info args with
+  match ArgParse.ParserInfo.exec info args with
   | .success cfg => IO.println s!"Hello, {cfg.name}! (count := {cfg.count}, verbose := {cfg.verbose})"
-  | .showHelp => IO.println (Argparse.ParserInfo.renderHelp info)
+  | .showHelp => IO.println (ArgParse.ParserInfo.renderHelp info)
   | .failure err => do
-      IO.eprintln (Argparse.ParserInfo.renderFailure info err)
+      IO.eprintln (ArgParse.ParserInfo.renderFailure info err)
       IO.Process.exit 1
 
 def bashCompletionScript : String :=
-  Argparse.ParserInfo.renderBashCompletion info
+  ArgParse.ParserInfo.renderBashCompletion info
 
 def zshCompletionScript : String :=
-  Argparse.ParserInfo.renderZshCompletion info
+  ArgParse.ParserInfo.renderZshCompletion info
 
 def fishCompletionScript : String :=
-  Argparse.ParserInfo.renderFishCompletion info
+  ArgParse.ParserInfo.renderFishCompletion info
 ```
 
 Running the compiled executable yields:
@@ -119,7 +119,7 @@ The lint driver re-elaborates every module to ensure public declarations carry d
 - Generate HTML documentation (after running `lake update doc-gen4` once inside `docbuild/`):
   ```sh
   cd docbuild
-  DOCGEN_SRC=file lake build Argparse:docs
+  DOCGEN_SRC=file lake build ArgParse:docs
   ```
 
 ## Shell Completions
@@ -127,9 +127,9 @@ The lint driver re-elaborates every module to ensure public declarations carry d
 Use the renderer that matches your shell to produce a completion script:
 
 ```lean
-#eval IO.println (Argparse.ParserInfo.renderBashCompletion info)
-#eval IO.println (Argparse.ParserInfo.renderZshCompletion info)
-#eval IO.println (Argparse.ParserInfo.renderFishCompletion info)
+#eval IO.println (ArgParse.ParserInfo.renderBashCompletion info)
+#eval IO.println (ArgParse.ParserInfo.renderZshCompletion info)
+#eval IO.println (ArgParse.ParserInfo.renderFishCompletion info)
 ```
 
 Redirect the output to a file and source it (or copy it into the appropriate completion directory) to enable tab completion for options and subcommands.
@@ -139,10 +139,10 @@ Redirect the output to a file and source it (or copy it into the appropriate com
 Generate a basic troff man page directly from your parser metadata:
 
 ```lean
-#eval IO.println (Argparse.ParserInfo.renderManpage info)
+#eval IO.println (ArgParse.ParserInfo.renderManpage info)
 
 -- With simple metadata overrides:
-#eval IO.println (Argparse.ParserInfo.renderManpage info { sectionName := "1", manual? := some "Lean Tools" })
+#eval IO.println (ArgParse.ParserInfo.renderManpage info { sectionName := "1", manual? := some "Lean Tools" })
 ```
 
 Pipe the output into `man -l` or write it to disk for installation alongside your executable.

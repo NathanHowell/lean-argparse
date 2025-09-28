@@ -1,7 +1,7 @@
-import Argparse.Core.Normalize
-import Argparse.Core.Parser
-import Argparse.Spec.Elab
-import Argparse.CLI.Print
+import ArgParse.Core.Normalize
+import ArgParse.Core.Parser
+import ArgParse.Spec.Elab
+import ArgParse.CLI.Print
 
 /-!
 # ArgParse.Core.Runner

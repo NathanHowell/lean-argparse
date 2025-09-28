@@ -1,8 +1,8 @@
-import Argparse.Spec.Elab
-import Argparse.Proofs.Soundness
-import Argparse.Doc.Help
-import Argparse.Doc.Man
-import Argparse.Doc.Completion
+import ArgParse.Spec.Elab
+import ArgParse.Proofs.Soundness
+import ArgParse.Doc.Help
+import ArgParse.Doc.Man
+import ArgParse.Doc.Completion
 
 /-!
 # ArgParse.Proofs.Soundness.Summary

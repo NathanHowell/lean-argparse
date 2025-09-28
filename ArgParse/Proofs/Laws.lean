@@ -1,10 +1,10 @@
-import Argparse.Core.Parser
+import ArgParse.Core.Parser
 
 /-!
 # ArgParse.Proofs.Laws
 
 Foundational Functor, Applicative, and Alternative laws for the core `Parser`.
-The statements follow the operations defined in `Argparse.Core.Parser` and are
+The statements follow the operations defined in `ArgParse.Core.Parser` and are
 expressed as definitional equalities of parser functions.
 -/
 

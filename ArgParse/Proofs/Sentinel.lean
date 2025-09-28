@@ -1,4 +1,4 @@
-import Argparse.Core.Normalize
+import ArgParse.Core.Normalize
 
 /-!
 # ArgParse.Proofs.Sentinel

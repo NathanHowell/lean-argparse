@@ -1,7 +1,7 @@
-import Argparse.Core.Parser
-import Argparse.Core.Value
-import Argparse.Core.Normalize
-import Argparse.Spec.AST
+import ArgParse.Core.Parser
+import ArgParse.Core.Value
+import ArgParse.Core.Normalize
+import ArgParse.Spec.AST
 
 /-!
 # ArgParse.Core.Combinators

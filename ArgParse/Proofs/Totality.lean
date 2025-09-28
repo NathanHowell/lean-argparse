@@ -1,6 +1,6 @@
-import Argparse.Core.Parser
-import Argparse.Core.Runner
-import Argparse.Spec.Elab
+import ArgParse.Core.Parser
+import ArgParse.Core.Runner
+import ArgParse.Spec.Elab
 
 /-!
 # ArgParse.Proofs.Totality

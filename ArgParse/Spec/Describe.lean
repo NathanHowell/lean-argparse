@@ -1,4 +1,4 @@
-import Argparse.Spec.AST
+import ArgParse.Spec.AST
 
 /-!
 # ArgParse.Spec.Describe

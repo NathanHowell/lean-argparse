@@ -1,5 +1,5 @@
-import Argparse.Core.Parser
-import Argparse.Spec.AST
+import ArgParse.Core.Parser
+import ArgParse.Spec.AST
 
 namespace ArgParse.Spec
 

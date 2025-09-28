@@ -1,5 +1,5 @@
-import Argparse.Spec.Describe
-import Argparse.Spec.Elab
+import ArgParse.Spec.Describe
+import ArgParse.Spec.Elab
 
 /-!
 # ArgParse.Doc.Man

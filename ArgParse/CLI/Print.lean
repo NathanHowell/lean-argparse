@@ -1,6 +1,6 @@
-import Argparse.Doc.Help
-import Argparse.Doc.Man
-import Argparse.Doc.Completion
+import ArgParse.Doc.Help
+import ArgParse.Doc.Man
+import ArgParse.Doc.Completion
 
 /-!
 # ArgParse.CLI.Print

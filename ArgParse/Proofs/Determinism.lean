@@ -1,4 +1,4 @@
-import Argparse.Core.Parser
+import ArgParse.Core.Parser
 
 /-!
 # ArgParse.Proofs.Determinism
