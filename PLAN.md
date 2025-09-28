@@ -7,39 +7,47 @@
 - Reuse Lean standard type classes (`Functor`, `Applicative`, `Alternative`, etc.) and keep implementations private when possible.
 
 ## Snapshot & Gap Analysis
-- Repository currently contains a bespoke "native" parser whose structure diverges from the spec (no unified AST, no Doc/Proof trees, limited module separation).
-- Core types (`State`, `Result`, `Error`, `Expect`) do not match the spec’s definitions; normalization and parser semantics need to be rebuilt around the spec’s two-list token split with a flattened cursor.
-- Module tree does not reflect the desired layout under `ArgParse/Core`, `Spec`, `Doc`, `Proofs`, `CLI`, `Examples`, and `Tests`.
-- Documentation/help/completion generators, proof skeletons, and milestone tests described in the spec are absent.
+- Module names roughly mirror the `SPEC.md` layout, but nearly every file is a stub (many definitions return `Unit`, `True`, or trivial strings). No meaningful parser, docs, or proofs exist today.
+- `Core` types and combinators do not implement the spec’s semantics (no token normalization, no cursor tracking, no Applicative instances beyond placeholders).
+- `Spec` AST and elaboration are skeletal: constructors exist but do not build real parsers or documentation artefacts.
+- `Doc` modules emit placeholder text; `Proofs` modules contain `True` stand-ins; `Tests` only run guard stubs; `Main.lean` prints a placeholder message.
+- The legacy applicative example in the original repository (`Main.lean` from https://github.com/NathanHowell/lean-argparse/blob/master/Main.lean) has been wiped; we must reintroduce it (or an updated equivalent) after rebuilding the core library.
 
-## High-Level Roadmap (mirrors SPEC milestones)
-1. **M0 – Scaffolding**
-   - Create the module hierarchy under `ArgParse/` as listed in the spec.
-   - Stub key files with module headers, docstrings, and TODO notes.
-2. **M1 – Core Runtime**
-   - Implement `Tokens`, `State`, `Result`, `Error`, `Expect`, `ErrorKind`, and the `Parser` type with `Functor`/`Applicative`/`Alternative` instances.
-   - Provide initial proofs: Functor/Applicative laws (record under `Proofs/Laws.lean`).
+## High-Level Roadmap (aligned with SPEC.md + legacy example)
+1. **M0 – Reestablish Scaffolding**
+   - Keep the existing module tree but replace stubs with the minimal data/type definitions from `SPEC.md`.
+   - Ensure every file has accurate module-level docstrings and imports; remove placeholder `True`/`Unit` exports during implementation.
+2. **M1 – Core Runtime Types**
+   - Implement `Tokens`, `State`, `Result`, `Error`, `Expect`, `ErrorKind`, and the `Parser` type (pure functions) with working `Functor`/`Applicative`/`Alternative` instances.
+   - Start `Proofs/Laws.lean` with Functor/Applicative/Alternative laws for the real implementations.
 3. **M2 – Normalization & Sentinel**
-   - Implement `ArgParse.Core.Normalize.normalize` splitting on `--` and populating `State`.
-   - Prove sentinel lemmas (`post_is_positional`, `stability`).
-4. **M3 – Value Parsing & Spec AST**
-   - Define `FromArg` class plus core instances in `Core/Value.lean`.
-   - Introduce the Spec AST in `Spec/AST.lean` and ensure it can express flags/options/positionals/subcommands.
-5. **M4 – Parser Elaboration**
-   - Build applicative combinators and an elaborator (`Spec/Elab.lean`) producing `Parser` from the AST.
-   - Implement runtime combinators in `Core/Combinators.lean` with correctness proofs in `Proofs/Soundness.lean`.
-6. **M5 – Docs & Tooling**
-   - Implement help/man/completion emitters and align them with the AST.
-   - Ensure `CLI/Print.lean` provides the built-ins (`--help`, `--man`, `--generate-completions`).
+   - Implement `Core/Normalize.normalize` with the pre/post split and cursor tracking.
+   - Add and prove sentinel theorems in `Proofs/Sentinel.lean` covering post-only consumption and stability w.r.t. `--` placement.
+4. **M3 – Values & Spec AST**
+   - Define `FromArg` and core instances in `Core/Value.lean` (String/Nat/Int/Bool/Enum helpers).
+   - Implement the declarative spec tree in `Spec/AST.lean`, matching field names (`«meta»`, arities, etc.) from the spec.
+5. **M4 – Runtime Combinators & Elaboration**
+   - Rebuild `Core/Combinators.lean` with structural parsers for flags/options/positionals/subcommands.
+   - Implement `Spec/Elab.lean` to elaborate the AST into `Parser` values using applicative composition.
+   - Provide progress/soundness lemmas in `Proofs/Totality.lean` and `Proofs/Soundness.lean` for the rebuilt combinators.
+6. **M5 – Docs & Built-ins**
+   - Implement `Doc/Help.lean`, `Doc/Man.lean`, and `Doc/Completion.lean` to render artifacts directly from the AST metadata.
+   - Implement `CLI/Print.lean` and a rebuilt `Core/Runner.lean` supporting built-ins (`--help`, `--man`, `--generate-completions`).
 7. **M6 – Proof Suite Expansion**
-   - Add determinism, totality, and soundness proofs using the spec’s structure.
+   - Populate `Proofs/Determinism.lean` and extend totality/soundness proofs to the doc/runner layers.
+   - Provide lawfulness proofs for Spec elaboration (Functor/Applicative) in `Proofs/Laws.lean`.
 8. **M7 – Testing & Examples**
-   - Populate `Tests/Unit.lean`, `Tests/Golden.lean`, and example apps (`Examples/Xargs0.lean`, `Examples/GitLike.lean`).
-   - Maintain property tests for option permutations, sentinel handling, and positional overflow.
-9. **M8 – Polish & Docs**
-   - Finalize docstrings, README, migration guidance, and ensure CI (`lake build; lake test; lake lint`) covers all milestones.
+   - Replace stub tests with unit/property/golden tests covering normalization, combinators, docs, runner, and CLI behavior.
+   - Reintroduce `Examples/Xargs0.lean` and `Examples/GitLike.lean` using the rebuilt API.
+9. **M8 – Legacy Example Restoration**
+   - Port the historic `Main.lean` example (greet/repeat app with completions) onto the new API, ensuring feature parity with the version at `master/Main.lean`.
+   - Add regression tests verifying the example’s behavior (parsing, built-ins, completions) and document migration notes.
+10. **M9 – Polish & Documentation**
+   - Finalize docstrings, README, and migration guidance; ensure `lake build; lake test; lake lint` remain green across the tree.
+   - Prepare release notes summarizing parity with the old API plus new guarantees.
 
 ## Activity Log
+- 2025-09-29: Reviewed `SPEC.md` and `KNOWLEDGE.md`, audited the current stubs, and updated this plan to reflect the required rebuild plus restoration of the legacy `Main.lean` example. (Validated with `lake build; lake test; lake lint` to establish the pre-change baseline.)
 - 2025-09-28: Added docstrings for `ErrorKind`, `Expect`, and `Result` constructors in `Argparse/Core/Types.lean`; `lake build; lake test; lake lint` now passes with no outstanding lint warnings.
 - 2025-09-28: Re-ran `lake build; lake test; lake lint` to confirm `Argparse/CLI/Print.lean` exports are lint-clean; backlog now advances to `Argparse/Examples/Xargs0.lean`.
 - 2025-09-28: Re-ran `lake build; lake test; lake lint` to confirm `Argparse/Proofs/Determinism.lean` has no lint warnings; backlog now advances to `Argparse/CLI/Print.lean`.
