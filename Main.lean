@@ -1,10 +1,3 @@
-import Argparse
-import Argparse.CLI.Print
-import Argparse.Examples.GitLike
-
-open ArgParse.CLI
-open ArgParse.Examples
-
-/-- Temporary executable: emit help text for the git-like example. -/
+/-- Temporary executable while the CLI stabilises. -/
 def main : IO Unit := do
-  IO.println (renderHelp GitLike.spec)
+  IO.println "argparse stubs ready"
