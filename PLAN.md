@@ -128,3 +128,5 @@
 - 2025-09-27: Extended unit tests with `#guard` checks covering repeated flags, option accumulation order, and positional aggregation.
 - 2025-09-27: Added `Partial.Summary` plus trivial bridge lemmas tying it back to the existing query helpers.
 - 2025-09-27: Introduced runner summary helpers (`runSummary`, `runNormalizedSummary`) and unit guards covering summary flag/option behaviour.
+- 2025-09-27: Threaded `Partial.Summary` through help/man/completion renderers and CLI wrappers, adding unit guards to verify summary-driven output.
+- 2025-09-27: Documented the summary-based workflow in `README.md`, highlighting `runSummary` and the new CLI render helpers.

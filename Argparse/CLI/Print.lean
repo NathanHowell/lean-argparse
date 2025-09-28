@@ -18,6 +18,11 @@ open ArgParse.Spec
 def renderHelpWith (spec : Spec.AppSpec) (partial? : Option Spec.Partial := none) : String :=
   Doc.renderHelpWith spec partial?
 
+/-- Render `--help` output using a payload summary. -/
+def renderHelpWithSummary (spec : Spec.AppSpec)
+    (summary? : Option Spec.Partial.Summary := none) : String :=
+  Doc.renderHelpWithSummary spec summary?
+
 /-- Render `--help` without runtime annotations. -/
 def renderHelp (spec : Spec.AppSpec) : String :=
   renderHelpWith spec none
@@ -26,6 +31,11 @@ def renderHelp (spec : Spec.AppSpec) : String :=
 def renderManWith (spec : Spec.AppSpec) (partial? : Option Spec.Partial := none) : String :=
   Doc.renderManWith spec partial?
 
+/-- Render `--man` output using a payload summary. -/
+def renderManWithSummary (spec : Spec.AppSpec)
+    (summary? : Option Spec.Partial.Summary := none) : String :=
+  Doc.renderManWithSummary spec summary?
+
 /-- Render `--man` without runtime annotations. -/
 def renderMan (spec : Spec.AppSpec) : String :=
   renderManWith spec none
@@ -33,6 +43,11 @@ def renderMan (spec : Spec.AppSpec) : String :=
 /-- Render completion script output, optionally including runtime data. -/
 def renderCompletionsWith (spec : Spec.AppSpec) (partial? : Option Spec.Partial := none) : String :=
   Doc.renderCompletionWith spec partial?
+
+/-- Render completion script output using a payload summary. -/
+def renderCompletionsWithSummary (spec : Spec.AppSpec)
+    (summary? : Option Spec.Partial.Summary := none) : String :=
+  Doc.renderCompletionWithSummary spec summary?
 
 /-- Render completion output without runtime annotations. -/
 def renderCompletions (spec : Spec.AppSpec) : String :=

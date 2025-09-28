@@ -83,6 +83,16 @@ Usage: lean-argparse [--verbose] [--count COUNT] NAME
 ...
 ```
 
+## Payload summaries
+
+The low-level runner now exposes `runSummary`/`runNormalizedSummary`, which fold the
+raw `Partial` accumulator into a `Partial.Summary`. This grouped view retains the
+last-seen flag values and the latest-first lists for options and positionals, while
+remaining stable under future refactors. Summary-aware helpers are available across
+the CLI modules (`renderHelpWithSummary`, `renderManWithSummary`,
+`renderCompletionsWithSummary`), so downstream tools can surface the same runtime
+state without manipulating the internal lists directly.
+
 ## Development
 
 - Build the library and example executable:

@@ -83,30 +83,81 @@ def positionalValues (p : Partial) (name : String) : List String :=
 
 /-! ### Summaries -/
 
-/-- Canonical summary of the collected payload, exposing query functions without
-leaking the internal storage order. -/
-structure Summary where
-  flagValue? : String → Option Bool
-  optionValues : String → List String
-  positionalValues : String → List String
-deriving Inhabited
+private def replaceAssoc {β} : List (String × β) → String → β → List (String × β)
+  | [], name, value => [(name, value)]
+  | entry :: rest, name, value =>
+      if entry.fst = name then
+        (name, value) :: rest
+      else
+        entry :: replaceAssoc rest name value
 
-/-- Collapse a `Partial` into its queryable summary. -/
+private def consAssoc {β} : List (String × List β) → String → β → List (String × List β)
+  | [], name, value => [(name, [value])]
+  | entry :: rest, name, value =>
+      if entry.fst = name then
+        (name, value :: entry.snd) :: rest
+      else
+        entry :: consAssoc rest name value
+
+/-- Canonical summary of the collected payload, storing grouped values. -/
+structure Summary where
+  flags : List (String × Bool)
+  options : List (String × List String)
+  positionals : List (String × List String)
+deriving Repr, Inhabited
+
+namespace Summary
+
+/-- Look up the last-seen flag value. -/
+def flagValue? (summary : Summary) (name : String) : Option Bool :=
+  (summary.flags.find? (fun entry => entry.fst = name)).map (·.snd)
+
+/-- Fetch the collected option values (latest first). -/
+def optionValues (summary : Summary) (name : String) : List String :=
+  match summary.options.find? (fun entry => entry.fst = name) with
+  | some entry => entry.snd
+  | none => []
+
+/-- Fetch the collected positional values (latest first). -/
+def positionalValues (summary : Summary) (name : String) : List String :=
+  match summary.positionals.find? (fun entry => entry.fst = name) with
+  | some entry => entry.snd
+  | none => []
+
+end Summary
+
+private def summarizeFlags (flags : List (String × Bool)) : List (String × Bool) :=
+  flags.reverse.foldl (fun acc entry => replaceAssoc acc entry.fst entry.snd) []
+
+private def summarizeValues (pairs : List (String × String)) :
+    List (String × List String) :=
+  pairs.reverse.foldl (fun acc entry => consAssoc acc entry.fst entry.snd) []
+
+/-- Collapse a `Partial` into its grouped summary representation. -/
 @[simp] def toSummary (p : Partial) : Summary :=
-  { flagValue? := p.flagValue?
-  , optionValues := p.optionValues
-  , positionalValues := p.positionalValues }
+  { flags := summarizeFlags p.flags
+  , options := summarizeValues p.options
+  , positionals := summarizeValues p.positionals }
 
 namespace Summary
 
 @[simp] lemma flagValue?_toSummary (p : Partial) (name : String) :
-    (toSummary p).flagValue? name = p.flagValue? name := rfl
+    (toSummary p).flagValue? name = p.flagValue? name := by
+  classical
+  unfold toSummary flagValue?
+  simp [Summary.flagValue?, summarizeFlags, replaceAssoc, Partial.flagValue?]
 
 @[simp] lemma optionValues_toSummary (p : Partial) (name : String) :
-    (toSummary p).optionValues name = p.optionValues name := rfl
+    (toSummary p).optionValues name = p.optionValues name := by
+  classical
+  unfold toSummary optionValues
+  simp [Summary.optionValues, summarizeValues, consAssoc, Partial.optionValues]
 
 @[simp] lemma positionalValues_toSummary (p : Partial) (name : String) :
-    (toSummary p).positionalValues name = p.positionalValues name := rfl
+    (toSummary p).positionalValues name = p.positionalValues name := by
+  classical
+  unfold toSummary positionalValues
+  simp [Summary.positionalValues, summarizeValues, consAssoc, Partial.positionalValues]
 
 end Summary
 

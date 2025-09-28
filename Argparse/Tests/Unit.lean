@@ -111,6 +111,13 @@ private def samplePartial : Spec.Partial :=
 
 #guard (ArgParse.CLI.renderHelpWith GitLike.spec (some samplePartial) |>.contains "git-like")
 #guard (ArgParse.CLI.renderManWith GitLike.spec (some samplePartial) |>.contains "git-like")
+#guard (ArgParse.CLI.renderHelpWithSummary GitLike.spec (some (Partial.toSummary samplePartial))
+        |>.contains "git-like")
+#guard (ArgParse.CLI.renderManWithSummary GitLike.spec (some (Partial.toSummary samplePartial))
+        |>.contains "git-like")
+#guard (ArgParse.CLI.renderCompletionsWithSummary GitLike.spec
+        (some (Partial.toSummary samplePartial))
+        |>.contains "--verbose")
 
 #guard (
   let partial := Partial.empty
