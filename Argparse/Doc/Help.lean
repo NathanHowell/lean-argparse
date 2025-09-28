@@ -11,9 +11,7 @@ namespace ArgParse.Doc
 
 open ArgParse.Spec
 
-namespace
-
-open Spec.EntryKind
+open ArgParse.Spec.EntryKind
 
 def runtimeLinesForSummary (summary? : Option Spec.Partial.Summary) (entry : DocEntry) :
     List String :=
@@ -35,8 +33,6 @@ def runtimeLinesForSummary (summary? : Option Spec.Partial.Summary) (entry : Doc
           if values.isEmpty then []
           else [s!"current: {String.intercalate ", " values}"]
       | .command => []
-
-end
 
 /-- Render a single documentation entry into a human-readable block. -/
 def renderEntryWithSummary (entry : DocEntry)
