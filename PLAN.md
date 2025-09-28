@@ -171,8 +171,9 @@
 - 2025-09-28: Replaced `Main.lean` with a stub executable message so the binary builds.
 - 2025-09-28: Replaced `Main.lean` with a stub executable message so the binary builds.
 - 2025-09-28: Reduced `Argparse.lean` to an empty namespace; top-level exports will return once real modules land.
+- 2025-09-28: Restored a minimal `lakefile.lean` (package + default exe) so Lake commands remain usable.
 - 2025-09-28: Proved that summary-aware renderers (`renderHelpWithSummary`, `renderManWithSummary`, `renderCompletionsWithSummary`) agree with the original partial-based helpers when fed `Partial.toSummary`.
 
 ## Build Fix Backlog (2025-09-28)
 Order the following tasks sequentially; after addressing each file, rerun `lake env lean --root=.<file>` and commit before progressing. Notes capture any blockers discovered while attempting earlier items.
-1. `lakefile.lean`: Lean DSL commands fail to elaborate (line 4); revisit Lake configuration after core modules compile.
+*(backlog empty)*
