@@ -20,10 +20,18 @@ def suggestionsWithSummary (spec : AppSpec)
     | none => []
     | some summary =>
         let flagNames := summary.flags.map (·.fst)
-        let optionTerms := summary.options.bind (fun (name, values) =>
-          values.map fun value => s!"{name}={value}")
-        let positionalTerms := summary.positionals.bind (fun (name, values) =>
-          values.map fun value => s!"{name}:{value}")
+        let optionTerms := summary.options.foldr
+          (fun entry acc =>
+            match entry with
+            | (name, values) =>
+                values.foldr (fun value acc' => s!"{name}={value}" :: acc') acc)
+          []
+        let positionalTerms := summary.positionals.foldr
+          (fun entry acc =>
+            match entry with
+            | (name, values) =>
+                values.foldr (fun value acc' => s!"{name}:{value}" :: acc') acc)
+          []
         flagNames ++ optionTerms ++ positionalTerms
   (base ++ extras).eraseDups
 
