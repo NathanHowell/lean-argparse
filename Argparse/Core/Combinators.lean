@@ -256,21 +256,24 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
   | .ok step => .ok (step.value?, step.state)
   | .error err => .error err
 
-@[specialize] def collectOptionStepsAux
+@[specialize] def collectOptionStepsLoop
     {α} [FromArg α] (spec : OptSpec α) :
-    List α → Nat → State → Except Error (CollectResult α)
-  | acc, consumed, curr =>
-      match takeOptionStep? spec curr with
+    Nat → List α → Nat → State → Except Error (CollectResult α)
+  | 0, acc, consumed, st =>
+      .ok { values := acc.reverse, state := st, consumed := consumed }
+  | Nat.succ fuel, acc, consumed, st =>
+      match takeOptionStep? spec st with
       | .error err => .error err
       | .ok step =>
           let consumed' := consumed + step.consumed
           match step.value? with
-          | some value => collectOptionStepsAux spec (value :: acc) consumed' step.state
-          | none => .ok { values := acc.reverse, state := step.state, consumed := consumed' }
+          | some value => collectOptionStepsLoop spec fuel (value :: acc) consumed' step.state
+          | none => .ok { values := acc.reverse, state := st, consumed := consumed }
 
 @[inline] def collectOptionSteps
     {α} [FromArg α] (spec : OptSpec α) (st : State) : Except Error (CollectResult α) :=
-  collectOptionStepsAux spec [] 0 st
+  let fuel := st.pre.length + st.post.length + 1
+  collectOptionStepsLoop spec fuel [] 0 st
 
 @[inline] def collectOptionValues
     {α} [FromArg α] (spec : OptSpec α) (st : State) : Except Error (List α × State) := do
@@ -326,21 +329,24 @@ def option {α} [FromArg α] (spec : OptSpec α) :
   | .ok step => .ok (step.value?, step.state)
   | .error err => .error err
 
-@[specialize] def collectPositionalStepsAux
+@[specialize] def collectPositionalStepsLoop
     {α} [FromArg α] (spec : PosSpec α) :
-    List α → Nat → State → Except Error (CollectResult α)
-  | acc, consumed, curr =>
-      match takePositionalStep? spec curr with
+    Nat → List α → Nat → State → Except Error (CollectResult α)
+  | 0, acc, consumed, st =>
+      .ok { values := acc.reverse, state := st, consumed := consumed }
+  | Nat.succ fuel, acc, consumed, st =>
+      match takePositionalStep? spec st with
       | .error err => .error err
       | .ok step =>
           let consumed' := consumed + step.consumed
           match step.value? with
-          | some value => collectPositionalStepsAux spec (value :: acc) consumed' step.state
-          | none => .ok { values := acc.reverse, state := step.state, consumed := consumed' }
+          | some value => collectPositionalStepsLoop spec fuel (value :: acc) consumed' step.state
+          | none => .ok { values := acc.reverse, state := st, consumed := consumed }
 
 @[inline] def collectPositionalSteps
     {α} [FromArg α] (spec : PosSpec α) (st : State) : Except Error (CollectResult α) :=
-  collectPositionalStepsAux spec [] 0 st
+  let fuel := st.pre.length + st.post.length + 1
+  collectPositionalStepsLoop spec fuel [] 0 st
 
 @[inline] def collectPositionalValues
     {α} [FromArg α] (spec : PosSpec α) (st : State) : Except Error (List α × State) := do

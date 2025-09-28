@@ -196,13 +196,85 @@ lemma takeOptionStep_some_progress
                   · have : token ≠ prefixShort := htok
                     by_cases hconcatShort : spec.concatVal? ∧ token.startsWith prefixShort
                     · simp [hshort, this, hconcatShort] at h
-                      rcases h with ⟨hv, hs, hc⟩
-                      cases hv; cases hs; cases hc
-                      exact Or.inl ⟨rfl,
-                        parseConcatValue_cursor (spec := spec) (token := token)
-                          (raw := token.drop prefixShort.length) (pending := rest)
-                          (st := st) (expect := expect) (value := value) rfl⟩
                     · simp [hshort, this, hconcatShort] at h
+
+/-- Aggregates cursor progress across the option collector loop. -/
+lemma collectOptionStepsLoop_progress
+    {α} [FromArg α] (spec : OptSpec α) :
+    ∀ fuel acc consumed st (result : CollectResult α),
+      collectOptionStepsLoop (spec := spec) fuel acc consumed st = .ok result →
+      ∃ δ,
+        result.consumed = consumed + δ ∧
+        result.state.cursor = st.cursor + δ := by
+  classical
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro acc consumed st result h
+      simp [collectOptionStepsLoop] at h
+      cases h
+      refine ⟨0, ?_, ?_⟩
+      · simp
+      · simp
+  | succ fuel ih =>
+      intro acc consumed st result h
+      simp [collectOptionStepsLoop] at h
+      cases hstep : takeOptionStep? spec st with
+      | error err =>
+          simp [hstep] at h
+      | ok step =>
+          cases step with
+          | mk value? state consumedStep =>
+              cases hvalue : value? with
+              | none =>
+                  simp [hstep, hvalue] at h
+                  cases h
+                  refine ⟨0, ?_, ?_⟩
+                  · simp
+                  · simp
+              | some value =>
+                  have hrecEq :
+                      collectOptionStepsLoop (spec := spec) fuel (value :: acc)
+                        (consumed + consumedStep) state = .ok result := by
+                    simpa [hstep, hvalue] using h
+                  have hrec := ih (acc := value :: acc)
+                    (consumed := consumed + consumedStep)
+                    (st := state) (result := result) hrecEq
+                  rcases hrec with ⟨δ, hcons, hcursor⟩
+                  have hstepEq :
+                      takeOptionStep? spec st =
+                        .ok { value? := some value, state := state, consumed := consumedStep } := by
+                    simpa [hstep, hvalue]
+                  have hprogress := takeOptionStep_some_progress
+                    (spec := spec) (st := st) (st' := state)
+                    (value := value) (c := consumedStep) hstepEq
+                  have hstepCursor :
+                      state.cursor = st.cursor + consumedStep := by
+                    cases hprogress with
+                    | inl h1 =>
+                        rcases h1 with ⟨hconsumed, hcursorStep⟩
+                        simp [hconsumed, hcursorStep]
+                    | inr h2 =>
+                        rcases h2 with ⟨hconsumed, hcursorStep⟩
+                        simp [hconsumed, hcursorStep]
+                  refine ⟨consumedStep + δ, ?_, ?_⟩
+                  · simp [hcons, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc]
+                  · simpa [hcursor, hstepCursor, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc]
+
+/-- Cursor delta for the option collector starting from an empty accumulator. -/
+theorem collectOptionSteps_progress
+    {α} [FromArg α] (spec : OptSpec α) (st : State) (result : CollectResult α) :
+    collectOptionSteps (spec := spec) st = .ok result →
+    result.state.cursor = st.cursor + result.consumed := by
+  intro h
+  unfold collectOptionSteps at h
+  classical
+  have hloop := collectOptionStepsLoop_progress (spec := spec)
+    (fuel := st.pre.length + st.post.length + 1)
+    (acc := []) (consumed := 0) (st := st) (result := result) h
+  rcases hloop with ⟨δ, hconsumed, hcursor⟩
+  have : result.consumed = δ := by simpa using hconsumed
+  simpa [this]
 
 /-- `takeOptionValue?` advances the cursor by one or two tokens on success. -/
 theorem takeOptionValue_some_progress
@@ -303,55 +375,77 @@ theorem takePositionalValue_some_progress
           exact hprogress.2
 
 /-- `takePositionalStep?` consumes exactly one token whenever it succeeds. -/
-lemma takePositionalStep_some_progress
-    {α} [FromArg α] (spec : PosSpec α) (st st' : State)
-    (value : α) (c : Nat) :
-    takePositionalStep? spec st = .ok { value? := some value, state := st', consumed := c } →
-    c = 1 ∧ st'.cursor = st.cursor + 1 := by
-  intro h
-  unfold takePositionalStep? at h
+lemma collectPositionalStepsLoop_progress
+    {α} [FromArg α] (spec : PosSpec α) :
+    ∀ fuel acc consumed st (result : CollectResult α),
+      collectPositionalStepsLoop (spec := spec) fuel acc consumed st = .ok result →
+      ∃ δ,
+        result.consumed = consumed + δ ∧
+        result.state.cursor = st.cursor + δ := by
   classical
-  have expect := expectPositional spec
-  cases hpreList : st.pre with
-  | nil =>
-      have hPre : State.consumePre? st = none := by
-        simp [State.consumePre?, hpreList]
-      simp [hPre] at h
-      cases hpostList : st.post with
-      | nil =>
-          have hPost : State.consumePost? st = none := by
-            simp [State.consumePost?, hpostList]
-          simp [hPost] at h
-      | cons postHead postTail =>
-          have hPost : State.consumePost? st =
-              some (postHead, { st with post := postTail, cursor := st.cursor + 1 }) := by
-            simp [State.consumePost?, hpostList]
-          simp [hPost] at h
-          cases hrun : FromArg.run postHead with
-          | ok parsed =>
-              simp [hrun] at h
-              cases h with
-              | intro hv hs =>
-                  cases hv; cases hs
-                  constructor
-                  · rfl
-                  · simp [State.consumePost?, hpostList]
-          | error msg => simp [hrun] at h
-  | cons head tail =>
-      have hPre : State.consumePre? st =
-          some (head, { st with pre := tail, cursor := st.cursor + 1 }) := by
-        simp [State.consumePre?, hpreList]
-      simp [hPre] at h
-      cases hrun : FromArg.run head with
-      | ok parsed =>
-          simp [hrun] at h
-          cases h with
-          | intro hv hs =>
-              cases hv; cases hs
-              constructor
-              · rfl
-              · simp [State.consumePre?, hpreList]
-      | error msg => simp [hrun] at h
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro acc consumed st result h
+      simp [collectPositionalStepsLoop] at h
+      cases h
+      refine ⟨0, ?_, ?_⟩
+      · simp
+      · simp
+  | succ fuel ih =>
+      intro acc consumed st result h
+      simp [collectPositionalStepsLoop] at h
+      cases hstep : takePositionalStep? spec st with
+      | error err =>
+          simp [hstep] at h
+      | ok step =>
+          cases step with
+          | mk value? state consumedStep =>
+              cases hvalue : value? with
+              | none =>
+                  simp [hstep, hvalue] at h
+                  cases h
+                  refine ⟨0, ?_, ?_⟩
+                  · simp
+                  · simp
+              | some value =>
+                  have hrecEq :
+                      collectPositionalStepsLoop (spec := spec) fuel (value :: acc)
+                        (consumed + consumedStep) state = .ok result := by
+                    simpa [hstep, hvalue] using h
+                  have hrec := ih (acc := value :: acc)
+                    (consumed := consumed + consumedStep)
+                    (st := state) (result := result) hrecEq
+                  rcases hrec with ⟨δ, hcons, hcursor⟩
+                  have hstepEq :
+                      takePositionalStep? spec st =
+                        .ok { value? := some value, state := state, consumed := consumedStep } := by
+                    simpa [hstep, hvalue]
+                  have hprogress := takePositionalStep_some_progress
+                    (spec := spec) (st := st) (st' := state)
+                    (value := value) (c := consumedStep) hstepEq
+                  have hstepCursor :
+                      state.cursor = st.cursor + consumedStep := by
+                    rcases hprogress with ⟨hconsumed, hcursorStep⟩
+                    simp [hconsumed, hcursorStep]
+                  refine ⟨consumedStep + δ, ?_, ?_⟩
+                  · simp [hcons, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc]
+                  · simpa [hcursor, hstepCursor, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc]
+
+/-- Cursor delta for positional collectors. -/
+theorem collectPositionalSteps_progress
+    {α} [FromArg α] (spec : PosSpec α) (st : State) (result : CollectResult α) :
+    collectPositionalSteps (spec := spec) st = .ok result →
+    result.state.cursor = st.cursor + result.consumed := by
+  intro h
+  unfold collectPositionalSteps at h
+  classical
+  have hloop := collectPositionalStepsLoop_progress (spec := spec)
+    (fuel := st.pre.length + st.post.length + 1)
+    (acc := []) (consumed := 0) (st := st) (result := result) h
+  rcases hloop with ⟨δ, hconsumed, hcursor⟩
+  have : result.consumed = δ := by simpa using hconsumed
+  simpa [this]
 
 /-- `positional` with arity `.some` never returns an empty list. -/
 theorem positional_some_nonempty
