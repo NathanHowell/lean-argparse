@@ -8,8 +8,10 @@ import Argparse.Core.Types
 
 namespace ArgParse
 
+universe u
+
 /-- Convert a single token to a typed value for option/positional parsing. -/
-class FromArg (α : Type) where
+class FromArg (α : Type u) where
   /-- Attempt to parse the token; failures are reported via a diagnostic string. -/
   parse : String → Except String α
   /-- Suggested metavariable name for help text. -/
