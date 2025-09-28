@@ -436,6 +436,80 @@ theorem option_some_progress
           exact collectOptionValues_progress (spec := spec)
             (st := st) (st' := st') (values := values) hvalues
 
+/-- Elaboration transformer for options preserves the cursor facts from `option`. -/
+theorem interpretOption_one_progress
+    {α} [FromArg α] (spec : OptSpec α) (st st' : State)
+    (updater : Spec.Partial → Spec.Partial) :
+    spec.arity = .one →
+    interpretOption (spec := spec) st = .ok updater st' →
+    st' = st ∨ st'.cursor = st.cursor + 1 ∨ st'.cursor = st.cursor + 2 := by
+  intro harity hres
+  subst harity
+  classical
+  unfold Spec.interpretOption at hres
+  simp [Parser.map] at hres
+  cases hop : option spec st with
+  | err => simp [hop] at hres
+  | ok result =>
+      rcases result with ⟨value?, stAfter⟩
+      simp [hop] at hres
+      cases hres
+      cases hvalue : value? with
+      | none =>
+          have hstate := option_one_none_preserves_state
+            (spec := spec) (st := st) (st' := stAfter) rfl
+            (by simpa [hop, hvalue])
+          exact Or.inl hstate
+      | some value =>
+          have hprog := option_one_some_progress
+            (spec := spec) (st := st) (st' := stAfter) (value := value) rfl
+            (by simpa [hop, hvalue])
+          cases hprog with
+          | inl h1 => exact Or.inr (Or.inl h1)
+          | inr h2 => exact Or.inr (Or.inr h2)
+
+/-- Elaboration transformer for options with `.many` arity inherits cursor deltas. -/
+theorem interpretOption_many_progress
+    {α} [FromArg α] (spec : OptSpec α) (st st' : State)
+    (updater : Spec.Partial → Spec.Partial) :
+    spec.arity = .many →
+    interpretOption (spec := spec) st = .ok updater st' →
+    ∃ consumed, st'.cursor = st.cursor + consumed := by
+  intro harity hres
+  subst harity
+  classical
+  unfold Spec.interpretOption at hres
+  simp [Parser.map] at hres
+  cases hop : option spec st with
+  | err => simp [hop] at hres
+  | ok result =>
+      rcases result with ⟨values, stAfter⟩
+      simp [hop] at hres
+      cases hres
+      exact option_many_progress (spec := spec) (st := st) (st' := stAfter)
+        (values := values) rfl (by simpa [hop])
+
+/-- Elaboration transformer for options with `.some` arity inherits cursor deltas. -/
+theorem interpretOption_some_progress
+    {α} [FromArg α] (spec : OptSpec α) (st st' : State)
+    (updater : Spec.Partial → Spec.Partial) :
+    spec.arity = .some →
+    interpretOption (spec := spec) st = .ok updater st' →
+    ∃ consumed, st'.cursor = st.cursor + consumed := by
+  intro harity hres
+  subst harity
+  classical
+  unfold Spec.interpretOption at hres
+  simp [Parser.map] at hres
+  cases hop : option spec st with
+  | err => simp [hop] at hres
+  | ok result =>
+      rcases result with ⟨values, stAfter⟩
+      simp [hop] at hres
+      cases hres
+      exact option_some_progress (spec := spec) (st := st) (st' := stAfter)
+        (values := values) rfl (by simpa [hop])
+
 /-- `takePositionalStep?` consumes exactly one token whenever it succeeds. -/
 lemma takePositionalStep_some_progress
     {α} [FromArg α] (spec : PosSpec α) (st st' : State)
@@ -577,6 +651,78 @@ theorem positional_one_none_preserves_state
                 (by simpa [htake, hvalue])
               simpa [hstate'] using hstate
       | some parsed => simp [htake, hvalue] at hres
+
+/-- Elaboration transformer for positionals preserves optional cursor facts. -/
+theorem interpretPositional_one_progress
+    {α} [FromArg α] (spec : PosSpec α) (st st' : State)
+    (updater : Spec.Partial → Spec.Partial) :
+    spec.arity = .one →
+    interpretPositional (spec := spec) st = .ok updater st' →
+    st' = st ∨ st'.cursor = st.cursor + 1 := by
+  intro harity hres
+  subst harity
+  classical
+  unfold Spec.interpretPositional at hres
+  simp [Parser.map] at hres
+  cases hop : positional spec st with
+  | err => simp [hop] at hres
+  | ok result =>
+      rcases result with ⟨value?, stAfter⟩
+      simp [hop] at hres
+      cases hres
+      cases hvalue : value? with
+      | none =>
+          have hstate := positional_one_none_preserves_state
+            (spec := spec) (st := st) (st' := stAfter) rfl
+            (by simpa [hop, hvalue])
+          exact Or.inl hstate
+      | some value =>
+          have hprog := positional_one_some_progress
+            (spec := spec) (st := st) (st' := stAfter) (value := value) rfl
+            (by simpa [hop, hvalue])
+          exact Or.inr hprog
+
+/-- Elaboration transformer for positionals with `.many` arity inherits cursor deltas. -/
+theorem interpretPositional_many_progress
+    {α} [FromArg α] (spec : PosSpec α) (st st' : State)
+    (updater : Spec.Partial → Spec.Partial) :
+    spec.arity = .many →
+    interpretPositional (spec := spec) st = .ok updater st' →
+    ∃ consumed, st'.cursor = st.cursor + consumed := by
+  intro harity hres
+  subst harity
+  classical
+  unfold Spec.interpretPositional at hres
+  simp [Parser.map] at hres
+  cases hop : positional spec st with
+  | err => simp [hop] at hres
+  | ok result =>
+      rcases result with ⟨values, stAfter⟩
+      simp [hop] at hres
+      cases hres
+      exact positional_many_progress (spec := spec) (st := st) (st' := stAfter)
+        (values := values) rfl (by simpa [hop])
+
+/-- Elaboration transformer for positionals with `.some` arity inherits cursor deltas. -/
+theorem interpretPositional_some_progress
+    {α} [FromArg α] (spec : PosSpec α) (st st' : State)
+    (updater : Spec.Partial → Spec.Partial) :
+    spec.arity = .some →
+    interpretPositional (spec := spec) st = .ok updater st' →
+    ∃ consumed, st'.cursor = st.cursor + consumed := by
+  intro harity hres
+  subst harity
+  classical
+  unfold Spec.interpretPositional at hres
+  simp [Parser.map] at hres
+  cases hop : positional spec st with
+  | err => simp [hop] at hres
+  | ok result =>
+      rcases result with ⟨values, stAfter⟩
+      simp [hop] at hres
+      cases hres
+      exact positional_some_progress (spec := spec) (st := st) (st' := stAfter)
+        (values := values) rfl (by simpa [hop])
 
 lemma collectPositionalStepsLoop_progress
     {α} [FromArg α] (spec : PosSpec α) :
