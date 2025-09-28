@@ -77,6 +77,64 @@ lemma positionalValues_fold_addPositional
     _ = values.reverse ++ (Partial.toSummary p).positionalValues name := by
           simpa [hBase.symm]
 
+/-- `runNormalizedSummary` mirrors the raw runner, only post-processing payloads. -/
+lemma runNormalizedSummary_matches_raw
+    (app : AppSpec) (st : State) :
+    let raw := ArgParse.runNormalizedRaw app st
+    let summary := ArgParse.runNormalizedSummary app st
+    summary =
+      match raw.result with
+      | .ok payload => { result := RunResult.ok (Partial.toSummary payload), state := raw.state }
+      | .help txt => { result := .help txt, state := raw.state }
+      | .man txt => { result := .man txt, state := raw.state }
+      | .completions txt => { result := .completions txt, state := raw.state }
+      | .err err => { result := .err err, state := raw.state } := by
+  classical
+  unfold ArgParse.runNormalizedRaw ArgParse.runNormalizedSummary ArgParse.runNormalized
+  -- `builtinOutcome?` pattern matches on `st.pre`; expand it explicitly.
+  unfold ArgParse.builtinOutcome?
+  cases hPre : st.pre with
+  | nil =>
+      simp [hPre]
+      cases hEval : Spec.elaborateApp app st with
+      | err error =>
+          simp [hEval]
+      | ok payload st' =>
+          simp [hEval]
+  | cons token rest =>
+      by_cases hHelp : token = "--help"
+      · subst hHelp
+        simp
+      · by_cases hMan : token = "--man"
+        · subst hMan
+          simp
+        · by_cases hComp : token = "--generate-completions"
+          · subst hComp
+            simp
+          · simp [hHelp, hMan, hComp] -- simplify builtin match to `none`
+            cases hEval : Spec.elaborateApp app st with
+            | err error =>
+                simp [hEval]
+            | ok payload st' =>
+                simp [hEval]
+
+/-- `runSummary` mirrors `runRaw`, only summarising the payload. -/
+lemma runSummary_matches_raw
+    (app : AppSpec) (tokens : Tokens) :
+    let raw := ArgParse.runRaw app tokens
+    let summary := ArgParse.runSummary app tokens
+    summary =
+      match raw.result with
+      | .ok payload => { result := RunResult.ok (Partial.toSummary payload), state := raw.state }
+      | .help txt => { result := .help txt, state := raw.state }
+      | .man txt => { result := .man txt, state := raw.state }
+      | .completions txt => { result := .completions txt, state := raw.state }
+      | .err err => { result := .err err, state := raw.state } := by
+  classical
+  set st := ArgParse.Core.normalize tokens
+  have h := runNormalizedSummary_matches_raw (app := app) (st := st)
+  simpa [ArgParse.runRaw, ArgParse.runSummary, st] using h
+
 end Partial.Summary
 
 end ArgParse.Proofs
