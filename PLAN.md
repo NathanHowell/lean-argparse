@@ -39,35 +39,7 @@
 9. **M8 – Polish & Docs**
    - Finalize docstrings, README, migration guidance, and ensure CI (`lake build; lake test; lake lint`) covers all milestones.
 
-## Lint Remediation Backlog (one-file increments)
-The following files still emit lint warnings/errors. Process them strictly in order, fixing one file per branch commit before moving on:
-1. ✅ `Argparse/Core/Combinators.lean`
-2. ✅ `Argparse/Spec/AST.lean`
-3. ✅ `Argparse/Core/Runner.lean`
-4. ✅ `Argparse/Spec/Describe.lean`
-5. ✅ `Argparse/Doc/Help.lean`
-6. ✅ `Argparse/Doc/Man.lean`
-7. ✅ `Argparse/Doc/Completion.lean`
-8. ✅ `Argparse/Spec/Elab.lean`
-9. ✅ `Argparse/Proofs/Soundness.lean`
-10. ✅ `Argparse/Proofs/Soundness/Summary.lean`
-11. ✅ `Argparse/Proofs/Totality.lean`
-12. ✅ `Argparse/Proofs/Determinism.lean`
-13. ✅ `Argparse/CLI/Print.lean`
-14. ✅ `Argparse/Examples/Xargs0.lean`
-15. ✅ `Argparse/Examples/GitLike.lean`
-16. ✅ `Argparse/Tests/Unit.lean`
-17. ✅ `Argparse/Tests/Golden.lean`
-18. ✅ `Argparse/Core/Types.lean`
-12. ✅ `Argparse/Proofs/Determinism.lean`
-13. ✅ `Argparse/CLI/Print.lean`
-14. `Argparse/Examples/Xargs0.lean`
-15. `Argparse/Examples/GitLike.lean`
-16. `Argparse/Tests/Unit.lean`
-17. `Argparse/Tests/Golden.lean`
-
-Record outcomes (successes, partial progress, or blockers) in the activity log after each file-specific commit, and run `lake build; lake test; lake lint` before declaring the file complete.
-
+## Activity Log
 - 2025-09-28: Added docstrings for `ErrorKind`, `Expect`, and `Result` constructors in `Argparse/Core/Types.lean`; `lake build; lake test; lake lint` now passes with no outstanding lint warnings.
 - 2025-09-28: Re-ran `lake build; lake test; lake lint` to confirm `Argparse/CLI/Print.lean` exports are lint-clean; backlog now advances to `Argparse/Examples/Xargs0.lean`.
 - 2025-09-28: Re-ran `lake build; lake test; lake lint` to confirm `Argparse/Proofs/Determinism.lean` has no lint warnings; backlog now advances to `Argparse/CLI/Print.lean`.
