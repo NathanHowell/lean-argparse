@@ -13,6 +13,7 @@ open ArgParse.Spec
 
 open ArgParse.Spec.EntryKind
 
+/-- Runtime annotations describing the current values associated with the entry. -/
 def runtimeLinesForSummary (summary? : Option Spec.Partial.Summary) (entry : DocEntry) :
     List String :=
   match summary? with

@@ -45,7 +45,7 @@ The following files still emit lint warnings/errors. Process them strictly in or
 2. ✅ `Argparse/Spec/AST.lean`
 3. ✅ `Argparse/Core/Runner.lean`
 4. ✅ `Argparse/Spec/Describe.lean`
-5. `Argparse/Doc/Help.lean`
+5. ✅ `Argparse/Doc/Help.lean`
 6. `Argparse/Doc/Man.lean`
 7. `Argparse/Doc/Completion.lean`
 8. `Argparse/Spec/Elab.lean`
@@ -62,6 +62,7 @@ The following files still emit lint warnings/errors. Process them strictly in or
 Record outcomes (successes, partial progress, or blockers) in the activity log after each file-specific commit, and run `lake build; lake test; lake lint` before declaring the file complete.
 
 ## Activity Log
+- 2025-09-28: Added a docstring for `runtimeLinesForSummary` in `Argparse/Doc/Help.lean` and verified with `lake build; lake test; lake lint`.
 - 2025-09-28: Documented `Argparse/Spec/Describe.lean` entry kinds/doc entries and reran `lake build; lake test; lake lint`.
 - 2025-09-28: Added constructor/field docstrings to `Argparse/Core/Runner.lean`, then ran `lake build; lake test; lake lint` to confirm.
 - 2025-09-28: Added field/constructor docstrings across `Argparse/Spec/AST.lean`, cleared its lint warnings, and re-ran `lake build; lake test; lake lint`.
