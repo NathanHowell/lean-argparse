@@ -1,17 +1,17 @@
 import Lake
 open Lake DSL System
 
-package «lean-argparse» where
+package «argparse» where
   version := v!"0.1.0"
 
 lean_lib Argparse
 
 @[default_target]
-lean_exe «lean-argparse» where
+lean_exe «argparse» where
   root := `Main
 
 @[test_driver]
-lean_exe «lean-argparse-tests» where
+lean_exe «argparse-tests» where
   root := `Tests.Main
   supportInterpreter := false
 
