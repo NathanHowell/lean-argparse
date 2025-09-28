@@ -47,7 +47,7 @@ The following files still emit lint warnings/errors. Process them strictly in or
 4. ✅ `Argparse/Spec/Describe.lean`
 5. ✅ `Argparse/Doc/Help.lean`
 6. ✅ `Argparse/Doc/Man.lean`
-7. `Argparse/Doc/Completion.lean`
+7. ✅ `Argparse/Doc/Completion.lean`
 8. `Argparse/Spec/Elab.lean`
 9. `Argparse/Proofs/Soundness.lean`
 10. `Argparse/Proofs/Soundness/Summary.lean`
@@ -62,6 +62,7 @@ The following files still emit lint warnings/errors. Process them strictly in or
 Record outcomes (successes, partial progress, or blockers) in the activity log after each file-specific commit, and run `lake build; lake test; lake lint` before declaring the file complete.
 
 ## Activity Log
+- 2025-09-28: Added doc coverage for `suggestionsWithSummary` in `Argparse/Doc/Completion.lean`; lint clean after `lake build; lake test; lake lint`.
 - 2025-09-28: Documented `runtimeParagraphs` in `Argparse/Doc/Man.lean` and confirmed with `lake build; lake test; lake lint`.
 - 2025-09-28: Added a docstring for `runtimeLinesForSummary` in `Argparse/Doc/Help.lean` and verified with `lake build; lake test; lake lint`.
 - 2025-09-28: Documented `Argparse/Spec/Describe.lean` entry kinds/doc entries and reran `lake build; lake test; lake lint`.
