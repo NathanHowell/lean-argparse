@@ -16,6 +16,7 @@ import Argparse.Proofs.Totality
 import Argparse.Proofs.Determinism
 import Argparse.Proofs.Sentinel
 import Argparse.Proofs.Soundness
+import Argparse.Proofs.Soundness.Summary
 import Argparse.CLI.Print
 import Argparse.Examples.Xargs0
 import Argparse.Examples.GitLike

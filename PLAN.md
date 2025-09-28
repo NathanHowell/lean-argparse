@@ -132,3 +132,4 @@
 - 2025-09-27: Documented the summary-based workflow in `README.md`, highlighting `runSummary` and the new CLI render helpers.
 - 2025-09-27: Extended the GitLike/Xargs0 examples with sample summaries and summary-aware help/man/completion renderers.
 - 2025-09-27: Updated the README payload summary section to point at the example helpers.
+- 2025-09-27: Added `Partial.Summary` soundness lemmas ensuring flag/option/positional folds agree with the underlying `Partial` accumulators.

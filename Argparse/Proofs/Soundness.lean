@@ -1,4 +1,5 @@
 import Argparse.Core.Parser
+import Argparse.Core.Runner
 import Argparse.Spec.Elab
 
 /-!
