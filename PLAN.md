@@ -69,6 +69,7 @@
 - 2025-09-27: takePositionalValue? and takeOptionValue? now have cursor-progress lemmas (option case yields a one- or two-token bound).
 - 2025-09-27: Established cursor progress for positional parsing via `takePositionalStep?`/`takePositionalValue?` lemmas.
 - 2025-09-27: Reviewed `collectOptionSteps`/`collectPositionalSteps` recursion; initial attempt to lift the single-step bounds stalled because the helper expands through `take*` and the current `Spec/AST` stubs fail to elaborate cleanly. Work deferred; no code changes landed.
+- 2025-09-27: Attempted to refactor `collectOptionStepsAux`/`collectPositionalStepsAux` to emit step traces. Encountered cascading termination/universe issues (Lean rejected the new recursion, `Spec/AST` defaults required rework, and build parity regressed), so the spike was rolled back with no code changes.
 - 2025-09-27: Spike to drive `collectPositionalStepsAux_progress` via an induction on a `positionalMeasure` count ran aground—the recursive branch reinstates tokens and the resulting arithmetic required heavier refactors than planned. Changes reverted; collector progress lemmas remain open.
 - 2025-09-27: Exposed `findConcatSplit?` for proofs and added `parseConcatValue_split_state` to confirm short-bundle leftovers are requeued for arbitrary `FromArg` payloads.
 - _Please append future successes and failures here with short rationales._

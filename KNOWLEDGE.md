@@ -41,5 +41,6 @@
 🧭 Debug & errors: message classes parse/scope/elab/kernel/termination/macro/tactic; editor goal panes; `#print` artifacts; `#guard_msgs` to assert diagnostics.
 
 ✅ Tips: use `abbrev` for aliases; `opaque` to hide impl; keep instances local/scoped; tune priorities sparingly; directional `[simp]` lemmas; add `termination_by` early; prefer class-based numerals; keep term-style when simple; isolate classical with `local open Classical`; prefer `Fin`/subtypes for bounds; safe indexing `a[i]?`/`a[i]!`/`a[i]'h`.
+    • When writing structurally recursive functions that live in a monad (e.g. returning `Except`), avoid `do`-notation around the recursive call unless you also supply a `termination_by`; elaborate the match manually or Lean may fail to see the decreasing argument.
 
 ➕ Extras: `conv` mode (navigate/lhs/rhs/`congr`/`intro`/pattern-rewrite); axioms `funext` `propext` `Choice` & `Quot`; `noncomputable` data via choice; `#reduce` vs `#eval` differences (casts/extensionality can block kernel eval); Unicode input via `\alpha`, `→`.
