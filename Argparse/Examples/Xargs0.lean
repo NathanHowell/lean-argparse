@@ -26,24 +26,23 @@ private def pathMeta : Meta :=
 private def rootMeta : Meta :=
   { name := "xargs0", help? := some "Minimal xargs-style demo." }
 
+private def readNullFlag : FlagSpec :=
+  { short? := some shortZero
+    long? := some "read-null"
+    «meta» := flagMeta }
+
+private def inputPos : PosSpec String :=
+  { «meta» := pathMeta, arity := .one }
+
+private def rootCmd : CmdSpec :=
+  { name := "xargs0"
+    «meta» := rootMeta
+    args := [ItemSpec.flag readNullFlag, ItemSpec.pos inputPos] }
+
 /-- Specification for the xargs -0 example. -/
 def spec : AppSpec :=
   { name := "xargs0"
-    root := {
-      name := "xargs0"
-      meta := rootMeta
-      args := [
-        ItemSpec.flag {
-          short? := some shortZero
-          long? := some "read-null"
-          meta := flagMeta
-        },
-        ItemSpec.pos {
-          meta := pathMeta
-          arity := .one
-        }
-      ]
-    }
+    root := rootCmd
   }
 
 /-- Sample runtime payload for documentation previews. -/
