@@ -79,6 +79,9 @@
 - 2025-09-27: Proved progress for `elaborateItem`, `foldItems`, and `elaborateCommand`, establishing that builder-level sequencing preserves the cursor delta from primitive interpreters.
 - 2025-09-27: Introduced `Spec.CommandResult`, rewrote `elaborateCommand` to select subcommands via cached child parsers, and proved the accompanying progress lemma using a `commandWeight` induction measure.
 - 2025-09-27: Extended progress reasoning to `elaborateApp`, showing the application-level parser inherits the cursor bounds from its root command.
+- 2025-09-27: Added runner wrappers (`Argparse/Core/Runner`) exposing `RunResult`/`RunOutcome` alongside `runNormalized`/`run` for spec-aligned execution.
+- 2025-09-27: Proved `runNormalized_ok_progress`, lifting the cursor-progress guarantees from `elaborateApp` through the runner convenience layer.
+- 2025-09-27: Extended unit tests with runner coverage, asserting successful flag parsing advances the cursor and preserves collected values.
 - _Please append future successes and failures here with short rationales._
 
 ## Immediate Next Steps
@@ -111,5 +114,6 @@
 27. ✅ **Command folding proofs** (2025-09-27): Extended progress lemmas to `elaborateItem`, `foldItems`, and `elaborateCommand`, so builder sequencing now carries explicit cursor deltas.
 28. ✅ **Subcommand progress** (2025-09-27): Reworked `elaborateCommand` to recurse over cached child parsers, proved subcommand cursor bounds via the new `commandWeight` measure, and confirmed tests remain green.
 29. ✅ **Whole-app progress** (2025-09-27): Proved `elaborateApp_progress`, confirming the application-level parser preserves cursor deltas established by command progress.
-30. **Runner progress**: Lift the progress lemmas through the planned runner convenience wrappers (once implemented), documenting any open issues that block end-to-end soundness proofs.
-31. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.
+30. ✅ **Runner progress** (2025-09-27): Added runner wrappers plus `runNormalized_ok_progress`, ensuring cursor guarantees persist through the convenience API.
+31. **Runner built-ins**: Integrate `--help`/`--man`/`--generate-completions` handling into the runner (producing appropriate `RunResult` cases) and document any outstanding proof obligations about non-consuming paths.
+32. Update this plan after each task, noting successes or blockers (including negative results) before proceeding to later milestones.

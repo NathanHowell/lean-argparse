@@ -1,5 +1,6 @@
 import Argparse.Core.Parser
 import Argparse.Core.Combinators
+import Argparse.Core.Runner
 import Argparse.Spec.AST
 import Argparse.Spec.Elab
 
@@ -1212,5 +1213,22 @@ lemma elaborateApp_progress
         (st := st) (st' := st1) (payload := result) hcmd
       refine ⟨c, ?_⟩
       simpa [hstate] using hcursor
+
+/-- Runner convenience wrapper preserves the cursor progress proof. -/
+lemma runNormalized_ok_progress
+    (app : AppSpec) {st st' : State} {payload : Spec.Partial} :
+    ArgParse.runNormalized app st = RunOutcome.ok payload st' →
+    ∃ consumed, st'.cursor = st.cursor + consumed := by
+  classical
+  intro h
+  unfold ArgParse.runNormalized at h
+  cases hEval : Spec.elaborateApp app st with
+  | err error =>
+      simp [hEval, RunOutcome.err] at h
+  | ok payload0 st0 =>
+      simp [hEval, RunOutcome.ok] at h
+      rcases h with ⟨rfl, rfl⟩
+      exact elaborateApp_progress (app := app) (st := st) (st' := st0)
+        (payload := payload0) hEval
 
 end ArgParse.Proofs

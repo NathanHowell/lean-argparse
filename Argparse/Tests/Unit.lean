@@ -1,5 +1,6 @@
 import Argparse.CLI.Print
 import Argparse.Core.Combinators
+import Argparse.Core.Runner
 import Argparse.Core.Types
 import Argparse.Examples.GitLike
 import Argparse.Examples.Xargs0
@@ -112,5 +113,39 @@ private def samplePartial : Spec.Partial :=
 #guard (ArgParse.CLI.renderManWith GitLike.spec (some samplePartial) |>.contains "git-like")
 
 end Basics
+
+namespace Runner
+
+open ArgParse
+open ArgParse.Core
+open ArgParse.Spec
+
+private def toolMeta : Meta := { name := "tool" }
+
+private def verboseFlag : FlagSpec :=
+  { long? := some "verbose", meta := { name := "--verbose" } }
+
+private def toolCmd : CmdSpec :=
+  { name := "tool", meta := toolMeta, args := [ItemSpec.flag verboseFlag] }
+
+private def toolApp : AppSpec :=
+  { name := "tool", root := toolCmd }
+
+#guard (
+  let state := ArgParse.Core.normalize ["--verbose"]
+  match ArgParse.runNormalized toolApp state with
+  | { result := .ok partial, state := st } =>
+      partial.flagValue? "--verbose" = some true ∧ st.pre = [] ∧ st.post = [] ∧ st.cursor = 1
+  | _ => False
+)
+
+#guard (
+  match ArgParse.run toolApp ["--verbose"] with
+  | { result := .ok partial, state := st } =>
+      partial.flagValue? "--verbose" = some true ∧ st.cursor = 1
+  | _ => False
+)
+
+end Runner
 
 end ArgParse.Tests

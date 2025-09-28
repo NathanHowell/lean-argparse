@@ -4,6 +4,7 @@ import Argparse.Core.Parser
 import Argparse.Core.Value
 import Argparse.Core.Combinators
 import Argparse.Core.Normalize
+import Argparse.Core.Runner
 import Argparse.Spec.AST
 import Argparse.Spec.Elab
 import Argparse.Spec.Describe
