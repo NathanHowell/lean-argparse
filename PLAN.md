@@ -51,7 +51,13 @@ The following files still emit lint warnings/errors. Process them strictly in or
 8. ✅ `Argparse/Spec/Elab.lean`
 9. ✅ `Argparse/Proofs/Soundness.lean`
 10. ✅ `Argparse/Proofs/Soundness/Summary.lean`
-11. `Argparse/Proofs/Totality.lean`
+11. ✅ `Argparse/Proofs/Totality.lean`
+12. `Argparse/Proofs/Determinism.lean`
+13. `Argparse/CLI/Print.lean`
+14. `Argparse/Examples/Xargs0.lean`
+15. `Argparse/Examples/GitLike.lean`
+16. `Argparse/Tests/Unit.lean`
+17. `Argparse/Tests/Golden.lean`
 12. `Argparse/Proofs/Determinism.lean`
 13. `Argparse/CLI/Print.lean`
 14. `Argparse/Examples/Xargs0.lean`
@@ -62,6 +68,7 @@ The following files still emit lint warnings/errors. Process them strictly in or
 Record outcomes (successes, partial progress, or blockers) in the activity log after each file-specific commit, and run `lake build; lake test; lake lint` before declaring the file complete.
 
 ## Activity Log
+- 2025-09-28: Re-ran `lake build; lake test; lake lint` to confirm `Argparse/Proofs/Totality.lean` is lint-clean; backlog now moves to `Argparse/Proofs/Determinism.lean`.
 - 2025-09-28: Re-ran `lake build; lake test; lake lint` to confirm `Argparse/Proofs/Soundness/Summary.lean` remains lint-clean; backlog now targets `Argparse/Proofs/Totality.lean`.
 - 2025-09-28: Ran `lake build; lake test; lake lint` after verifying `Argparse/Proofs/Soundness.lean` placeholders already satisfy the linter; next warnings surface in `Core/Types` constructors.
 - 2025-09-28: Documented structures and placeholder helpers in `Argparse/Spec/Elab.lean`, then ran `lake build; lake test; lake lint` (next lint warnings surface in `Core/Types`).
