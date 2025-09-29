@@ -46,6 +46,16 @@ namespace State
 @[simp] theorem withPost_pre (st : ArgParse.State) (post : List String) (delta : Nat) :
     (withPost st post delta).pre = st.pre := rfl
 
+/-- Cursor monotonicity for `withPre`. -/
+@[simp] theorem cursor_le_withPre (st : ArgParse.State) (pre : List String) (delta : Nat) :
+    st.cursor ≤ (withPre st pre delta).cursor := by
+  simp [withPre, Nat.le_add_right]
+
+/-- Cursor monotonicity for `withPost`. -/
+@[simp] theorem cursor_le_withPost (st : ArgParse.State) (post : List String) (delta : Nat) :
+    st.cursor ≤ (withPost st post delta).cursor := by
+  simp [withPost, Nat.le_add_right]
+
 /-- Remove the next token from `pre`, updating the cursor. -/
 def consumePre? (st : State) : Option (String × State) :=
   match st.pre with
