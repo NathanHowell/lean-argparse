@@ -69,10 +69,6 @@ def cmdOpt : CmdSpec := { name := "app", «meta» := mkMeta "app", args := [.opt
    | .ok part _ => part.options.any (fun (k,_) => k = "name")
    | _ => False)
 
--- ElaborateCommand leaves non-option/flag tokens as leftovers in state.
--- Placeholder: we will add a leftover regression once elaboration recursion lands.
-
--- Runner built-ins: `--help` routes to help text without parsing.
 open ArgParse in
 #guard
   (let app : ArgParse.Spec.AppSpec := { name := "app", root := cmd }
@@ -97,12 +93,129 @@ def parentCmd : CmdSpec := { name := "app", «meta» := mkMeta "app", args := []
    | .ok _ _ => True
    | _ => False)
 
--- Runner leftover detection test will be added when elaboration stabilizes.
+-- Runner leftover detection surfaces `ErrorKind.leftover` when tokens remain.
+#guard
+  (let app : ArgParse.Spec.AppSpec := { name := "app", root := cmd }
+   let out := ArgParse.runRaw app ["--verbose", "--name=foo", "dangling"]
+   match out.result with
+   | .err err =>
+       err.kind = ArgParse.ErrorKind.leftover ∧
+       err.context = ["dangling"] ∧
+       out.state.pre = ["dangling"] ∧
+       out.state.post = []
+   | _ => False)
 
--- Debug: print the leftover detection outcome to help diagnose if needed.
--- (debug prints suppressed in lint environment)
+-- Leftover tokens in the post-sentinel stream also trigger detection.
+#guard
+  (let app : ArgParse.Spec.AppSpec := { name := "app", root := cmd }
+   let out := ArgParse.runRaw app ["--verbose", "--name=foo", "--", "tail"]
+   match out.result with
+   | .err err =>
+       err.kind = ArgParse.ErrorKind.leftover ∧
+       err.context = ["tail"] ∧
+       out.state.pre = [] ∧
+       out.state.post = ["tail"]
+   | _ => False)
 
--- Subcommand selection placeholder: elaborator currently consumes a matching
--- subcommand token without recursing; full recursion will be tested later.
+-- Repeated `.one` option invocations append values left-to-right (last wins).
+#guard
+  (let app : ArgParse.Spec.AppSpec := { name := "app", root := cmd }
+   let out := ArgParse.runSummary app ["--name=alpha", "--name", "beta"]
+   match out.result with
+   | .ok summary =>
+       let vals := Partial.Summary.optionValues summary "name"
+       vals = ["alpha", "beta"] ∧ vals.getLast? = some "beta"
+   | _ => False)
+
+def optMany : OptSpec String :=
+  { long? := some "mode", «meta» := mkMeta "mode", arity := .many }
+def manyCmd : CmdSpec :=
+  { name := "many", «meta» := mkMeta "many", args := [.opt optMany] }
+
+-- `.many` options collect all values in encounter order.
+#guard
+  (let app : ArgParse.Spec.AppSpec := { name := "many", root := manyCmd }
+   let out := ArgParse.runSummary app ["--mode=alpha", "--mode", "beta", "--mode=gamma"]
+   match out.result with
+   | .ok summary =>
+       Partial.Summary.optionValues summary "mode" = ["alpha", "beta", "gamma"]
+   | _ => False)
+
+def optSome : OptSpec String :=
+  { long? := some "tag", «meta» := mkMeta "tag", arity := .some }
+def someCmd : CmdSpec :=
+  { name := "some", «meta» := mkMeta "some", args := [.opt optSome] }
+
+-- `.some` options require at least one value.
+#guard
+  (let app : ArgParse.Spec.AppSpec := { name := "some", root := someCmd }
+   let out := ArgParse.runRaw app []
+   match out.result with
+   | .err err => err.kind = ArgParse.ErrorKind.missingValue
+   | _ => False)
+
+-- Providing values for `.some` options succeeds and accumulates raw strings.
+#guard
+  (let app : ArgParse.Spec.AppSpec := { name := "some", root := someCmd }
+   let out := ArgParse.runSummary app ["--tag=alpha", "--tag=beta"]
+   match out.result with
+   | .ok summary => Partial.Summary.optionValues summary "tag" = ["alpha", "beta"]
+   | _ => False)
+
+open ArgParse.Spec in
+def shortV : Short := { c := 'v', ok := by decide }
+def shortF : Short := { c := 'f', ok := by decide }
+def verboseFlag : FlagSpec := { short? := some shortV, «meta» := mkMeta "verbose" }
+def forceFlag : FlagSpec := { short? := some shortF, «meta» := mkMeta "force" }
+def bundleCmd : CmdSpec :=
+  { name := "bundle", «meta» := mkMeta "bundle", args := [.flag verboseFlag, .flag forceFlag] }
+
+-- Bundled short flags (`-vf`) are expanded left-to-right.
+#guard
+  (let app : ArgParse.Spec.AppSpec := { name := "bundle", root := bundleCmd }
+   let out := ArgParse.runSummary app ["-vf"]
+   match out.result with
+   | .ok summary =>
+       Partial.Summary.flagValue? summary "verbose" = some true ∧
+       Partial.Summary.flagValue? summary "force" = some true
+   | _ => False)
+
+def posFiles : PosSpec String := { «meta» := mkMeta "file", arity := .many }
+def sentinelCmd : CmdSpec :=
+  { name := "sentinel"
+  , «meta» := mkMeta "sentinel"
+  , args := [.opt optShortLong, .pos posFiles] }
+
+-- Sentinel boundary keeps option parsing to the pre-stream and positionals post.
+#guard
+  (let app : ArgParse.Spec.AppSpec := { name := "sentinel", root := sentinelCmd }
+   let out := ArgParse.runSummary app ["--name=foo", "--", "--name=bar", "file.txt"]
+   match out.result with
+   | .ok summary =>
+       let optVals := Partial.Summary.optionValues summary "name"
+       let posVals := Partial.Summary.positionalValues summary "file"
+       optVals = ["foo"] ∧ posVals = ["--name=bar", "file.txt"]
+   | _ => False)
+
+def countSpec : OptSpec Nat :=
+  { long? := some "count", «meta» := mkMeta "count", arity := .one }
+def countCmd : CmdSpec :=
+  { name := "counting", «meta» := mkMeta "counting", args := [.opt countSpec] }
+
+-- Missing option values yield `ErrorKind.missingValue`.
+#guard
+  (let app : ArgParse.Spec.AppSpec := { name := "counting", root := countCmd }
+   let out := ArgParse.runRaw app ["--count"]
+   match out.result with
+   | .err err => err.kind = ArgParse.ErrorKind.missingValue
+   | _ => False)
+
+-- Invalid option payloads surface `ErrorKind.custom` from `FromArg.run` failures.
+#guard
+  (let app : ArgParse.Spec.AppSpec := { name := "counting", root := countCmd }
+   let out := ArgParse.runRaw app ["--count=oops"]
+   match out.result with
+   | .err err => err.kind = ArgParse.ErrorKind.custom
+   | _ => False)
 
 end ArgParse.Tests

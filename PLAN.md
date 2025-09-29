@@ -55,15 +55,16 @@
   - Accumulators now append the actual token strings, enabling last-value-wins lookup semantics in summaries.
   - Next: revisit typed accumulators once the builder layer needs richer folding.
 
-- Leftover detection
-  - Teach the runner to emit `ErrorKind.leftover` when tokens remain after parsing. Add tests.
+- ✅ Leftover detection
+  - Runner now raises `ErrorKind.leftover` with regression guards in `ArgParse/Tests/Unit.lean` (pre and post streams).
 
 - Rebuild proof basics (small and steady)
-  - In `ArgParse/Proofs/Totality.lean`, prove progress/consumption facts for `Core.flag`, `Core.option`, and `Core.positional`.
-  - Lift these through `Spec.elaborateItems`/`elaborateCommand` to recover command-level cursor guarantees.
+  - `ArgParse/Proofs/Totality.lean` now establishes totality cases for flags/options/positionals and elaboration (`flag_result_ok`, `option_result_cases`, etc.).
+  - TODO: strengthen these into cursor delta and consumption lemmas before moving on to command-level guarantees.
 
 - Tests expansion
-  - Extend `ArgParse/Tests/Unit.lean` with: repeated options by arity; bundled short flags; `--name=value` and `-nvalue` forms; sentinel boundary cases; leftover detection.
+  - Added coverage in `ArgParse/Tests/Unit.lean` for repeated arities (`.one`/`.many`/`.some`), bundled short flags, sentinel boundaries, and missing/invalid option values.
+  - TODO: cover interleaved subcommands with repeated flags/options plus additional negative paths once builder proofs settle.
 
 - Legacy Main example
   - After values and recursion land, rebuild the historic example in `Main.lean` (greet/repeat app) and add regression tests.
@@ -80,6 +81,7 @@
 - Make small, focused commits (one file or closely-related files at a time) and record outcomes—positive or negative—in the Activity Log.
 
 ## Activity Log
+- 2025-09-30: Added runner leftover detection regressions plus broader unit coverage (repeated `.one`/`.many`/`.some`, bundled shorts, sentinel boundary, missing/invalid payload) in `ArgParse/Tests/Unit.lean`; exported `matchFlagToken` and replaced `Proofs/Totality` placeholders with result-case lemmas. `lake test`.
 - 2025-09-30: Spiked on refactoring `ArgParse/Core/Normalize.lean` to expose sentinel metadata (pre/post/saw) and accompanying proofs/tests; recursive `simp` obligations around `splitOnSentinel` made the approach unstable, so the code was reverted. Next iteration will explore a `takeWhile`/`dropWhile` decomposition before reattempting Step 1.
 - 2025-09-30: Second attempt at the normalization refactor (with explicit recursion proofs) also stalled: `List.Mem` case analysis and rewrites around concatenated prefixes produced stubborn lint errors. Backed out the changes again; plan to prototype the `List.span` formulation in a scratch file before touching the main module.
 - 2025-09-30: Third iteration succeeded—introduced `SentinelSplit`, structural `split`, and proved reconstruction/post/`mem` lemmas; `Proofs/Sentinel.lean` and unit guards now rely on the new facts while `lake build`/`lake test` stay green (lint still slow under the harness timeout).

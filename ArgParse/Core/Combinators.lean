@@ -130,7 +130,7 @@ inductive FlagMatch
   /-- The token matches the long-form flag. -/
   | long
 
-private def matchFlagToken (spec : FlagSpec) (token : String) : FlagMatch :=
+@[inline] def matchFlagToken (spec : FlagSpec) (token : String) : FlagMatch :=
   match spec.long? with
   | some name =>
       if token = longLexeme name then
