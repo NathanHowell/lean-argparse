@@ -72,10 +72,8 @@
 
 - Legacy Main example
   - After values and recursion land, rebuild the historic example in `Main.lean` (greet/repeat app) and add regression tests.
-- Library-owned subcommand combinator
-  - Promote subcommand token dispatch into `ArgParse/Core/Combinators.lean`, exposing a `Parser` helper that tries each branch via `Alternative` and emits `Expect.subcommand` diagnostics on failure.
-  - Thread the helper through `Spec/Elab` so `CmdSpec.subs` elaborates into an applicative parser automatically (no manual token matching in examples).
-  - Refresh docs/completions/examples once the combinator exists, ensuring `Main.lean` and other demos compose subcommands purely with `<*>`/`<|>`.
+- ✅ Library-owned subcommand combinator
+  - `ArgParse/Core/Combinators.subcommand` now centralises token dispatch with `Alternative`; `Spec/Elab` and `Main.lean` use it so examples remain applicative-only.
 
 ## Design notes / decisions pending
 - Option semantics for `.one`
@@ -90,6 +88,7 @@
 
 ## Activity Log
 - 2025-09-30: Added interleaved subcommand regressions (success + missing-value failure) to `ArgParse/Tests/Unit.lean`, keeping totality lemmas intact; verified with `lake test`.
+- 2025-09-30: Introduced `Core.subcommand`, updated `Spec.Elab`/`Main.lean`, and adjusted runtime tests to match the new diagnostics; `lake build; lake test`.
 - 2025-09-30: Taught `.one` options to consume duplicates (last value wins) and enforced `.some` arity errors in `Core.option`/`Spec.Elab`; runtime guard checks now execute via `lake test`. `lake test`.
 - 2025-09-30: Proved `flag_cursor_progress`/`flag_cursor_bounds` in `ArgParse/Proofs/Totality.lean`, refactoring result-case lemmas to use `rfl`; `lake build; lake test` (warnings only about `simpa`).
 - 2025-09-30: Added runner leftover detection regressions plus broader unit coverage (repeated `.one`/`.many`/`.some`, bundled shorts, sentinel boundary, missing/invalid payload) in `ArgParse/Tests/Unit.lean`; exported `matchFlagToken` and replaced `Proofs/Totality` placeholders with result-case lemmas. `lake test`.
