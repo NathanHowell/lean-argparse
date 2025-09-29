@@ -33,6 +33,22 @@ def ofOption (failMsg : String) : Option α → Except String α
 /-- Normalise strings for case-insensitive comparisons. -/
 private def lowercase (s : String) : String := s.toLower
 
+/-- Build a `FromArg` instance for enumerations described by `(name, value)` pairs.
+
+Names are matched case-insensitively while documentation retains the original
+spelling from `xs`. Duplicate keys prefer the first occurrence. -/
+def enumFrom (xs : List (String × α)) : FromArg α where
+  parse input :=
+    let needle := lowercase input
+    let table := xs.map (fun pair => (lowercase pair.fst, pair.snd))
+    match table.find? (fun entry : String × α => entry.fst = needle) with
+    | some entry => .ok entry.snd
+    | none =>
+        let expectation := String.intercalate ", " (xs.map Prod.fst)
+        .error s!"expected one of {expectation}, found '{input}'"
+  metavar := "VALUE"
+  choices := some (xs.map Prod.fst)
+
 end FromArg
 
 open FromArg
