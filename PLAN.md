@@ -47,15 +47,13 @@
    - Prepare release notes summarizing parity with the old API plus new guarantees.
 
 ## Next Actions (focused, incremental)
-- Subcommand recursion
-  - Implement well-founded recursion for subcommand descent in `ArgParse/Spec/Elab.lean` using a `commandWeight`-style measure and `termination_by`.
-  - Add a unit test exercising nested subcommand dispatch (options before/after subcommand token; sentinel interactions).
+- ✅ Subcommand recursion
+  - `ArgParse/Spec/Elab.lean` now recurses on subcommands using a token-derived fuel measure, preserving left-to-right parsing and termination.
+  - Added nested subcommand coverage in `Tests/Main.lean` (options before/after the subcommand token plus sentinel handling).
 
-- Replace placeholder values in Partial
-  - Today option/positional values are recorded as the placeholder string "<val>". Choose an approach:
-    - A: Keep `Partial` untyped but require `ToString α` at elaboration sites to record real strings.
-    - B: Make `Partial` typed (store `Σ α, value` with an erasure path to strings for docs). This is more invasive but closer to SPEC.
-  - Update `ArgParse/Spec/Elab.lean` accordingly and extend tests to cover success/invalid/missing value cases.
+- ✅ Replace placeholder values in Partial
+  - Accumulators now append the actual token strings, enabling last-value-wins lookup semantics in summaries.
+  - Next: revisit typed accumulators once the builder layer needs richer folding.
 
 - Leftover detection
   - Teach the runner to emit `ErrorKind.leftover` when tokens remain after parsing. Add tests.
@@ -242,6 +240,7 @@
 - 2025-09-28: Proved that summary-aware renderers (`renderHelpWithSummary`, `renderManWithSummary`, `renderCompletionsWithSummary`) agree with the original partial-based helpers when fed `Partial.toSummary`.
 - 2025-09-29: Implemented runner leftover detection in `ArgParse/Core/Runner.lean` (emit `.leftover` with `expect = [.endOfInput]` when `pre`/`post` remain after a successful parse); deferred strict `#guard` due to evaluator flakiness and will add regression coverage alongside elaboration recursion work.
 - 2025-09-29: Implemented fuel-based subcommand recursion in `ArgParse/Spec/Elab.lean` via `elaborateCommandCore`; kept the tree green and deferred strict recursion guards until option semantics under recursion are verified.
+- 2025-09-29: Replaced placeholder `"<val>"` accumulation with real token strings, wired summaries for last-value-wins, and restored nested subcommand parsing/tests so `lake test` covers recursion plus duplicate options.
 
 ## Build Fix Backlog (2025-09-28)
 Order the following tasks sequentially; after addressing each file, rerun `lake env lean --root=.<file>` and commit before progressing. Notes capture any blockers discovered while attempting earlier items.

@@ -5,14 +5,15 @@ import ArgParse.Spec.AST
 namespace ArgParse.Spec
 
 open ArgParse
+open Classical
 
 /- Parser runtime accumulator storing intermediate flag/option/positional values. -/
 structure Partial where
-  /-- Recorded flag values, newest entry first. -/
+  /-- Recorded flag values in chronological order. -/
   flags : List (String × Bool) := []
-  /-- Recorded option key/value pairs. -/
+  /-- Recorded option key/value pairs in chronological order. -/
   options : List (String × String) := []
-  /-- Recorded positional key/value pairs. -/
+  /-- Recorded positional key/value pairs in chronological order. -/
   positionals : List (String × String) := []
 deriving Repr
 
@@ -23,15 +24,15 @@ def empty : Partial := {}
 
 /-- Record a boolean flag in the accumulator. -/
 def addFlag (name : String) (value : Bool) (p : Partial) : Partial :=
-  { p with flags := (name, value) :: p.flags }
+  { p with flags := p.flags ++ [(name, value)] }
 
 /-- Record an option key/value pair in the accumulator. -/
 def addOption (name : String) (value : String) (p : Partial) : Partial :=
-  { p with options := (name, value) :: p.options }
+  { p with options := p.options ++ [(name, value)] }
 
 /-- Record a positional key/value pair in the accumulator. -/
 def addPositional (name : String) (value : String) (p : Partial) : Partial :=
-  { p with positionals := (name, value) :: p.positionals }
+  { p with positionals := p.positionals ++ [(name, value)] }
 
 /-- Summary view derived from `Partial` for downstream consumers. -/
 structure Summary where
@@ -45,9 +46,11 @@ deriving Repr
 
 namespace Summary
 
-/-- Lookup the current boolean value for a flag. -/
+/-- Lookup the current boolean value for a flag using last-value-wins semantics. -/
 def flagValue? (summary : Summary) (name : String) : Option Bool :=
-  (summary.flags.find? (fun entry => entry.fst = name)).map (·.snd)
+  summary.flags.foldl
+    (fun latest entry => if entry.fst = name then some entry.snd else latest)
+    none
 
 /-- Collect all values provided for a particular option. -/
 def optionValues (summary : Summary) (name : String) : List String :=
@@ -63,23 +66,26 @@ end Summary
 def toSummary (p : Partial) : Summary :=
   { flags := p.flags, options := p.options, positionals := p.positionals }
 
-/-- Combine two partial payloads, appending records in left-to-right order. -/
-def merge (a b : Partial) : Partial :=
-  { flags := a.flags ++ b.flags
-  , options := a.options ++ b.options
-  , positionals := a.positionals ++ b.positionals }
+/-- Combine two partial payloads, appending records left-to-right. -/
+def merge (earlier later : Partial) : Partial :=
+  { flags := earlier.flags ++ later.flags
+  , options := earlier.options ++ later.options
+  , positionals := earlier.positionals ++ later.positionals }
 
 end Partial
 
 
--- Subcommand recursion helper is defined below `elaborateItems` to satisfy
--- dependencies; it uses a simple fuel derived from the input state.
+-- Subcommand recursion uses a simple token-derived measure to ensure
+-- termination without relying on explicit proofs about the spec tree.
+
+private def stateFuel (st : ArgParse.State) : Nat :=
+  st.pre.length + st.post.length + 1
 
 /-- Elaborate a single item specification into a transformer over `Partial`. -/
 def elaborateItem : ItemSpec → Parser (Partial → Partial)
   | .flag spec =>
       -- Parse a boolean flag and record the result under the meta name.
-      ArgParse.Core.flag spec |>.map (fun b => fun p => p.addFlag spec.«meta».name b)
+      ArgParse.Core.flag spec |>.map (fun b => fun p => if b then p.addFlag spec.«meta».name true else p)
   | @ItemSpec.opt α _ spec =>
       -- Handle options by arity; values are recorded using `repr`.
       match spec.arity with
@@ -88,54 +94,58 @@ def elaborateItem : ItemSpec → Parser (Partial → Partial)
           Parser.pure id
       | .one =>
           -- Use the arity-agnostic helper to avoid dependent type equalities.
-          (Parser.map (fun (ov : Option α) =>
+          (Parser.map (fun (ov : Option (α × String)) =>
             fun p =>
               match ov with
               | none => p
-              | some _ => p.addOption spec.«meta».name "<val>")
+              | some (_, raw) => p.addOption spec.«meta».name raw)
             (fun st =>
             match ArgParse.Core.takeOptionValue? (α := α) spec st with
             | .ok (ov, st') => ArgParse.Result.ok ov st'
             | .error err => ArgParse.Result.err err))
       | .many =>
-          (Parser.map (fun (vs : List α) =>
-            fun p => vs.foldl (fun acc _ => acc.addOption spec.«meta».name "<val>") p)
+          (Parser.map (fun (payload : List α × List String) =>
+            let raws := payload.snd
+            fun p => raws.foldl (fun acc raw => acc.addOption spec.«meta».name raw) p)
             (fun st =>
             match ArgParse.Core.collectOptionValues (α := α) spec st with
-            | .ok (vs, st') => ArgParse.Result.ok vs st'
+            | .ok (values, raws, st') => ArgParse.Result.ok (values, raws) st'
             | .error err => ArgParse.Result.err err))
       | .some =>
-          (Parser.map (fun (vs : List α) =>
-            fun p => vs.foldl (fun acc _ => acc.addOption spec.«meta».name "<val>") p)
+          (Parser.map (fun (payload : List α × List String) =>
+            let raws := payload.snd
+            fun p => raws.foldl (fun acc raw => acc.addOption spec.«meta».name raw) p)
             (fun st =>
             match ArgParse.Core.collectOptionValues (α := α) spec st with
-            | .ok (vs, st') => ArgParse.Result.ok vs st'
+            | .ok (values, raws, st') => ArgParse.Result.ok (values, raws) st'
             | .error err => ArgParse.Result.err err))
   | @ItemSpec.pos α _ spec =>
       match spec.arity with
       | .zero => Parser.pure id
       | .one  =>
-          (Parser.map (fun (ov : Option α) =>
+          (Parser.map (fun (ov : Option (α × String)) =>
             fun p => match ov with
               | none => p
-              | some _ => p.addPositional spec.«meta».name "<val>")
+              | some (_, raw) => p.addPositional spec.«meta».name raw)
             (fun st =>
             match ArgParse.Core.takePositionalValue? (α := α) spec st with
             | .ok (ov, st') => ArgParse.Result.ok ov st'
             | .error err => ArgParse.Result.err err))
       | .many =>
-          (Parser.map (fun (vs : List α) =>
-            fun p => vs.foldl (fun acc _ => acc.addPositional spec.«meta».name "<val>") p)
+          (Parser.map (fun (payload : List α × List String) =>
+            let raws := payload.snd
+            fun p => raws.foldl (fun acc raw => acc.addPositional spec.«meta».name raw) p)
             (fun st =>
             match ArgParse.Core.collectPositionalValues (α := α) spec st with
-            | .ok (vs, st') => ArgParse.Result.ok vs st'
+            | .ok (values, raws, st') => ArgParse.Result.ok (values, raws) st'
             | .error err => ArgParse.Result.err err))
       | .some =>
-          (Parser.map (fun (vs : List α) =>
-            fun p => vs.foldl (fun acc _ => acc.addPositional spec.«meta».name "<val>") p)
+          (Parser.map (fun (payload : List α × List String) =>
+            let raws := payload.snd
+            fun p => raws.foldl (fun acc raw => acc.addPositional spec.«meta».name raw) p)
             (fun st =>
             match ArgParse.Core.collectPositionalValues (α := α) spec st with
-            | .ok (vs, st') => ArgParse.Result.ok vs st'
+            | .ok (values, raws, st') => ArgParse.Result.ok (values, raws) st'
             | .error err => ArgParse.Result.err err))
 
 /-- Elaborate a list of items, sequencing their transformers left-to-right. -/
@@ -149,11 +159,6 @@ def elaborateItems (items : List ItemSpec) : Parser (Partial → Partial) :=
         Parser.seq (Parser.map (fun f => fun (g : Partial → Partial) => g ∘ f) head) (fun _ => tail)
   go items
 
-/--
-Elaborate a command with a fuel parameter that bounds subcommand recursion by the
-sum of remaining tokens. This avoids a bespoke well‑founded proof while preserving
-the intended behaviour: each descent into a child decrements the fuel.
--/
 private def elaborateCommandCore : (fuel : Nat) → CmdSpec → Parser Partial
   | 0, _ => Parser.pure Partial.empty
   | fuel+1, cmd =>
@@ -162,22 +167,23 @@ private def elaborateCommandCore : (fuel : Nat) → CmdSpec → Parser Partial
         match st.pre with
         | token :: rest =>
             if token.startsWith "-" then
-              -- Not a subcommand token; stop here.
               ArgParse.Result.ok Partial.empty st
             else
               match cmd.subs.find? (fun c => c.name = token) with
               | some child =>
                   let st' : ArgParse.State := { st with pre := rest, cursor := st.cursor + 1 }
-                  -- Recurse into the child with one less unit of fuel.
                   (elaborateCommandCore fuel child) st'
               | none => ArgParse.Result.ok Partial.empty st
         | [] => ArgParse.Result.ok Partial.empty st
-      Parser.seq (Parser.map (fun (f : Partial → Partial) => fun (child : Partial) => Partial.merge (f Partial.empty) child) itemsP) (fun _ => subP)
+      Parser.seq
+        (Parser.map (fun (f : Partial → Partial) => fun (child : Partial) => Partial.merge (f Partial.empty) child) itemsP)
+        (fun _ => subP)
+
 
 /-- Elaborate a command by folding its items into an initial `Partial`. -/
 def elaborateCommand (cmd : CmdSpec) : Parser Partial :=
   fun st =>
-    let fuel := st.pre.length + st.post.length + 1
+    let fuel := stateFuel st
     (elaborateCommandCore fuel cmd) st
 
 /-- Elaborate the application; currently delegates to the root command. -/
