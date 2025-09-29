@@ -1,5 +1,7 @@
 import ArgParse.Core.Normalize
 import ArgParse.Core.Value
+import ArgParse.Spec.AST
+import ArgParse.Spec.Elab
 import ArgParse.Proofs.Sentinel
 
 namespace ArgParse.Tests
@@ -29,5 +31,23 @@ instance : ArgParse.FromArg Toggle :=
   (let tokens := ["-v", "--", "tail"]
    let st := normalize tokens
    tokens = st.pre ++ "--" :: st.post)
+
+-- Spec/Elab sanity: elaborate a simple flag + option and parse.
+open ArgParse.Spec
+def mkMeta (n : String) : ArgParse.Spec.Meta := { name := n }
+def flagSpec : ArgParse.Spec.FlagSpec := { long? := some "verbose", «meta» := mkMeta "verbose" }
+def optSpec : ArgParse.Spec.OptSpec String := { long? := some "name", «meta» := mkMeta "name", arity := .one }
+def cmd : ArgParse.Spec.CmdSpec := { name := "app", «meta» := mkMeta "app", args := [.flag flagSpec, .opt optSpec] }
+
+#guard
+  (let p := ArgParse.Spec.elaborateCommand cmd
+   let st := normalize ["--verbose", "--name=foo"]
+   match p st with
+   | .ok part _ => part.flags.any (fun (k,v) => k = "verbose" ∧ v = true) ∧
+                   part.options.any (fun (k,_) => k = "name")
+   | _ => False)
+
+-- Subcommand selection placeholder: elaborator currently consumes a matching
+-- subcommand token without recursing; full recursion will be tested later.
 
 end ArgParse.Tests
