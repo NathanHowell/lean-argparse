@@ -72,6 +72,34 @@ def consumePost? (st : State) : Option (String × State) :=
       let st' : State := withPost st rest 1
       some (tok, st')
 
+/-- Successful `consumePre?` advances the cursor by one. -/
+@[simp] theorem consumePre?_cursor
+    {st : State} {tok : String} {st' : State}
+    (h : consumePre? st = some (tok, st')) :
+    st'.cursor = st.cursor + 1 := by
+  classical
+  cases hpre : st.pre with
+  | nil =>
+      simp [consumePre?, hpre] at h
+  | cons head rest =>
+      simp [consumePre?, hpre] at h
+      rcases h with ⟨rfl, rfl⟩
+      simp [State.withPre]
+
+/-- Successful `consumePost?` advances the cursor by one. -/
+@[simp] theorem consumePost?_cursor
+    {st : State} {tok : String} {st' : State}
+    (h : consumePost? st = some (tok, st')) :
+    st'.cursor = st.cursor + 1 := by
+  classical
+  cases hpost : st.post with
+  | nil =>
+      simp [consumePost?, hpost] at h
+  | cons head rest =>
+      simp [consumePost?, hpost] at h
+      rcases h with ⟨rfl, rfl⟩
+      simp [State.withPost]
+
 end State
 
 private def shortLexeme (short : Short) : String :=
