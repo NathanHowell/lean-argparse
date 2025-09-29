@@ -65,7 +65,7 @@
 
 - Tests expansion
   - Added coverage in `ArgParse/Tests/Unit.lean` for repeated arities (`.one`/`.many`/`.some`), bundled short flags, sentinel boundaries, missing/invalid option values, and interleaved subcommand success/failure cases.
-  - TODO: extend to more complex subcommand trees (multi-level branching) and property-style negative paths once builder proofs settle.
+  - Added multi-level subcommand runtime checks (nested child + grandchild) plus negative paths covering missing grandchild values and unknown subcommand leftovers.
 
 - Legacy Main example
   - After values and recursion land, rebuild the historic example in `Main.lean` (greet/repeat app) and add regression tests.
@@ -88,6 +88,8 @@
 - 2025-09-30: Added runner leftover detection regressions plus broader unit coverage (repeated `.one`/`.many`/`.some`, bundled shorts, sentinel boundary, missing/invalid payload) in `ArgParse/Tests/Unit.lean`; exported `matchFlagToken` and replaced `Proofs/Totality` placeholders with result-case lemmas. `lake test`.
 - 2025-09-30: Spiked on refactoring `ArgParse/Core/Normalize.lean` to expose sentinel metadata (pre/post/saw) and accompanying proofs/tests; recursive `simp` obligations around `splitOnSentinel` made the approach unstable, so the code was reverted. Next iteration will explore a `takeWhile`/`dropWhile` decomposition before reattempting Step 1.
 - 2025-09-30: Second attempt at the normalization refactor (with explicit recursion proofs) also stalled: `List.Mem` case analysis and rewrites around concatenated prefixes produced stubborn lint errors. Backed out the changes again; plan to prototype the `List.span` formulation in a scratch file before touching the main module.
+- 2025-09-30: Added nested subcommand runtime checks (grandchild success, missing value, unknown subcommand leftover) to `ArgParse/Tests/Unit.lean`; `lake build; lake test`.
+- 2025-09-30: Began option cursor/consumption lemmas in `ArgParse/Proofs/Totality.lean` but deferred after scope exploded—need supporting runtime helpers before retrying.
 - 2025-09-30: Third iteration succeeded—introduced `SentinelSplit`, structural `split`, and proved reconstruction/post/`mem` lemmas; `Proofs/Sentinel.lean` and unit guards now rely on the new facts while `lake build`/`lake test` stay green (lint still slow under the harness timeout).
 - 2025-09-30: Added `FromArg.enumFrom` helper plus enumeration guards, rounding out baseline `FromArg` instances (String/Substring/Nat/Int/Bool) and confirming `lake build; lake test` with lint still limited by the CLI timeout.
 - 2025-09-30: Wired up Spec.Elab to fold flags/options/positionals into a Partial accumulator and added a minimal end-to-end guard. Subcommands are stubbed for now (token is consumed when a child name matches; recursion deferred) and will be revisited with a well-founded measure.

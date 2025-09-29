@@ -301,6 +301,92 @@ private def checkInterleavedMissing : Except String Unit := do
   | other =>
       .error s!"expected missing-value error, got {repr other}"
 
+private def treeRootFlag : FlagSpec := { long? := some "tree-root-verbose", «meta» := mkMeta "tree-root-verbose" }
+private def treeRootMode : OptSpec String :=
+  { long? := some "tree-root-mode", «meta» := mkMeta "tree-root-mode", arity := .one }
+private def childTreeFlag : FlagSpec := { long? := some "child-tree-debug", «meta» := mkMeta "child-tree-debug" }
+private def childTreeMode : OptSpec String :=
+  { long? := some "child-tree-mode", «meta» := mkMeta "child-tree-mode", arity := .one }
+private def grandTreeMode : OptSpec String :=
+  { long? := some "grand-tree-mode", «meta» := mkMeta "grand-tree-mode", arity := .many }
+private def siblingTreeFlag : FlagSpec := { long? := some "sibling-tree-flag", «meta» := mkMeta "sibling-tree-flag" }
+private def grandTreeCmd : CmdSpec :=
+  { name := "grand"
+  , «meta» := mkMeta "grand"
+  , args := [.opt grandTreeMode] }
+private def siblingTreeCmd : CmdSpec :=
+  { name := "sibling"
+  , «meta» := mkMeta "sibling"
+  , args := [.flag siblingTreeFlag] }
+private def childTreeCmd : CmdSpec :=
+  { name := "child"
+  , «meta» := mkMeta "child-tree"
+  , args := [.flag childTreeFlag, .opt childTreeMode]
+  , subs := [grandTreeCmd, siblingTreeCmd] }
+private def peerTreeFlag : FlagSpec := { long? := some "peer-flag", «meta» := mkMeta "peer-flag" }
+private def peerTreeCmd : CmdSpec :=
+  { name := "peer"
+  , «meta» := mkMeta "peer"
+  , args := [.flag peerTreeFlag] }
+private def treeRootCmd : CmdSpec :=
+  { name := "tree"
+  , «meta» := mkMeta "tree"
+  , args := [.flag treeRootFlag, .opt treeRootMode]
+  , subs := [childTreeCmd, peerTreeCmd] }
+
+private def checkNestedSubcommandSuccess : Except String Unit := do
+  let app : AppSpec := { name := "tree-app", root := treeRootCmd }
+  let out := ArgParse.runSummary app
+    [ "--tree-root-verbose"
+    , "--tree-root-mode=cli"
+    , "child"
+    , "--child-tree-debug"
+    , "--child-tree-mode=first"
+    , "--child-tree-mode", "second"
+    , "grand"
+    , "--grand-tree-mode=one"
+    , "--grand-tree-mode", "two" ]
+  match out.result with
+  | .ok summary =>
+      let rootFlag := Partial.Summary.flagValue? summary "tree-root-verbose"
+      let rootModeVals := Partial.Summary.optionValues summary "tree-root-mode"
+      let childFlag := Partial.Summary.flagValue? summary "child-tree-debug"
+      let childModeVals := Partial.Summary.optionValues summary "child-tree-mode"
+      let grandModeVals := Partial.Summary.optionValues summary "grand-tree-mode"
+      expectTrue (rootFlag = some true) s!"expected root verbose flag, got {repr rootFlag}"
+      expectTrue (rootModeVals = ["cli"]) s!"expected root mode cli, got {repr rootModeVals}"
+      expectTrue (childFlag = some true) s!"expected child debug flag, got {repr childFlag}"
+      expectTrue (childModeVals = ["first", "second"]) s!"expected child modes, got {repr childModeVals}"
+      expectTrue (childModeVals.getLast? = some "second")
+        s!"expected child last value second, got {repr (childModeVals.getLast?)}"
+      expectTrue (grandModeVals = ["one", "two"]) s!"expected grand modes, got {repr grandModeVals}"
+  | other =>
+      .error s!"expected ok summary, got {repr other}"
+
+private def checkNestedGrandMissingValue : Except String Unit := do
+  let app : AppSpec := { name := "tree-app", root := treeRootCmd }
+  let out := ArgParse.runRaw app ["child", "grand", "--grand-tree-mode"]
+  match out.result with
+  | .err err =>
+      expectTrue (err.kind = ArgParse.ErrorKind.missingValue)
+        s!"expected missing-value error, got {repr err.kind}"
+      expectTrue (err.context = ["--grand-tree-mode"])
+        s!"expected context [--grand-tree-mode], got {repr err.context}"
+  | other =>
+      .error s!"expected missing-value error, got {repr other}"
+
+private def checkNestedUnknownSubcommand : Except String Unit := do
+  let app : AppSpec := { name := "tree-app", root := treeRootCmd }
+  let out := ArgParse.runRaw app ["child", "bogus"]
+  match out.result with
+  | .err err =>
+      expectTrue (err.kind = ArgParse.ErrorKind.leftover)
+        s!"expected leftover error, got {repr err.kind}"
+      expectTrue (err.context = ["bogus"])
+        s!"expected context [bogus], got {repr err.context}"
+  | other =>
+      .error s!"expected leftover error, got {repr other}"
+
 /-- Runtime regression checks executed by `lake test`. -/
 def runtimeChecks : List (String × Except String Unit) :=
   [ ("runner leftover (pre)", checkRunnerLeftoverPre)
@@ -315,5 +401,8 @@ def runtimeChecks : List (String × Except String Unit) :=
   , ("invalid option payload", checkInvalidOptionPayload)
   , ("interleaved subcommand success", checkInterleavedSuccess)
   , ("interleaved subcommand missing value", checkInterleavedMissing)
+  , ("nested subcommand success", checkNestedSubcommandSuccess)
+  , ("nested grandchild missing value", checkNestedGrandMissingValue)
+  , ("nested unknown subcommand", checkNestedUnknownSubcommand)
   ]
 end ArgParse.Tests
