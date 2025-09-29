@@ -241,6 +241,7 @@
 - 2025-09-28: Restored a minimal `lakefile.lean` (package + default exe) so Lake commands remain usable.
 - 2025-09-28: Proved that summary-aware renderers (`renderHelpWithSummary`, `renderManWithSummary`, `renderCompletionsWithSummary`) agree with the original partial-based helpers when fed `Partial.toSummary`.
 - 2025-09-29: Implemented runner leftover detection in `ArgParse/Core/Runner.lean` (emit `.leftover` with `expect = [.endOfInput]` when `pre`/`post` remain after a successful parse); deferred strict `#guard` due to evaluator flakiness and will add regression coverage alongside elaboration recursion work.
+- 2025-09-29: Implemented fuel-based subcommand recursion in `ArgParse/Spec/Elab.lean` via `elaborateCommandCore`; kept the tree green and deferred strict recursion guards until option semantics under recursion are verified.
 
 ## Build Fix Backlog (2025-09-28)
 Order the following tasks sequentially; after addressing each file, rerun `lake env lean --root=.<file>` and commit before progressing. Notes capture any blockers discovered while attempting earlier items.
