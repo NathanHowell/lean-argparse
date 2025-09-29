@@ -156,7 +156,7 @@ def elaborateCommand (cmd : CmdSpec) : Parser Partial :=
           ArgParse.Result.ok Partial.empty st
         else
           match cmd.subs.find? (fun c => c.name = token) with
-          | some child =>
+          | some _ =>
               let st' : ArgParse.State := { st with pre := rest, cursor := st.cursor + 1 }
               -- For now, consume the subcommand token and stop (no recursion).
               ArgParse.Result.ok Partial.empty st'

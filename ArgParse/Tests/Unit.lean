@@ -2,6 +2,7 @@ import ArgParse.Core.Normalize
 import ArgParse.Core.Value
 import ArgParse.Spec.AST
 import ArgParse.Spec.Elab
+import ArgParse.Core.Runner
 import ArgParse.Proofs.Sentinel
 
 namespace ArgParse.Tests
@@ -34,6 +35,7 @@ instance : ArgParse.FromArg Toggle :=
 
 -- Spec/Elab sanity: elaborate a simple flag + option and parse.
 open ArgParse.Spec
+/-– Helper to construct minimal metadata for test specs. -/
 def mkMeta (n : String) : ArgParse.Spec.Meta := { name := n }
 def flagSpec : ArgParse.Spec.FlagSpec := { long? := some "verbose", «meta» := mkMeta "verbose" }
 def optSpec : ArgParse.Spec.OptSpec String := { long? := some "name", «meta» := mkMeta "name", arity := .one }
@@ -45,6 +47,15 @@ def cmd : ArgParse.Spec.CmdSpec := { name := "app", «meta» := mkMeta "app", ar
    match p st with
    | .ok part _ => part.flags.any (fun (k,v) => k = "verbose" ∧ v = true) ∧
                    part.options.any (fun (k,_) => k = "name")
+   | _ => False)
+
+-- Runner built-ins: `--help` routes to help text without parsing.
+open ArgParse in
+#guard
+  (let app : ArgParse.Spec.AppSpec := { name := "app", root := cmd }
+   let out := ArgParse.runRaw app ["--help", "--name", "x"]
+   match out.result with
+   | .help _ => True
    | _ => False)
 
 -- Subcommand selection placeholder: elaborator currently consumes a matching
