@@ -69,7 +69,14 @@ def runNormalized (app : AppSpec) (fold : Spec.Partial → α) (st : State) : Ru
   | some outcome => outcome
   | none =>
       match Spec.elaborateApp app st with
-      | .ok payload st' => RunOutcome.ok (fold payload) st'
+      | .ok payload st' =>
+          -- Detect leftover tokens after a successful parse and surface an error.
+          if st'.pre ≠ [] ∨ st'.post ≠ [] then
+            let ctx := st'.pre ++ st'.post
+            let err : Error := { kind := .leftover, context := ctx, expect := [.endOfInput] }
+            RunOutcome.err err st'
+          else
+            RunOutcome.ok (fold payload) st'
       | .err error => RunOutcome.err error st
 
 /-- Run the application parser against raw argv tokens, folding the collected `Partial`. -/

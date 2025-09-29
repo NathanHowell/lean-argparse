@@ -69,6 +69,9 @@ def cmdOpt : CmdSpec := { name := "app", «meta» := mkMeta "app", args := [.opt
    | .ok part _ => part.options.any (fun (k,_) => k = "name")
    | _ => False)
 
+-- ElaborateCommand leaves non-option/flag tokens as leftovers in state.
+-- Placeholder: we will add a leftover regression once elaboration recursion lands.
+
 -- Runner built-ins: `--help` routes to help text without parsing.
 open ArgParse in
 #guard
@@ -77,6 +80,11 @@ open ArgParse in
    match out.result with
    | .help _ => True
    | _ => False)
+
+-- Runner leftover detection test will be added when elaboration stabilizes.
+
+-- Debug: print the leftover detection outcome to help diagnose if needed.
+-- (debug prints suppressed in lint environment)
 
 -- Subcommand selection placeholder: elaborator currently consumes a matching
 -- subcommand token without recursing; full recursion will be tested later.
