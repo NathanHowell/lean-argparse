@@ -46,6 +46,41 @@
    - Finalize docstrings, README, and migration guidance; ensure `lake build; lake test; lake lint` remain green across the tree.
    - Prepare release notes summarizing parity with the old API plus new guarantees.
 
+## Next Actions (focused, incremental)
+- Subcommand recursion
+  - Implement well-founded recursion for subcommand descent in `ArgParse/Spec/Elab.lean` using a `commandWeight`-style measure and `termination_by`.
+  - Add a unit test exercising nested subcommand dispatch (options before/after subcommand token; sentinel interactions).
+
+- Replace placeholder values in Partial
+  - Today option/positional values are recorded as the placeholder string "<val>". Choose an approach:
+    - A: Keep `Partial` untyped but require `ToString α` at elaboration sites to record real strings.
+    - B: Make `Partial` typed (store `Σ α, value` with an erasure path to strings for docs). This is more invasive but closer to SPEC.
+  - Update `ArgParse/Spec/Elab.lean` accordingly and extend tests to cover success/invalid/missing value cases.
+
+- Leftover detection
+  - Teach the runner to emit `ErrorKind.leftover` when tokens remain after parsing. Add tests.
+
+- Rebuild proof basics (small and steady)
+  - In `ArgParse/Proofs/Totality.lean`, prove progress/consumption facts for `Core.flag`, `Core.option`, and `Core.positional`.
+  - Lift these through `Spec.elaborateItems`/`elaborateCommand` to recover command-level cursor guarantees.
+
+- Tests expansion
+  - Extend `ArgParse/Tests/Unit.lean` with: repeated options by arity; bundled short flags; `--name=value` and `-nvalue` forms; sentinel boundary cases; leftover detection.
+
+- Legacy Main example
+  - After values and recursion land, rebuild the historic example in `Main.lean` (greet/repeat app) and add regression tests.
+
+## Design notes / decisions pending
+- Option semantics for `.one`
+  - Adopt "last value wins" for `.one` options (standard behavior), while `.many`/`.some` accumulate in-order lists. Update docs/tests accordingly.
+
+- Typed vs. string payloads
+  - Typed `Partial` improves downstream safety and proofs but requires existentials or dependent records; string-only is simpler for docs and the runner. Prototype A (string with `ToString`) first, then evaluate B.
+
+## Process guardrails
+- Always run `lake build; lake test; lake lint` before committing.
+- Make small, focused commits (one file or closely-related files at a time) and record outcomes—positive or negative—in the Activity Log.
+
 ## Activity Log
 - 2025-09-30: Spiked on refactoring `ArgParse/Core/Normalize.lean` to expose sentinel metadata (pre/post/saw) and accompanying proofs/tests; recursive `simp` obligations around `splitOnSentinel` made the approach unstable, so the code was reverted. Next iteration will explore a `takeWhile`/`dropWhile` decomposition before reattempting Step 1.
 - 2025-09-30: Second attempt at the normalization refactor (with explicit recursion proofs) also stalled: `List.Mem` case analysis and rewrites around concatenated prefixes produced stubborn lint errors. Backed out the changes again; plan to prototype the `List.span` formulation in a scratch file before touching the main module.
