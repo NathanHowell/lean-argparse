@@ -218,4 +218,47 @@ def countCmd : CmdSpec :=
    | .err err => err.kind = ArgParse.ErrorKind.custom
    | _ => False)
 
+def rootVerbose : FlagSpec := { long? := some "root-verbose", «meta» := mkMeta "root-verbose" }
+def rootMode : OptSpec String := { long? := some "root-mode", «meta» := mkMeta "root-mode", arity := .one }
+def childDebug : FlagSpec := { long? := some "child-debug", «meta» := mkMeta "child-debug" }
+def childMode : OptSpec String := { long? := some "child-mode", «meta» := mkMeta "child-mode", arity := .one }
+def childDeep : CmdSpec :=
+  { name := "child"
+  , «meta» := mkMeta "child"
+  , args := [.flag childDebug, .opt childMode] }
+def interleavedCmd : CmdSpec :=
+  { name := "root"
+  , «meta» := mkMeta "root"
+  , args := [.flag rootVerbose, .opt rootMode]
+  , subs := [childDeep] }
+
+-- Subcommand options honour last-value-wins while root items persist.
+#guard
+  (let app : ArgParse.Spec.AppSpec := { name := "interleaved", root := interleavedCmd }
+   let out := ArgParse.runSummary app
+     [ "--root-verbose"
+     , "--root-mode=alpha"
+     , "child"
+     , "--child-debug"
+     , "--child-mode=beta"
+     , "--child-mode", "gamma" ]
+   match out.result with
+   | .ok summary =>
+       let rootFlag := Partial.Summary.flagValue? summary "root-verbose"
+       let rootVals := Partial.Summary.optionValues summary "root-mode"
+       let childFlag := Partial.Summary.flagValue? summary "child-debug"
+       let childVals := Partial.Summary.optionValues summary "child-mode"
+       rootFlag = some true ∧ rootVals = ["alpha"] ∧
+       childFlag = some true ∧ childVals = ["beta", "gamma"] ∧
+       childVals.getLast? = some "gamma"
+   | _ => False)
+
+-- Missing child option payload bubbles the structured error through the runner.
+#guard
+  (let app : ArgParse.Spec.AppSpec := { name := "interleaved", root := interleavedCmd }
+   let out := ArgParse.runRaw app ["child", "--child-mode"]
+   match out.result with
+   | .err err => err.kind = ArgParse.ErrorKind.missingValue ∧ err.context = ["--child-mode"]
+   | _ => False)
+
 end ArgParse.Tests
