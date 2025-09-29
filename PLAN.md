@@ -72,6 +72,10 @@
 
 - Legacy Main example
   - After values and recursion land, rebuild the historic example in `Main.lean` (greet/repeat app) and add regression tests.
+- Library-owned subcommand combinator
+  - Promote subcommand token dispatch into `ArgParse/Core/Combinators.lean`, exposing a `Parser` helper that tries each branch via `Alternative` and emits `Expect.subcommand` diagnostics on failure.
+  - Thread the helper through `Spec/Elab` so `CmdSpec.subs` elaborates into an applicative parser automatically (no manual token matching in examples).
+  - Refresh docs/completions/examples once the combinator exists, ensuring `Main.lean` and other demos compose subcommands purely with `<*>`/`<|>`.
 
 ## Design notes / decisions pending
 - Option semantics for `.one`

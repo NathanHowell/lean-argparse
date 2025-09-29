@@ -21,7 +21,7 @@ ArgParse/
     Types.lean            -- core types (State, Result, Error, Doc, Shell, etc.)
     Parser.lean           -- Parser α & instances; stepping semantics
     Value.lean            -- FromArg α class & instances (String, Int, Nat, Bool, Enum…)
-    Combinators.lean      -- flags/options/positionals/subcommands DSL
+  Combinators.lean      -- flags/options/positionals/subcommands DSL (Applicative/Alternative-first)
     Normalize.lean        -- argv normalization & `--` sentinel partition
   Spec/
     AST.lean              -- command/spec tree (the single source of truth)
@@ -237,7 +237,7 @@ This keeps the single source of truth while giving a friendly Applicative style.
 	•	--long=value and --long value if eqVal? / space form allowed.
 	•	-xVALUE if concatVal? and arity .one.
 	•	Bundles of short flags allowed (-abc ≡ -a -b -c), including digits (so -0v is ok).
-	•	Subcommand: first non-option token that matches a declared subcommand name selects it and switches to that command’s parser.
+	•	Subcommand: `Core.subcommand` exposes an Applicative-friendly combinator.  Given a list of `(name, parser)` entries, it uses `Alternative` to try each branch, consuming the matching command token, and produces informative errors (`Expect.subcommand`) when nothing matches.  Builder modules use this helper so example apps never pattern-match on tokens directly.
 	•	Positionals: consumed in declared order; many/some are greedy within their scope.
 	•	Sentinel --: all tokens after move to post and are matched only by positionals.
 
