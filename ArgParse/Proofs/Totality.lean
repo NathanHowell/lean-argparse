@@ -33,14 +33,13 @@ namespace Totality
       | none =>
           exact ⟨false, st, by simp [Core.flag, hpre, hmatch]⟩
       | short =>
-          let st' : State := { st with pre := rest, cursor := st.cursor + 1 }
+          let st' : State := State.withPre st rest 1
           exact ⟨true, st', by simp [Core.flag, hpre, hmatch, st']⟩
       | long =>
-          let st' : State := { st with pre := rest, cursor := st.cursor + 1 }
+          let st' : State := State.withPre st rest 1
           exact ⟨true, st', by simp [Core.flag, hpre, hmatch, st']⟩
       | shortBundled tail =>
-          let st' : State :=
-            { st with pre := ("-" ++ tail) :: rest, cursor := st.cursor + 1 }
+          let st' : State := State.withPre st (("-" ++ tail) :: rest) 1
           exact ⟨true, st', by simp [Core.flag, hpre, hmatch, st']⟩
 
 /-- Flag parsers either leave the cursor untouched or advance by one token. -/
@@ -66,27 +65,27 @@ theorem flag_cursor_progress {spec : FlagSpec} {st : State} {b : Bool} {st' : St
           cases hst
           simp
       | short =>
-          have h' : b = true ∧ { st with pre := rest, cursor := st.cursor + 1 } = st' := by
+          have h' : b = true ∧ State.withPre st rest 1 = st' := by
             simpa [Core.flag, hpre, hmatch] using h
           rcases h' with ⟨hb, hst⟩
           subst hb
           cases hst
-          simp
+          simp [State.withPre]
       | long =>
-          have h' : b = true ∧ { st with pre := rest, cursor := st.cursor + 1 } = st' := by
+          have h' : b = true ∧ State.withPre st rest 1 = st' := by
             simpa [Core.flag, hpre, hmatch] using h
           rcases h' with ⟨hb, hst⟩
           subst hb
           cases hst
-          simp
+          simp [State.withPre]
       | shortBundled tail =>
           have h' : b = true ∧
-              { st with pre := ("-" ++ tail) :: rest, cursor := st.cursor + 1 } = st' := by
+              State.withPre st (("-" ++ tail) :: rest) 1 = st' := by
             simpa [Core.flag, hpre, hmatch] using h
           rcases h' with ⟨hb, hst⟩
           subst hb
           cases hst
-          simp
+          simp [State.withPre]
 
 /-- Flag cursors never retreat and grow by at most one. -/
 theorem flag_cursor_bounds {spec : FlagSpec} {st : State} {b : Bool} {st' : State}

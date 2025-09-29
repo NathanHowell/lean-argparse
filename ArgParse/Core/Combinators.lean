@@ -20,12 +20,38 @@ Helpers
 
 namespace State
 
+/-- Replace the `pre` stream while advancing the cursor by `delta`. -/
+@[inline] def withPre (st : State) (pre : List String) (delta : Nat) : State :=
+  { st with pre := pre, cursor := st.cursor + delta }
+
+/-- Replace the `post` stream while advancing the cursor by `delta`. -/
+@[inline] def withPost (st : State) (post : List String) (delta : Nat) : State :=
+  { st with post := post, cursor := st.cursor + delta }
+
+@[simp] theorem withPre_pre (st : ArgParse.State) (pre : List String) (delta : Nat) :
+    (withPre st pre delta).pre = pre := rfl
+
+@[simp] theorem withPre_cursor (st : ArgParse.State) (pre : List String) (delta : Nat) :
+    (withPre st pre delta).cursor = st.cursor + delta := rfl
+
+@[simp] theorem withPre_post (st : ArgParse.State) (pre : List String) (delta : Nat) :
+    (withPre st pre delta).post = st.post := rfl
+
+@[simp] theorem withPost_post (st : ArgParse.State) (post : List String) (delta : Nat) :
+    (withPost st post delta).post = post := rfl
+
+@[simp] theorem withPost_cursor (st : ArgParse.State) (post : List String) (delta : Nat) :
+    (withPost st post delta).cursor = st.cursor + delta := rfl
+
+@[simp] theorem withPost_pre (st : ArgParse.State) (post : List String) (delta : Nat) :
+    (withPost st post delta).pre = st.pre := rfl
+
 /-- Remove the next token from `pre`, updating the cursor. -/
 def consumePre? (st : State) : Option (String × State) :=
   match st.pre with
   | [] => none
   | tok :: rest =>
-      let st' : State := { st with pre := rest, cursor := st.cursor + 1 }
+      let st' : State := withPre st rest 1
       some (tok, st')
 
 /-- Remove the next token from `post`, updating the cursor. -/
@@ -33,7 +59,7 @@ def consumePost? (st : State) : Option (String × State) :=
   match st.post with
   | [] => none
   | tok :: rest =>
-      let st' : State := { st with post := rest, cursor := st.cursor + 1 }
+      let st' : State := withPost st rest 1
       some (tok, st')
 
 end State
@@ -177,14 +203,14 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
       match matchFlagToken spec token with
       | .none => .ok false st
       | .short =>
-          let st' : State := { st with pre := rest, cursor := st.cursor + 1 }
+          let st' : State := State.withPre st rest 1
           .ok true st'
       | .long =>
-          let st' : State := { st with pre := rest, cursor := st.cursor + 1 }
+          let st' : State := State.withPre st rest 1
           .ok true st'
       | .shortBundled tail =>
           let remainder := "-" ++ tail
-          let st' : State := { st with pre := remainder :: rest, cursor := st.cursor + 1 }
+          let st' : State := State.withPre st (remainder :: rest) 1
           .ok true st'
   | [] => .ok false st
 
@@ -196,14 +222,14 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
   if raw = "" then
     .error (missingValueError token expect)
   else
-    let stAfter := { st with pre := pending, cursor := st.cursor + 1 }
+    let stAfter := State.withPre st pending 1
     match FromArg.run raw with
     | .ok value => .ok (some (value, raw), stAfter)
     | .error msg =>
         match findConcatSplit? (raw := raw) with
         | some (value, remainder) =>
             let newState :=
-              { stAfter with pre := ("-" ++ remainder) :: pending }
+              State.withPre stAfter (("-" ++ remainder) :: pending) 0
             let consumedToken := stringTake raw (raw.length - remainder.length)
             .ok (some (value, consumedToken), newState)
         | none => .error (invalidValueError raw msg expect)
@@ -233,7 +259,7 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
             | valueTok :: restTail =>
                 match FromArg.run valueTok with
                 | .ok value =>
-                    let st' : State := { st with pre := restTail, cursor := st.cursor + 2 }
+                    let st' : State := State.withPre st restTail 2
                     .ok { value? := some value, raw? := some valueTok, state := st', consumed := 2 }
                 | .error msg => .error (invalidValueError valueTok msg expect)
             | [] => .error (missingValueError token expect)
@@ -246,7 +272,7 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
                   | valueTok :: restTail =>
                       match FromArg.run valueTok with
                       | .ok value =>
-                          let st' : State := { st with pre := restTail, cursor := st.cursor + 2 }
+                          let st' : State := State.withPre st restTail 2
                           .ok { value? := some value, raw? := some valueTok, state := st', consumed := 2 }
                       | .error msg => .error (invalidValueError valueTok msg expect)
                   | [] => .error (missingValueError token expect)
@@ -270,7 +296,7 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
                 | valueTok :: restTail =>
                     match FromArg.run valueTok with
                     | .ok value =>
-                        let st' : State := { st with pre := restTail, cursor := st.cursor + 2 }
+                        let st' : State := State.withPre st restTail 2
                         .ok { value? := some value, raw? := some valueTok, state := st', consumed := 2 }
                     | .error msg => .error (invalidValueError valueTok msg expect)
                 | [] => .error (missingValueError token expect)

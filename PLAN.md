@@ -62,6 +62,7 @@
   - `ArgParse/Proofs/Totality.lean` now establishes totality cases for flags/options/positionals and elaboration (`flag_result_ok`, `option_result_cases`, etc.).
   - Added `flag_cursor_progress`/`flag_cursor_bounds` showing flag parsers advance the cursor by at most one tick.
   - Next: mirror the new option semantics with cursor/consumption lemmas so `.one` no longer requires `takeOptionValue?` progress proofs.
+  - Introduced `State.withPre`/`withPost` helpers in `ArgParse/Core/Combinators.lean` and rewired flag proofs to use them, so future cursor lemmas can reference a single definition.
 
 - Tests expansion
   - Added coverage in `ArgParse/Tests/Unit.lean` for repeated arities (`.one`/`.many`/`.some`), bundled short flags, sentinel boundaries, missing/invalid option values, and interleaved subcommand success/failure cases.
@@ -90,6 +91,7 @@
 - 2025-09-30: Second attempt at the normalization refactor (with explicit recursion proofs) also stalled: `List.Mem` case analysis and rewrites around concatenated prefixes produced stubborn lint errors. Backed out the changes again; plan to prototype the `List.span` formulation in a scratch file before touching the main module.
 - 2025-09-30: Added nested subcommand runtime checks (grandchild success, missing value, unknown subcommand leftover) to `ArgParse/Tests/Unit.lean`; `lake build; lake test`.
 - 2025-09-30: Began option cursor/consumption lemmas in `ArgParse/Proofs/Totality.lean` but deferred after scope exploded—need supporting runtime helpers before retrying.
+- 2025-09-30: Refactored option/flag combinators to use `State.withPre`/`withPost`, updated flag proofs accordingly, and confirmed runtime/tests remain green; option cursor lemma still pending.
 - 2025-09-30: Third iteration succeeded—introduced `SentinelSplit`, structural `split`, and proved reconstruction/post/`mem` lemmas; `Proofs/Sentinel.lean` and unit guards now rely on the new facts while `lake build`/`lake test` stay green (lint still slow under the harness timeout).
 - 2025-09-30: Added `FromArg.enumFrom` helper plus enumeration guards, rounding out baseline `FromArg` instances (String/Substring/Nat/Int/Bool) and confirming `lake build; lake test` with lint still limited by the CLI timeout.
 - 2025-09-30: Wired up Spec.Elab to fold flags/options/positionals into a Partial accumulator and added a minimal end-to-end guard. Subcommands are stubbed for now (token is consumed when a child name matches; recursion deferred) and will be revisited with a well-founded measure.
