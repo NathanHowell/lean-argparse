@@ -60,7 +60,8 @@
 
 - Rebuild proof basics (small and steady)
   - `ArgParse/Proofs/Totality.lean` now establishes totality cases for flags/options/positionals and elaboration (`flag_result_ok`, `option_result_cases`, etc.).
-  - TODO: strengthen these into cursor delta and consumption lemmas before moving on to command-level guarantees.
+  - Added `flag_cursor_progress`/`flag_cursor_bounds` showing flag parsers advance the cursor by at most one tick.
+  - TODO: strengthen option/positional cases into cursor delta and consumption lemmas before moving on to command-level guarantees.
 
 - Tests expansion
   - Added coverage in `ArgParse/Tests/Unit.lean` for repeated arities (`.one`/`.many`/`.some`), bundled short flags, sentinel boundaries, missing/invalid option values, and interleaved subcommand success/failure cases.
@@ -82,6 +83,7 @@
 
 ## Activity Log
 - 2025-09-30: Added interleaved subcommand regressions (success + missing-value failure) to `ArgParse/Tests/Unit.lean`, keeping totality lemmas intact; verified with `lake test`.
+- 2025-09-30: Proved `flag_cursor_progress`/`flag_cursor_bounds` in `ArgParse/Proofs/Totality.lean`, refactoring result-case lemmas to use `rfl`; `lake build; lake test` (warnings only about `simpa`).
 - 2025-09-30: Added runner leftover detection regressions plus broader unit coverage (repeated `.one`/`.many`/`.some`, bundled shorts, sentinel boundary, missing/invalid payload) in `ArgParse/Tests/Unit.lean`; exported `matchFlagToken` and replaced `Proofs/Totality` placeholders with result-case lemmas. `lake test`.
 - 2025-09-30: Spiked on refactoring `ArgParse/Core/Normalize.lean` to expose sentinel metadata (pre/post/saw) and accompanying proofs/tests; recursive `simp` obligations around `splitOnSentinel` made the approach unstable, so the code was reverted. Next iteration will explore a `takeWhile`/`dropWhile` decomposition before reattempting Step 1.
 - 2025-09-30: Second attempt at the normalization refactor (with explicit recursion proofs) also stalled: `List.Mem` case analysis and rewrites around concatenated prefixes produced stubborn lint errors. Backed out the changes again; plan to prototype the `List.span` formulation in a scratch file before touching the main module.
