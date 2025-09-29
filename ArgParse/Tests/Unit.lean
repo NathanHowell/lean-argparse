@@ -81,6 +81,9 @@ open ArgParse in
    | .help _ => True
    | _ => False)
 
+-- Subcommand recursion tests will be added after we stabilise option semantics
+-- within recursive contexts.
+
 -- Runner leftover detection test will be added when elaboration stabilizes.
 
 -- Debug: print the leftover detection outcome to help diagnose if needed.

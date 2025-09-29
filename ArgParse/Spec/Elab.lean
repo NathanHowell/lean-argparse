@@ -72,6 +72,9 @@ def merge (a b : Partial) : Partial :=
 end Partial
 
 
+-- Subcommand recursion helper is defined below `elaborateItems` to satisfy
+-- dependencies; it uses a simple fuel derived from the input state.
+
 /-- Elaborate a single item specification into a transformer over `Partial`. -/
 def elaborateItem : ItemSpec → Parser (Partial → Partial)
   | .flag spec =>
@@ -146,23 +149,36 @@ def elaborateItems (items : List ItemSpec) : Parser (Partial → Partial) :=
         Parser.seq (Parser.map (fun f => fun (g : Partial → Partial) => g ∘ f) head) (fun _ => tail)
   go items
 
+/--
+Elaborate a command with a fuel parameter that bounds subcommand recursion by the
+sum of remaining tokens. This avoids a bespoke well‑founded proof while preserving
+the intended behaviour: each descent into a child decrements the fuel.
+-/
+private def elaborateCommandCore : (fuel : Nat) → CmdSpec → Parser Partial
+  | 0, _ => Parser.pure Partial.empty
+  | fuel+1, cmd =>
+      let itemsP := elaborateItems cmd.args
+      let subP : Parser Partial := fun st =>
+        match st.pre with
+        | token :: rest =>
+            if token.startsWith "-" then
+              -- Not a subcommand token; stop here.
+              ArgParse.Result.ok Partial.empty st
+            else
+              match cmd.subs.find? (fun c => c.name = token) with
+              | some child =>
+                  let st' : ArgParse.State := { st with pre := rest, cursor := st.cursor + 1 }
+                  -- Recurse into the child with one less unit of fuel.
+                  (elaborateCommandCore fuel child) st'
+              | none => ArgParse.Result.ok Partial.empty st
+        | [] => ArgParse.Result.ok Partial.empty st
+      Parser.seq (Parser.map (fun (f : Partial → Partial) => fun (child : Partial) => Partial.merge (f Partial.empty) child) itemsP) (fun _ => subP)
+
 /-- Elaborate a command by folding its items into an initial `Partial`. -/
 def elaborateCommand (cmd : CmdSpec) : Parser Partial :=
-  let itemsP := elaborateItems cmd.args
-  let subP : Parser Partial := fun st =>
-    match st.pre with
-    | token :: rest =>
-        if token.startsWith "-" then
-          ArgParse.Result.ok Partial.empty st
-        else
-          match cmd.subs.find? (fun c => c.name = token) with
-          | some _ =>
-              let st' : ArgParse.State := { st with pre := rest, cursor := st.cursor + 1 }
-              -- For now, consume the subcommand token and stop (no recursion).
-              ArgParse.Result.ok Partial.empty st'
-          | none => ArgParse.Result.ok Partial.empty st
-    | [] => ArgParse.Result.ok Partial.empty st
-  Parser.seq (Parser.map (fun (f : Partial → Partial) => fun (child : Partial) => Partial.merge (f Partial.empty) child) itemsP) (fun _ => subP)
+  fun st =>
+    let fuel := st.pre.length + st.post.length + 1
+    (elaborateCommandCore fuel cmd) st
 
 /-- Elaborate the application; currently delegates to the root command. -/
 def elaborateApp (app : AppSpec) : Parser Partial :=
