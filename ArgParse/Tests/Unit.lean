@@ -47,6 +47,26 @@ def cmd : ArgParse.Spec.CmdSpec := { name := "app", «meta» := mkMeta "app", ar
    match p st with
    | .ok part _ => part.flags.any (fun (k,v) => k = "verbose" ∧ v = true) ∧
                    part.options.any (fun (k,_) => k = "name")
+    | _ => False)
+
+-- Option forms: equals and concatenated short are both accepted.
+open ArgParse.Spec in
+def shortN : Short := { c := 'n', ok := by decide }
+def optShortLong : OptSpec String := { short? := some shortN, long? := some "name", «meta» := mkMeta "name", arity := .one }
+def cmdOpt : CmdSpec := { name := "app", «meta» := mkMeta "app", args := [.opt optShortLong] }
+
+#guard
+  (let p := ArgParse.Spec.elaborateCommand cmdOpt
+   let st := normalize ["--name=foo"]
+   match p st with
+   | .ok part _ => part.options.any (fun (k,_) => k = "name")
+   | _ => False)
+
+#guard
+  (let p := ArgParse.Spec.elaborateCommand cmdOpt
+   let st := normalize ["-nfoo"]
+   match p st with
+   | .ok part _ => part.options.any (fun (k,_) => k = "name")
    | _ => False)
 
 -- Runner built-ins: `--help` routes to help text without parsing.
