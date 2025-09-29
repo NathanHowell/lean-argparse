@@ -389,6 +389,37 @@ private def checkNestedUnknownSubcommand : Except String Unit := do
   | other =>
       .error s!"expected leftover error, got {repr other}"
 
+private def checkCoreSubcommand : Except String Unit := do
+  let entries : List (ArgParse.Core.Subcommand Nat) :=
+    [ { name := "one", parser := Parser.pure 1 }
+    , { name := "two", parser := Parser.pure 2 } ]
+  let parser := ArgParse.Core.subcommand entries
+  let stOk := normalize ["two", "extra"]
+  match parser stOk with
+  | .ok value st' =>
+      expectTrue (value = 2) s!"expected value 2, got {value}"
+      expectTrue (st'.cursor = stOk.cursor + 1)
+        s!"expected cursor advance, got {st'.cursor}"
+      expectTrue (st'.pre = ["extra"]) s!"expected remaining token, got {repr st'.pre}"
+  | other =>
+      .error s!"expected ok result, got {repr other}"
+  let stUnknown := normalize ["three"]
+  match parser stUnknown with
+  | .err err =>
+      expectTrue (err.kind = ArgParse.ErrorKind.unknownLong)
+        s!"expected unknownLong, got {repr err.kind}"
+      expectTrue (err.expect = [ArgParse.Expect.subcommand "one", ArgParse.Expect.subcommand "two"])
+        s!"expected command hints, got {repr err.expect}"
+  | other =>
+      .error s!"expected unknownLong, got {repr other}"
+  let stMissing := normalize ([] : List String)
+  match parser stMissing with
+  | .err err =>
+      expectTrue (err.kind = ArgParse.ErrorKind.missingValue)
+        s!"expected missingValue, got {repr err.kind}"
+  | other =>
+      .error s!"expected missingValue, got {repr other}"
+
 /-- Runtime regression checks executed by `lake test`. -/
 def runtimeChecks : List (String × Except String Unit) :=
   [ ("runner leftover (pre)", checkRunnerLeftoverPre)
@@ -406,5 +437,6 @@ def runtimeChecks : List (String × Except String Unit) :=
   , ("nested subcommand success", checkNestedSubcommandSuccess)
   , ("nested grandchild missing value", checkNestedGrandMissingValue)
   , ("nested unknown subcommand", checkNestedUnknownSubcommand)
+  , ("core subcommand combinator", checkCoreSubcommand)
   ]
 end ArgParse.Tests
