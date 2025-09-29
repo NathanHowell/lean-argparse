@@ -84,6 +84,19 @@ open ArgParse in
 -- Subcommand recursion tests will be added after we stabilise option semantics
 -- within recursive contexts.
 
+-- Minimal recursion regression: ensure descending to a child yields `.ok`.
+open ArgParse.Spec in
+def childOpt : OptSpec String := { long? := some "name", «meta» := mkMeta "name", arity := .one }
+def childCmd : CmdSpec := { name := "child", «meta» := mkMeta "child", args := [.opt childOpt] }
+def parentCmd : CmdSpec := { name := "app", «meta» := mkMeta "app", args := [], subs := [childCmd] }
+
+#guard
+  (let p := ArgParse.Spec.elaborateCommand parentCmd
+   let st := normalize ["child", "--name=foo"]
+   match p st with
+   | .ok _ _ => True
+   | _ => False)
+
 -- Runner leftover detection test will be added when elaboration stabilizes.
 
 -- Debug: print the leftover detection outcome to help diagnose if needed.
