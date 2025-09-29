@@ -102,6 +102,42 @@ theorem flag_cursor_bounds {spec : FlagSpec} {st : State} {b : Bool} {st' : Stat
         simpa [hEq] using this
       · simpa [hEq]
 
+/-- Successful concatenated option parsing always advances the cursor by one token. -/
+theorem parseConcatValue_cursor
+    {α : Type} [FromArg α] {spec : OptSpec α} {token raw : String}
+    {pending : List String} {st : State} {expect : Expect}
+    {payload : Option (α × String)} {st' : State}
+    (h : Core.parseConcatValue spec token raw pending st expect = .ok (payload, st')) :
+    st'.cursor = st.cursor + 1 := by
+  classical
+  by_cases hEmpty : raw = ""
+  · have := congrArg Except.isOk h
+    simp [Core.parseConcatValue, hEmpty] at this
+    cases this
+  · have hRaw : raw ≠ "" := hEmpty
+    cases hRun : FromArg.run (α := α) raw with
+    | ok value =>
+        have hEval := h
+        simp [Core.parseConcatValue, hRaw, hRun] at hEval
+        rcases hEval with ⟨hPayload, hState⟩
+        subst payload
+        subst st'
+        simp [State.withPre]
+    | error msg =>
+        cases hSplit : Core.findConcatSplit? (α := α) (raw := raw) with
+        | none =>
+            have := congrArg Except.isOk h
+            simp [Core.parseConcatValue, hRaw, hRun, hSplit] at this
+            cases this
+        | some result =>
+            obtain ⟨value, remainder⟩ := result
+            have hEval := h
+            simp [Core.parseConcatValue, hRaw, hRun, hSplit] at hEval
+            rcases hEval with ⟨hPayload, hState⟩
+            subst payload
+            subst st'
+            simp [State.withPre]
+
 /-- Option parsers either succeed with a value/state or emit an error. -/
 @[simp] theorem option_result_cases
     {α : Type} [FromArg α] (spec : OptSpec α) (st : State) :
