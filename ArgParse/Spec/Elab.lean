@@ -6,7 +6,7 @@ namespace ArgParse.Spec
 
 open ArgParse
 
-/-- Parser runtime accumulator storing intermediate flag/option/positional values. -/
+/- Parser runtime accumulator storing intermediate flag/option/positional values. -/
 structure Partial where
   /-- Recorded flag values, newest entry first. -/
   flags : List (String × Bool) := []
@@ -59,7 +59,7 @@ def positionalValues (summary : Summary) (name : String) : List String :=
 
 end Summary
 
-/-- Convert the accumulated partial state into a summary view. -/
+/-- Convert the accumulated partial state into a summary view using stored erasures. -/
 def toSummary (p : Partial) : Summary :=
   { flags := p.flags, options := p.options, positionals := p.positionals }
 
