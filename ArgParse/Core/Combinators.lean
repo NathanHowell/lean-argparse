@@ -340,11 +340,10 @@ def option {α : Type} [ArgParse.FromArg α] (spec : OptSpec α) :
   match spec.arity with
   | .zero => .ok PUnit.unit st
   | .one =>
-      match takeOptionValue? spec st with
+      match collectOptionValues spec st with
       | .error err => .err err
-      | .ok (value?, st') =>
-          let typed := value?.map Prod.fst
-          .ok typed st'
+      | .ok (values, _, st') =>
+          .ok (values.getLast?) st'
   | .many =>
       match collectOptionValues spec st with
       | .error err => .err err

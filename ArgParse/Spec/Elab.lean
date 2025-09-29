@@ -75,6 +75,14 @@ def merge (earlier later : Partial) : Partial :=
 end Partial
 
 
+/- Helper error for `.some` options when no value is provided. -/
+private def missingOptionError {α : Type} [ArgParse.FromArg α]
+    (spec : ArgParse.Spec.OptSpec α) : ArgParse.Error :=
+  { kind := ArgParse.ErrorKind.missingValue
+  , context := []
+  , expect := [ArgParse.Expect.optionVal spec.«meta».name] }
+
+
 -- Subcommand recursion uses a simple token-derived measure to ensure
 -- termination without relying on explicit proofs about the spec tree.
 
@@ -93,15 +101,12 @@ def elaborateItem : ItemSpec → Parser (Partial → Partial)
           -- Zero-arity option: nothing to record; do not consume tokens here.
           Parser.pure id
       | .one =>
-          -- Use the arity-agnostic helper to avoid dependent type equalities.
-          (Parser.map (fun (ov : Option (α × String)) =>
-            fun p =>
-              match ov with
-              | none => p
-              | some (_, raw) => p.addOption spec.«meta».name raw)
+          (Parser.map (fun (payload : List α × List String) =>
+            let raws := payload.snd
+            fun p => raws.foldl (fun acc raw => acc.addOption spec.«meta».name raw) p)
             (fun st =>
-            match ArgParse.Core.takeOptionValue? (α := α) spec st with
-            | .ok (ov, st') => ArgParse.Result.ok ov st'
+            match ArgParse.Core.collectOptionValues (α := α) spec st with
+            | .ok (values, raws, st') => ArgParse.Result.ok (values, raws) st'
             | .error err => ArgParse.Result.err err))
       | .many =>
           (Parser.map (fun (payload : List α × List String) =>
@@ -117,7 +122,10 @@ def elaborateItem : ItemSpec → Parser (Partial → Partial)
             fun p => raws.foldl (fun acc raw => acc.addOption spec.«meta».name raw) p)
             (fun st =>
             match ArgParse.Core.collectOptionValues (α := α) spec st with
-            | .ok (values, raws, st') => ArgParse.Result.ok (values, raws) st'
+            | .ok (values, raws, st') =>
+                match values with
+                | [] => ArgParse.Result.err (missingOptionError spec)
+                | _ => ArgParse.Result.ok (values, raws) st'
             | .error err => ArgParse.Result.err err))
   | @ItemSpec.pos α _ spec =>
       match spec.arity with
