@@ -1,4 +1,5 @@
 import ArgParse.Core.Runner
+import ArgParse.Tests.Unit
 
 open ArgParse
 open ArgParse.Spec
@@ -95,6 +96,14 @@ private def testNestedSubcommand : IO Bool := do
   | other =>
       IO.eprintln s!"unexpected runner result: {repr other}" *> pure false
 
+private def runCheck (label : String) (check : Except String Unit) : IO Bool :=
+  match check with
+  | .ok _ => pure true
+  | .error msg =>
+      IO.eprintln s!"[FAIL] {label}: {msg}" *> pure false
+
 def main : IO UInt32 := do
-  let ok ← testNestedSubcommand
-  pure (if ok then 0 else 1)
+  let unitChecks ← ArgParse.Tests.runtimeChecks.mapM (fun (label, chk) => runCheck label chk)
+  let nestedOk ← testNestedSubcommand
+  let allOk := nestedOk && unitChecks.all id
+  pure <| if allOk then 0 else 1
