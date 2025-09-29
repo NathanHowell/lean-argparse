@@ -117,7 +117,7 @@ private def checkRunnerLeftoverPre : Except String Unit := do
       expectTrue (out.state.post = [])
         s!"expected state.post [], got {repr out.state.post}"
   | other =>
-      .error s!"expected leftover error, got {repr other}"
+      .error s!"expected unknown-subcommand error, got {repr other}"
 
 private def checkRunnerLeftoverPost : Except String Unit := do
   let app : AppSpec := { name := "app", root := cmd }
@@ -133,7 +133,7 @@ private def checkRunnerLeftoverPost : Except String Unit := do
       expectTrue (out.state.post = ["tail"])
         s!"expected post [tail], got {repr out.state.post}"
   | other =>
-      .error s!"expected leftover error, got {repr other}"
+      .error s!"expected unknown-subcommand error, got {repr other}"
 
 private def checkRepeatedOne : Except String Unit := do
   let app : AppSpec := { name := "app", root := cmd }
@@ -380,10 +380,12 @@ private def checkNestedUnknownSubcommand : Except String Unit := do
   let out := ArgParse.runRaw app ["child", "bogus"]
   match out.result with
   | .err err =>
-      expectTrue (err.kind = ArgParse.ErrorKind.leftover)
-        s!"expected leftover error, got {repr err.kind}"
+      expectTrue (err.kind = ArgParse.ErrorKind.unknownLong)
+        s!"expected unknown-subcommand error, got {repr err.kind}"
       expectTrue (err.context = ["bogus"])
         s!"expected context [bogus], got {repr err.context}"
+      expectTrue (err.expect.contains (ArgParse.Expect.subcommand "grand"))
+        s!"expected subcommand hints, got {repr err.expect}"
   | other =>
       .error s!"expected leftover error, got {repr other}"
 

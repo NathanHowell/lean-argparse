@@ -121,6 +121,39 @@ structure CollectResult (α : Type) where
   /-- Total number of tokens consumed during collection. -/
   consumed : Nat
 
+/-- Entry describing a subcommand parser branch. -/
+structure Subcommand (α : Type) where
+  /-- Subcommand name matched against the next token. -/
+  name : String
+  /-- Parser invoked when the subcommand name matches. -/
+  parser : Parser α
+
+/-! ### Subcommand helpers -/
+
+@[inline] private def subcommandError
+    (kind : ErrorKind) (token? : Option String) (expect : List Expect) : Error :=
+  { kind := kind
+  , context := token?.toList
+  , expect := expect }
+
+@[inline] def subcommand {α : Type} (entries : List (Subcommand α)) : Parser α :=
+  let expects := entries.map (fun e => Expect.subcommand e.name)
+  fun st =>
+    match entries with
+    | [] => .err (subcommandError .missingValue none expects)
+    | _ =>
+        match st.pre with
+        | [] => .err (subcommandError .missingValue none expects)
+        | token :: rest =>
+            let rec loop : List (Subcommand α) → Result α
+              | [] => .err (subcommandError .unknownLong (some token) expects)
+              | entry :: tail =>
+                  if token = entry.name then
+                    entry.parser (State.withPre st rest 1)
+                  else
+                    loop tail
+            loop entries
+
 /--- Take the first `n` characters from a string. -/
 @[inline] def stringTake (s : String) (n : Nat) : String :=
   String.mk (s.data.take n)

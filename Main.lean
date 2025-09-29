@@ -142,30 +142,11 @@ def repeatParser : Parser RepeatConfig :=
     <*> repeatMessageParser
 
 /-- Parse the subcommand token and dispatch to the appropriate parser. -/
-def appParser : Parser AppCommand := fun st =>
-  match st.pre with
-  | [] =>
-      let err : Error :=
-        { kind := .missingValue
-        , context := []
-        , expect := [Expect.subcommand "greet", Expect.subcommand "repeat"] }
-      .err err
-  | token :: rest =>
-      let stCmd := State.withPre st rest 1
-      if token = "greet" then
-        match greetParser stCmd with
-        | .ok cfg st' => .ok (AppCommand.greet cfg) st'
-        | .err err => .err err
-      else if token = "repeat" then
-        match repeatParser stCmd with
-        | .ok cfg st' => .ok (AppCommand.repeat cfg) st'
-        | .err err => .err err
-      else
-        let err : Error :=
-          { kind := .unknownLong
-          , context := [token]
-          , expect := [Expect.subcommand "greet", Expect.subcommand "repeat"] }
-        .err err
+def appParser : Parser AppCommand :=
+  let entries : List (Core.Subcommand AppCommand) :=
+    [ { name := "greet", parser := AppCommand.greet <$> greetParser }
+    , { name := "repeat", parser := AppCommand.repeat <$> repeatParser } ]
+  Core.subcommand entries
 
 /-! ### Runtime helpers -/
 

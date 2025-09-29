@@ -171,18 +171,22 @@ private def elaborateCommandCore : (fuel : Nat) → CmdSpec → Parser Partial
   | 0, _ => Parser.pure Partial.empty
   | fuel+1, cmd =>
       let itemsP := elaborateItems cmd.args
-      let subP : Parser Partial := fun st =>
-        match st.pre with
-        | token :: rest =>
-            if token.startsWith "-" then
-              ArgParse.Result.ok Partial.empty st
-            else
-              match cmd.subs.find? (fun c => c.name = token) with
-              | some child =>
-                  let st' : ArgParse.State := { st with pre := rest, cursor := st.cursor + 1 }
-                  (elaborateCommandCore fuel child) st'
-              | none => ArgParse.Result.ok Partial.empty st
-        | [] => ArgParse.Result.ok Partial.empty st
+      let childParsers : List (ArgParse.Core.Subcommand Partial) :=
+        cmd.subs.map fun child =>
+          { name := child.name
+            , parser := elaborateCommandCore fuel child : ArgParse.Core.Subcommand Partial }
+      let subP : Parser Partial :=
+        match childParsers with
+        | [] => Parser.pure Partial.empty
+        | _ =>
+            fun st =>
+              match st.pre with
+              | token :: _ =>
+                  if token.startsWith "-" then
+                    ArgParse.Result.ok Partial.empty st
+                  else
+                    ArgParse.Core.subcommand childParsers st
+              | [] => ArgParse.Result.ok Partial.empty st
       Parser.seq
         (Parser.map (fun (f : Partial → Partial) => fun (child : Partial) => Partial.merge (f Partial.empty) child) itemsP)
         (fun _ => subP)
