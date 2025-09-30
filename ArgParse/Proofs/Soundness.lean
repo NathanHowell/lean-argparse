@@ -605,21 +605,67 @@ theorem elaborateItem_mergesRight
       exact elaborateItem_pos_mergesRight (spec := spec) (st := st) (f := f)
         (st' := st') h
 
+@[simp] theorem elaborateItems_nil_eq :
+    Spec.elaborateItems [] = Parser.pure id := rfl
+
+@[simp] theorem elaborateItems_cons_eq (item : ItemSpec) (rest : List ItemSpec) :
+    Spec.elaborateItems (item :: rest) =
+      Parser.seq
+        (Parser.map (fun f => fun (g : Spec.Partial → Spec.Partial) => g ∘ f)
+          (Spec.elaborateItem item))
+        (fun _ => Spec.elaborateItems rest) := rfl
+
 theorem elaborateItems_nil_mergesRight
     (st : State)
     {f : Spec.Partial → Spec.Partial} {st' : State}
     (h : Spec.elaborateItems [] st = Result.ok f st') :
     mergesRight f := by
   classical
-  have hPure : Spec.elaborateItems [] st = Parser.pure id st := by
-    unfold Spec.elaborateItems
-    rfl
-  have hEval : Parser.pure id st = Result.ok f st' := by
-    simpa [hPure] using h
-  simp [Parser.pure] at hEval
-  cases hEval with
-  | intro left _ =>
-      subst left
-      simpa using mergesRight_id
+  have hEval : Result.ok (fun p => p) st = Result.ok f st' := by
+    simpa [elaborateItems_nil_eq, Parser.pure] using h
+  cases hEval
+  simpa using mergesRight_id
+
+theorem elaborateItems_mergesRight
+    : ∀ items (st : State)
+        {f : Spec.Partial → Spec.Partial} {st' : State},
+        Spec.elaborateItems items st = Result.ok f st' → mergesRight f
+  | [], st, f, st', h =>
+      elaborateItems_nil_mergesRight (st := st) (f := f) (st' := st') h
+  | item :: rest, st, f, st', h => by
+      classical
+      -- expand the sequence structure produced for a non-empty item list
+      have hSeq :
+          Parser.seq
+              (Parser.map (fun f => fun (g : Spec.Partial → Spec.Partial) => g ∘ f)
+                (Spec.elaborateItem item))
+              (fun _ => Spec.elaborateItems rest) st = Result.ok f st' := by
+            simpa [elaborateItems_cons_eq] using h
+      -- analyse the head parser's outcome
+      cases hItem : Spec.elaborateItem item st with
+      | err err =>
+          have : Result.ok f st' ≠ Result.err err := by simp
+          simpa [Parser.seq, Parser.map, hItem] using hSeq
+      | ok headFun st₁ =>
+          -- evaluate the sequential composition in the success case
+          simp [Parser.seq, Parser.map, hItem] at hSeq
+          -- evaluate the tail parser on the updated state
+          cases hTail : Spec.elaborateItems rest st₁ with
+          | err err =>
+              have : Result.ok f st' ≠ Result.err err := by simp
+              simpa [Parser.seq, Parser.map, hTail] using hSeq
+          | ok tailFun st₂ =>
+              -- identify the final transformer emitted by the sequence
+              have hSeqOk : Result.ok (tailFun ∘ headFun) st₂ = Result.ok f st' := by
+                simpa [Parser.seq, Parser.map, hTail] using hSeq
+              have hHeadMerge : mergesRight headFun :=
+                elaborateItem_mergesRight (item := item) (st := st) (f := headFun)
+                  (st' := st₁)
+                  (by simpa [hItem])
+              have hTailMerge : mergesRight tailFun :=
+                elaborateItems_mergesRight rest st₁ (f := tailFun) (st' := st₂)
+                  (by simpa using hTail)
+              cases hSeqOk
+              exact mergesRight_comp (g := headFun) (h := tailFun) hHeadMerge hTailMerge
 
 end ArgParse.Proofs
