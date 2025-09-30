@@ -23,14 +23,38 @@ open ArgParse.Spec.Partial
 @[simp] theorem addFlag_flags (p : Spec.Partial) (name : String) (value : Bool) :
     (p.addFlag name value).flags = p.flags ++ [(name, value)] := rfl
 
+/-- Recording a flag leaves other bindings unchanged. -/
+@[simp] theorem addFlag_options (p : Spec.Partial) (name : String) (value : Bool) :
+    (p.addFlag name value).options = p.options := rfl
+
+/-- Recording a flag leaves other bindings unchanged. -/
+@[simp] theorem addFlag_positionals (p : Spec.Partial) (name : String) (value : Bool) :
+    (p.addFlag name value).positionals = p.positionals := rfl
+
 /-- Auxiliary simp lemma describing the updated `options` list. -/
 @[simp] theorem addOption_options (p : Spec.Partial) (name : String) (value : String) :
     (p.addOption name value).options = p.options ++ [(name, value)] := rfl
+
+/-- Recording an option leaves other bindings unchanged. -/
+@[simp] theorem addOption_flags (p : Spec.Partial) (name : String) (value : String) :
+    (p.addOption name value).flags = p.flags := rfl
+
+/-- Recording an option leaves other bindings unchanged. -/
+@[simp] theorem addOption_positionals (p : Spec.Partial) (name : String) (value : String) :
+    (p.addOption name value).positionals = p.positionals := rfl
 
 /-- Auxiliary simp lemma describing the updated `positionals` list. -/
 @[simp] theorem addPositional_positionals
     (p : Spec.Partial) (name : String) (value : String) :
     (p.addPositional name value).positionals = p.positionals ++ [(name, value)] := rfl
+
+/-- Recording a positional leaves other bindings unchanged. -/
+@[simp] theorem addPositional_flags (p : Spec.Partial) (name : String) (value : String) :
+    (p.addPositional name value).flags = p.flags := rfl
+
+/-- Recording a positional leaves other bindings unchanged. -/
+@[simp] theorem addPositional_options (p : Spec.Partial) (name : String) (value : String) :
+    (p.addPositional name value).options = p.options := rfl
 
 /-- Folding `addFlag` appends the new bindings to the end of `flags`. -/
 @[simp] theorem foldl_addFlag_flags
@@ -204,6 +228,68 @@ private theorem flagFold_override
           cases c with
           | mk cf co cp =>
               simp [Spec.Partial.merge, List.append_assoc]
+
+/-- Two partial payloads agree when each component list agrees. -/
+@[ext] theorem ext
+    {p q : Spec.Partial}
+    (hFlags : p.flags = q.flags)
+    (hOptions : p.options = q.options)
+    (hPositionals : p.positionals = q.positionals) :
+    p = q := by
+  cases p
+  cases q
+  cases hFlags
+  cases hOptions
+  cases hPositionals
+  rfl
+
+/-- Functions that append payloads to the right via `Partial.merge`. -/
+def mergesRight (f : Spec.Partial → Spec.Partial) : Prop :=
+  ∀ base, f base = Spec.Partial.merge base (f Spec.Partial.empty)
+
+/-- The identity transformer is merge-compatible. -/
+theorem mergesRight_id : mergesRight (fun p => p) := by
+  intro base
+  symm
+  simpa using (merge_empty_right (p := base))
+
+/-- Recording a flag is merge-compatible. -/
+theorem mergesRight_flag (name : String) (value : Bool) :
+    mergesRight (fun p => if value then p.addFlag name true else p) := by
+  intro base
+  cases value with
+  | false =>
+      symm
+      simpa [Spec.Partial.merge, Spec.Partial.empty]
+  | true =>
+      cases base with
+      | mk flags options positionals =>
+          refine ext ?hf ?ho ?hp
+          · simp [Spec.Partial.merge, Spec.Partial.empty, addFlag_flags]
+          · simp [Spec.Partial.merge, Spec.Partial.empty, addFlag_options]
+          · simp [Spec.Partial.merge, Spec.Partial.empty, addFlag_positionals]
+
+/-- Recording an option payload is merge-compatible. -/
+theorem mergesRight_addOption (name : String) (raw : String) :
+    mergesRight (fun p => p.addOption name raw) := by
+  intro base
+  cases base with
+  | mk flags options positionals =>
+      refine ext ?hf ?ho ?hp
+      · simp [Spec.Partial.merge, Spec.Partial.empty, addOption_flags]
+      · simp [Spec.Partial.merge, Spec.Partial.empty, addOption_options]
+      · simp [Spec.Partial.merge, Spec.Partial.empty, addOption_positionals]
+
+/-- Recording a positional payload is merge-compatible. -/
+theorem mergesRight_addPositional (name : String) (raw : String) :
+    mergesRight (fun p => p.addPositional name raw) := by
+  intro base
+  cases base with
+  | mk flags options positionals =>
+      refine ext ?hf ?ho ?hp
+      · simp [Spec.Partial.merge, Spec.Partial.empty, addPositional_flags]
+      · simp [Spec.Partial.merge, Spec.Partial.empty, addPositional_options]
+      · simp [Spec.Partial.merge, Spec.Partial.empty, addPositional_positionals]
 
 end Partial
 
