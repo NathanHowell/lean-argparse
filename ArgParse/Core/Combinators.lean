@@ -137,6 +137,28 @@ structure OptionStep (α : Type) where
   /-- Number of tokens consumed while handling the option. -/
   consumed : Nat
 
+namespace OptionStep
+
+@[inline] def stay {α : Type} (st : State) : OptionStep α :=
+  { value? := none, raw? := none, state := st, consumed := 0 }
+
+@[inline] def ofPre {α : Type}
+    (st : State) (rest : List String) (delta : Nat)
+    (value? : Option α) (raw? : Option String) : OptionStep α :=
+  { value? := value?
+  , raw? := raw?
+  , state := State.withPre st rest delta
+  , consumed := delta }
+
+@[inline] def ofConcat {α : Type}
+    (payload : Option (α × String)) (state : State) : OptionStep α :=
+  { value? := payload.map Prod.fst
+  , raw? := payload.map Prod.snd
+  , state := state
+  , consumed := 1 }
+
+end OptionStep
+
 /--- Result of attempting to consume a positional argument. -/
 structure PosStep (α : Type) where
   /-- Parsed value, when the positional was present. -/
@@ -310,7 +332,7 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
     {α : Type} [ArgParse.FromArg α] (spec : OptSpec α) (st : State) :
     Except Error (OptionStep α) :=
   match st.pre with
-  | [] => .ok { value? := none, raw? := none, state := st, consumed := 0 }
+  | [] => .ok (OptionStep.stay st)
   | token :: rest =>
       let expect := expectOption spec
       match spec.long? with
@@ -321,17 +343,14 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
             let raw := token.drop eqPrefix.length
             match parseConcatValue spec token raw rest st expect with
             | .ok (value?, st') =>
-                let value := value?.map Prod.fst
-                let rawVal := value?.map Prod.snd
-                .ok { value? := value, raw? := rawVal, state := st', consumed := 1 }
+                .ok (OptionStep.ofConcat value? st')
             | .error err => .error err
           else if token = longLex then
             match rest with
             | valueTok :: restTail =>
                 match FromArg.run valueTok with
                 | .ok value =>
-                    let st' : State := State.withPre st restTail 2
-                    .ok { value? := some value, raw? := some valueTok, state := st', consumed := 2 }
+                    .ok (OptionStep.ofPre st restTail 2 (some value) (some valueTok))
                 | .error msg => .error (invalidValueError valueTok msg expect)
             | [] => .error (missingValueError token expect)
           else
@@ -343,21 +362,18 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
                   | valueTok :: restTail =>
                       match FromArg.run valueTok with
                       | .ok value =>
-                          let st' : State := State.withPre st restTail 2
-                          .ok { value? := some value, raw? := some valueTok, state := st', consumed := 2 }
+                          .ok (OptionStep.ofPre st restTail 2 (some value) (some valueTok))
                       | .error msg => .error (invalidValueError valueTok msg expect)
                   | [] => .error (missingValueError token expect)
                 else if spec.concatVal? ∧ token.startsWith shortLex then
                   let raw := token.drop shortLex.length
                   match parseConcatValue spec token raw rest st expect with
-                  | .ok (value?, st') =>
-                      let value := value?.map Prod.fst
-                      let rawVal := value?.map Prod.snd
-                      .ok { value? := value, raw? := rawVal, state := st', consumed := 1 }
+                  | .ok (payload, st') =>
+                      .ok (OptionStep.ofConcat payload st')
                   | .error err => .error err
                 else
-                  .ok { value? := none, raw? := none, state := st, consumed := 0 }
-            | none => .ok { value? := none, raw? := none, state := st, consumed := 0 }
+                  .ok (OptionStep.stay st)
+            | none => .ok (OptionStep.stay st)
       | none =>
           match spec.short? with
           | some short =>
@@ -367,21 +383,18 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
                 | valueTok :: restTail =>
                     match FromArg.run valueTok with
                     | .ok value =>
-                        let st' : State := State.withPre st restTail 2
-                        .ok { value? := some value, raw? := some valueTok, state := st', consumed := 2 }
+                        .ok (OptionStep.ofPre st restTail 2 (some value) (some valueTok))
                     | .error msg => .error (invalidValueError valueTok msg expect)
                 | [] => .error (missingValueError token expect)
               else if spec.concatVal? ∧ token.startsWith shortLex then
                 let raw := token.drop shortLex.length
                 match parseConcatValue spec token raw rest st expect with
-                | .ok (value?, st') =>
-                    let value := value?.map Prod.fst
-                    let rawVal := value?.map Prod.snd
-                    .ok { value? := value, raw? := rawVal, state := st', consumed := 1 }
+                | .ok (payload, st') =>
+                    .ok (OptionStep.ofConcat payload st')
                 | .error err => .error err
               else
-                .ok { value? := none, raw? := none, state := st, consumed := 0 }
-          | none => .ok { value? := none, raw? := none, state := st, consumed := 0 }
+                .ok (OptionStep.stay st)
+          | none => .ok (OptionStep.stay st)
 
 /-- Extract only the value/state pair from `takeOptionStep?`. -/
 @[inline] def takeOptionValue?
