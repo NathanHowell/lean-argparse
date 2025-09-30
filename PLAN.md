@@ -69,6 +69,7 @@
   - Added merge lemmas in `Proofs/Soundness.lean` (`flagValue?_merge`, `optionValues_merge`, `positionalValues_merge`) to explain how summaries combine when `Partial.merge` is used.
   - Replaced the determinism placeholder with a real extensionality lemma (`Proofs/Determinism.parser_ext`) to anchor future uniqueness proofs.
   - Extended the documentation helpers: `runtimeLinesForSummary`, `runtimeParagraphs`, and completion extras now respect merged option/positional values using the new merge lemmas.
+  - Recorded algebraic laws for `Partial.merge` (identities, associativity) so elaboration proofs can collapse nested merges.
   - Next: propagate these merge facts into the remaining soundness modules (command/app elaboration plus CLI summaries) so we can retire the outstanding `True` stubs.
 
 - ✅ Soundness accumulator proofs
