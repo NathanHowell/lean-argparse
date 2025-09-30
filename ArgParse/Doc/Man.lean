@@ -4,7 +4,8 @@ import ArgParse.Spec.Elab
 /-!
 # ArgParse.Doc.Man
 
-Placeholder manpage emitter consuming describer output.
+Lightweight mdoc-style renderer built from describer output, with optional
+runtime annotations from a summary payload.
 -/
 
 namespace ArgParse.Doc

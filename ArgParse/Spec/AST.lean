@@ -28,7 +28,7 @@ structure Meta where
   help?     : Option String := none
   /-- Long-form description used in detailed help/man pages. -/
   longHelp? : Option String := none
-  /-- Placeholder text displayed for values in usage strings. -/
+  /-- Text shown as the metavariable placeholder in usage strings. -/
   metavar?  : Option String := none
   /-- Environment variable name consulted as an alternate default. -/
   env?      : Option String := none

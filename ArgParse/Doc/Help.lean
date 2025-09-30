@@ -4,7 +4,8 @@ import ArgParse.Spec.Elab
 /-!
 # ArgParse.Doc.Help
 
-Placeholder help renderer that consumes describer output.
+Basic help renderer that consumes describer output and optionally threads
+summary information captured at runtime.
 -/
 
 namespace ArgParse.Doc

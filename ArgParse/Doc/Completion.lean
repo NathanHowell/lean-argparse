@@ -4,7 +4,8 @@ import ArgParse.Spec.Elab
 /-!
 # ArgParse.Doc.Completion
 
-Placeholder completion emitters built from describer output.
+Minimal completion helpers derived from describer output and optional runtime
+summary data.
 -/
 
 namespace ArgParse.Doc
