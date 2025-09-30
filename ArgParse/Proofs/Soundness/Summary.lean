@@ -7,8 +7,8 @@ import ArgParse.Doc.Completion
 /-!
 # ArgParse.Proofs.Soundness.Summary
 
-Placeholder summary soundness lemmas; real proofs will land once the
-`Partial` infrastructure settles.
+Soundness facts connecting the `Partial` accumulator with summary-based runners
+and documentation helpers.
 -/
 
 namespace ArgParse.Proofs
@@ -17,32 +17,67 @@ open ArgParse
 open ArgParse.Spec
 open ArgParse.Doc
 open Classical
+open ArgParse.RunOutcome
 
 namespace PartialSummary
 
-/-- Placeholder for future summary flag soundness. -/
-@[simp] theorem flagValue?_fold_addFlag : True := trivial
+/-- Folding `Partial.addFlag` is compatible with the `Summary.flagValue?` query. -/
+@[simp] theorem flagValue?_fold_addFlag
+    (entries : List (String × Bool)) (p : Spec.Partial) (name : String) :
+    Spec.Partial.Summary.flagValue?
+        ((entries.foldl (fun acc entry => acc.addFlag entry.fst entry.snd) p).toSummary) name =
+      entries.foldl
+        (fun latest entry => if entry.fst = name then some entry.snd else latest)
+        (Spec.Partial.Summary.flagValue? (Spec.Partial.toSummary p) name) :=
+  Partial.flagValue?_fold_addFlag entries p name
 
-/-- Placeholder for future summary option soundness. -/
-@[simp] theorem optionValues_fold_addOption : True := trivial
+/-- Folding `Partial.addOption` preserves the chronological order queried by `Summary.optionValues`. -/
+@[simp] theorem optionValues_fold_addOption
+    (entries : List (String × String)) (p : Spec.Partial) (name : String) :
+    Spec.Partial.Summary.optionValues
+        ((entries.foldl (fun acc entry => acc.addOption entry.fst entry.snd) p).toSummary) name =
+      Spec.Partial.Summary.optionValues (Spec.Partial.toSummary p) name ++
+        entries.filterMap (fun entry =>
+          if entry.fst = name then some entry.snd else none) :=
+  Partial.optionValues_fold_addOption entries p name
 
-/-- Placeholder for future summary positional soundness. -/
-@[simp] theorem positionalValues_fold_addPositional : True := trivial
+/-- Folding `Partial.addPositional` preserves the chronological order queried by `Summary.positionalValues`. -/
+@[simp] theorem positionalValues_fold_addPositional
+    (entries : List (String × String)) (p : Spec.Partial) (name : String) :
+    Spec.Partial.Summary.positionalValues
+        ((entries.foldl (fun acc entry => acc.addPositional entry.fst entry.snd) p).toSummary) name =
+      Spec.Partial.Summary.positionalValues (Spec.Partial.toSummary p) name ++
+        entries.filterMap (fun entry =>
+          if entry.fst = name then some entry.snd else none) :=
+  Partial.positionalValues_fold_addPositional entries p name
 
-/-- Placeholder for runner/summary equivalence. -/
-@[simp] theorem runNormalizedSummary_matches_raw : True := trivial
+/-- Running with summaries maps the raw payload through `Partial.toSummary`. -/
+@[simp] theorem runNormalizedSummary_matches_raw (app : AppSpec) (st : State) :
+    ArgParse.runNormalizedSummary app st =
+      map Spec.Partial.toSummary (ArgParse.runNormalizedRaw app st) := rfl
 
-/-- Placeholder for runner/summary equivalence. -/
-@[simp] theorem runSummary_matches_raw : True := trivial
+/-- Running from tokens behaves identically after mapping the raw payload. -/
+@[simp] theorem runSummary_matches_raw (app : AppSpec) (tokens : Tokens) :
+    ArgParse.runSummary app tokens =
+      map Spec.Partial.toSummary (ArgParse.runRaw app tokens) := rfl
 
-/-- Placeholder for help renderer equivalence. -/
-@[simp] theorem renderHelpWithSummary_eq_partial : True := trivial
+/-- Rendering help with a summary argument agrees with the partial-based helper. -/
+@[simp] theorem renderHelpWithSummary_eq_partial
+    (spec : AppSpec) (partial? : Option Spec.Partial) :
+    renderHelpWithSummary spec (partial?.map Partial.toSummary) =
+      renderHelpWith spec partial? := rfl
 
-/-- Placeholder for man renderer equivalence. -/
-@[simp] theorem renderManWithSummary_eq_partial : True := trivial
+/-- Rendering manpages with a summary argument agrees with the partial-based helper. -/
+@[simp] theorem renderManWithSummary_eq_partial
+    (spec : AppSpec) (partial? : Option Spec.Partial) :
+    renderManWithSummary spec (partial?.map Partial.toSummary) =
+      renderManWith spec partial? := rfl
 
-/-- Placeholder for completion renderer equivalence. -/
-@[simp] theorem renderCompletionsWithSummary_eq_partial : True := trivial
+/-- Rendering completions with a summary argument agrees with the partial-based helper. -/
+@[simp] theorem renderCompletionsWithSummary_eq_partial
+    (spec : AppSpec) (partial? : Option Spec.Partial) :
+    renderCompletionWithSummary spec (partial?.map Partial.toSummary) =
+      renderCompletionWith spec partial? := rfl
 
 end PartialSummary
 

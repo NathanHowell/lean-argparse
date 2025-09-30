@@ -65,7 +65,8 @@
   - Introduced `State.withPre`/`withPost` helpers in `ArgParse/Core/Combinators.lean` and rewired flag proofs to use them, so future cursor lemmas can reference a single definition.
   - Proved `parseConcatValue_cursor` in `ArgParse/Proofs/Totality.lean`, confirming concatenated options advance exactly one token with the refactored helpers.
   - Strengthened `ArgParse/Proofs/Soundness.lean` with accumulator lemmas so `Partial.add*` folds line up with `Summary` queries (last-write-wins for flags, append order for options/positionals).
-  - Next: thread these facts into the higher-level soundness proofs (command/app elaboration) and start peeling back the `True` placeholders in `Proofs/Soundness/Summary.lean`.
+  - Replaced the `Proofs/Soundness/Summary` placeholders with real lemmas (runner mapping and doc helpers now reduce to `rfl`) after refactoring the runner to expose `RunOutcome.map`.
+  - Next: push these summary facts into the remaining soundness modules (`Proofs/Soundness` higher-level sections and CLI soundness) so we can retire the outstanding `True` stubs.
 
 - ✅ Soundness accumulator proofs
   - `ArgParse/Proofs/Soundness.lean` now describes how folding `Partial.add*` updates interacts with `Summary` lookups, replacing the previous `True` placeholders.
@@ -92,6 +93,7 @@
 - Make small, focused commits (one file or closely-related files at a time) and record outcomes—positive or negative—in the Activity Log.
 
 ## Activity Log
+- 2025-09-30: Rewired the runner to factor `RunOutcome.map` and proved the summary-level soundness lemmas (`ArgParse/Proofs/Soundness/Summary.lean`) so the placeholders are gone.
 - 2025-09-30: Documented the accumulator soundness proofs in PLAN after landing the new lemmas in `ArgParse/Proofs/Soundness.lean`.
 - 2025-09-30: Recorded completion of option cursor lemmas/collectors in PLAN and queued `Proofs/Soundness` accumulator work.
 - 2025-09-30: Added interleaved subcommand regressions (success + missing-value failure) to `ArgParse/Tests/Unit.lean`, keeping totality lemmas intact; verified with `lake test`.

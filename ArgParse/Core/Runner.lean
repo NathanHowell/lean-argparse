@@ -50,6 +50,14 @@ namespace RunOutcome
 @[simp] def err (error : Error) (st : State) : RunOutcome α :=
   { result := .err error, state := st }
 
+/-- Map the payload produced by a runner outcome. -/
+@[simp] def map (f : α → β) : RunOutcome α → RunOutcome β
+  | ⟨.ok payload, st⟩        => ⟨.ok (f payload), st⟩
+  | ⟨.help text, st⟩         => ⟨.help text, st⟩
+  | ⟨.man text, st⟩          => ⟨.man text, st⟩
+  | ⟨.completions text, st⟩  => ⟨.completions text, st⟩
+  | ⟨.err err, st⟩           => ⟨.err err, st⟩
+
 end RunOutcome
 
 /-- Detect runner built-ins (`--help`, `--man`, `--generate-completions`). -/
@@ -63,21 +71,25 @@ end RunOutcome
       some { result := .completions (renderCompletions app), state := st }
   | _ => none
 
-/-- Run the elaborated parser against a normalized state, folding the collected `Partial`. -/
-def runNormalized (app : AppSpec) (fold : Spec.Partial → α) (st : State) : RunOutcome α :=
-  match builtinOutcome? (α := α) app st with
+/-- Core runner producing the raw `Partial` payload. -/
+@[inline] private def runNormalizedRawCore (app : AppSpec) (st : State) :
+    RunOutcome Spec.Partial :=
+  match builtinOutcome? (α := Spec.Partial) app st with
   | some outcome => outcome
   | none =>
       match Spec.elaborateApp app st with
       | .ok payload st' =>
-          -- Detect leftover tokens after a successful parse and surface an error.
           if st'.pre ≠ [] ∨ st'.post ≠ [] then
             let ctx := st'.pre ++ st'.post
             let err : Error := { kind := .leftover, context := ctx, expect := [.endOfInput] }
             RunOutcome.err err st'
           else
-            RunOutcome.ok (fold payload) st'
+            RunOutcome.ok payload st'
       | .err error => RunOutcome.err error st
+
+/-- Run the elaborated parser against a normalized state, folding the collected `Partial`. -/
+def runNormalized (app : AppSpec) (fold : Spec.Partial → α) (st : State) : RunOutcome α :=
+  RunOutcome.map fold (runNormalizedRawCore app st)
 
 /-- Run the application parser against raw argv tokens, folding the collected `Partial`. -/
 def run (app : AppSpec) (fold : Spec.Partial → α) (tokens : Tokens) : RunOutcome α :=
@@ -85,20 +97,20 @@ def run (app : AppSpec) (fold : Spec.Partial → α) (tokens : Tokens) : RunOutc
 
 /-- Convenience alias returning the raw `Partial` payload. -/
 @[inline] def runNormalizedRaw (app : AppSpec) (st : State) : RunOutcome Spec.Partial :=
-  runNormalized app id st
+  runNormalizedRawCore app st
 
 /-- Convenience alias returning the raw `Partial` payload from token input. -/
 @[inline] def runRaw (app : AppSpec) (tokens : Tokens) : RunOutcome Spec.Partial :=
-  run app id tokens
+  runNormalizedRawCore app (Core.normalize tokens)
 
 /-- Convenience alias returning the payload summary from a normalized state. -/
 @[inline] def runNormalizedSummary (app : AppSpec) (st : State) :
     RunOutcome Spec.Partial.Summary :=
-  runNormalized app Partial.toSummary st
+  RunOutcome.map Partial.toSummary (runNormalizedRawCore app st)
 
 /-- Convenience alias returning the payload summary from raw tokens. -/
 @[inline] def runSummary (app : AppSpec) (tokens : Tokens) :
     RunOutcome Spec.Partial.Summary :=
-  run app Partial.toSummary tokens
+  RunOutcome.map Partial.toSummary (runRaw app tokens)
 
 end ArgParse
