@@ -605,4 +605,21 @@ theorem elaborateItem_mergesRight
       exact elaborateItem_pos_mergesRight (spec := spec) (st := st) (f := f)
         (st' := st') h
 
+theorem elaborateItems_nil_mergesRight
+    (st : State)
+    {f : Spec.Partial → Spec.Partial} {st' : State}
+    (h : Spec.elaborateItems [] st = Result.ok f st') :
+    mergesRight f := by
+  classical
+  have hPure : Spec.elaborateItems [] st = Parser.pure id st := by
+    unfold Spec.elaborateItems
+    rfl
+  have hEval : Parser.pure id st = Result.ok f st' := by
+    simpa [hPure] using h
+  simp [Parser.pure] at hEval
+  cases hEval with
+  | intro left _ =>
+      subst left
+      simpa using mergesRight_id
+
 end ArgParse.Proofs
