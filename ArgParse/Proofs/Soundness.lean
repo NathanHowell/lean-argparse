@@ -179,6 +179,32 @@ private theorem flagFold_override
   simp [Spec.Partial.Summary.positionalValues, Spec.Partial.merge, Spec.Partial.toSummary,
         List.filterMap_append]
 
+/-- `Partial.empty` is a left identity for `Partial.merge`. -/
+@[simp] theorem merge_empty_left (p : Spec.Partial) :
+    Spec.Partial.merge Spec.Partial.empty p = p := by
+  cases p with
+  | mk flags options positionals =>
+      simp [Spec.Partial.merge, Spec.Partial.empty]
+
+/-- `Partial.empty` is a right identity for `Partial.merge`. -/
+@[simp] theorem merge_empty_right (p : Spec.Partial) :
+    Spec.Partial.merge p Spec.Partial.empty = p := by
+  cases p with
+  | mk flags options positionals =>
+      simp [Spec.Partial.merge, Spec.Partial.empty]
+
+/-- `Partial.merge` is associative. -/
+@[simp] theorem merge_assoc (a b c : Spec.Partial) :
+    Spec.Partial.merge (Spec.Partial.merge a b) c =
+      Spec.Partial.merge a (Spec.Partial.merge b c) := by
+  cases a with
+  | mk af ao ap =>
+      cases b with
+      | mk bf bo bp =>
+          cases c with
+          | mk cf co cp =>
+              simp [Spec.Partial.merge, List.append_assoc]
+
 end Partial
 
 end ArgParse.Proofs
