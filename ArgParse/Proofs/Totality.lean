@@ -102,42 +102,6 @@ theorem flag_cursor_bounds {spec : FlagSpec} {st : State} {b : Bool} {st' : Stat
         simpa [hEq] using this
       · simpa [hEq]
 
-/-- Successful concatenated option parsing always advances the cursor by one token. -/
-theorem parseConcatValue_cursor
-    {α : Type} [FromArg α] {spec : OptSpec α} {token raw : String}
-    {pending : List String} {st : State} {expect : Expect}
-    {payload : Option (α × String)} {st' : State}
-    (h : Core.parseConcatValue spec token raw pending st expect = .ok (payload, st')) :
-    st'.cursor = st.cursor + 1 := by
-  classical
-  by_cases hEmpty : raw = ""
-  · have := congrArg Except.isOk h
-    simp [Core.parseConcatValue, hEmpty] at this
-    cases this
-  · have hRaw : raw ≠ "" := hEmpty
-    cases hRun : FromArg.run (α := α) raw with
-    | ok value =>
-        have hEval := h
-        simp [Core.parseConcatValue, hRaw, hRun] at hEval
-        rcases hEval with ⟨hPayload, hState⟩
-        subst payload
-        subst st'
-        simp [State.withPre]
-    | error msg =>
-        cases hSplit : Core.findConcatSplit? (α := α) (raw := raw) with
-        | none =>
-            have := congrArg Except.isOk h
-            simp [Core.parseConcatValue, hRaw, hRun, hSplit] at this
-            cases this
-        | some result =>
-            obtain ⟨value, remainder⟩ := result
-            have hEval := h
-            simp [Core.parseConcatValue, hRaw, hRun, hSplit] at hEval
-            rcases hEval with ⟨hPayload, hState⟩
-            subst payload
-            subst st'
-            simp [State.withPre]
-
 /-- Cursor alignment for the positional collection loop. -/
 theorem collectPositionalStepsLoop_cursor
     {α : Type} [FromArg α] {spec : PosSpec α} :
@@ -198,6 +162,68 @@ theorem collectPositionalSteps_cursor
   have hLoop := h
   simp [Core.collectPositionalSteps] at hLoop
   exact collectPositionalStepsLoop_cursor (fuel := st.pre.length + st.post.length + 1)
+    [] [] 0 st st.cursor rfl hLoop
+
+/-- Cursor alignment for the option collection loop. -/
+theorem collectOptionStepsLoop_cursor
+    {α : Type} [FromArg α] {spec : OptSpec α} :
+    ∀ fuel accVals accRaws consumed (st : State) (cursor0 : Nat)
+      {result : Core.CollectResult α},
+      st.cursor = cursor0 + consumed →
+      Core.collectOptionStepsLoop spec fuel accVals accRaws consumed st = .ok result →
+      result.state.cursor = cursor0 + result.consumed := by
+  classical
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro accVals accRaws consumed st cursor0 result hCursor hLoop
+      simp [Core.collectOptionStepsLoop] at hLoop
+      cases hLoop
+      simp [hCursor]
+  | succ fuel ih =>
+      intro accVals accRaws consumed st cursor0 result hCursor hLoop
+      simp [Core.collectOptionStepsLoop] at hLoop
+      cases hStep : Core.takeOptionStep? spec st with
+      | error err =>
+          simp [hStep] at hLoop
+      | ok step =>
+          have hStepCursor :=
+            Core.takeOptionStep?_cursor (spec := spec) (st := st) (step := step) hStep
+          cases hValue : step.value? with
+          | none =>
+              simp [hStep, hValue] at hLoop
+              cases hLoop
+              simpa [hCursor]
+          | some value =>
+              cases hRaw : step.raw? with
+              | none =>
+                  simp [hStep, hValue, hRaw] at hLoop
+                  cases hLoop
+                  simpa [hCursor]
+              | some raw =>
+                  have hCursor' : step.state.cursor =
+                      cursor0 + (consumed + step.consumed) := by
+                    calc
+                      step.state.cursor = st.cursor + step.consumed := hStepCursor
+                      _ = (cursor0 + consumed) + step.consumed := by simpa [hCursor]
+                      _ = cursor0 + (consumed + step.consumed) :=
+                        by simpa [Nat.add_assoc] using
+                          (Nat.add_assoc cursor0 consumed step.consumed)
+                  have hLoop' := hLoop
+                  simp [hStep, hValue, hRaw] at hLoop'
+                  exact ih (value :: accVals) (raw :: accRaws)
+                    (consumed + step.consumed) step.state cursor0 hCursor' hLoop'
+
+/-- Cursor alignment for the option collector. -/
+theorem collectOptionSteps_cursor
+    {α : Type} [FromArg α] {spec : OptSpec α} {st : State}
+    {result : Core.CollectResult α}
+    (h : Core.collectOptionSteps spec st = .ok result) :
+    result.state.cursor = st.cursor + result.consumed := by
+  classical
+  have hLoop := h
+  simp [Core.collectOptionSteps] at hLoop
+  exact collectOptionStepsLoop_cursor (fuel := st.pre.length + st.post.length + 1)
     [] [] 0 st st.cursor rfl hLoop
 
 /-- Option parsers either succeed with a value/state or emit an error. -/

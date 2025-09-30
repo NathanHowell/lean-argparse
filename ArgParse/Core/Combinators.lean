@@ -327,6 +327,100 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
             .ok (some (value, consumedToken), newState)
         | none => .error (invalidValueError raw msg expect)
 
+/-- Successful concatenated option parsing always advances the cursor by one token. -/
+@[simp] theorem parseConcatValue_cursor
+    {α : Type} [FromArg α] {spec : OptSpec α} {token raw : String}
+    {pending : List String} {st : State} {expect : Expect}
+    {payload : Option (α × String)} {st' : State}
+    (h : parseConcatValue spec token raw pending st expect = .ok (payload, st')) :
+    st'.cursor = st.cursor + 1 := by
+  classical
+  by_cases hEmpty : raw = ""
+  · have := congrArg Except.isOk h
+    simp [parseConcatValue, hEmpty] at this
+    cases this
+  · have hRaw : raw ≠ "" := hEmpty
+    cases hRun : FromArg.run (α := α) raw with
+    | ok value =>
+        have hEval := h
+        simp [parseConcatValue, hRaw, hRun] at hEval
+        rcases hEval with ⟨hPayload, hState⟩
+        cases hPayload; cases hState
+        simp [State.withPre]
+    | error msg =>
+        cases hSplit : findConcatSplit? (α := α) (raw := raw) with
+        | none =>
+            have := congrArg Except.isOk h
+            simp [parseConcatValue, hRaw, hRun, hSplit] at this
+            cases this
+        | some result =>
+            obtain ⟨value, remainder⟩ := result
+            have hEval := h
+            simp [parseConcatValue, hRaw, hRun, hSplit] at hEval
+            rcases hEval with ⟨hPayload, hState⟩
+            cases hPayload; cases hState
+            simp [State.withPre]
+
+/-- Attempt a single option parsing step when the value is detached as the next token. -/
+@[inline] def takeOptionDetachedValue?
+    {α : Type} [ArgParse.FromArg α]
+    (token : String) (rest : List String) (st : State) (expect : Expect) :
+    Except Error (OptionStep α) :=
+  match rest with
+  | valueTok :: restTail =>
+      match FromArg.run valueTok with
+      | .ok value =>
+          .ok (OptionStep.ofPre st restTail 2 (some value) (some valueTok))
+      | .error msg => .error (invalidValueError valueTok msg expect)
+  | [] => .error (missingValueError token expect)
+
+/-- Attempt a single option parsing step when the value is bundled with the token. -/
+@[inline] def takeOptionConcatPayload?
+    {α : Type} [ArgParse.FromArg α] (spec : OptSpec α)
+    (token raw : String) (rest : List String) (st : State) (expect : Expect) :
+    Except Error (OptionStep α) :=
+  match parseConcatValue spec token raw rest st expect with
+  | .ok (payload, st') => .ok (OptionStep.ofConcat payload st')
+  | .error err => .error err
+
+/-- Handle short option tokens, accounting for detached and concatenated forms. -/
+@[inline] def takeOptionShortToken?
+    {α : Type} [ArgParse.FromArg α] (spec : OptSpec α)
+    (token : String) (rest : List String) (st : State) (expect : Expect) :
+    Except Error (OptionStep α) :=
+  match spec.short? with
+  | some short =>
+      if token = shortLexeme short then
+        takeOptionDetachedValue? token rest st expect
+      else
+        match spec.concatVal? with
+        | true =>
+            match token.startsWith (shortLexeme short) with
+            | true =>
+                let raw := token.drop (shortLexeme short).length
+                takeOptionConcatPayload? spec token raw rest st expect
+            | false => .ok (OptionStep.stay st)
+        | false => .ok (OptionStep.stay st)
+  | none => .ok (OptionStep.stay st)
+
+/-- Handle long option tokens, delegating to short-token logic when needed. -/
+@[inline] def takeOptionLongToken?
+    {α : Type} [ArgParse.FromArg α] (spec : OptSpec α)
+    (name token : String) (rest : List String) (st : State) (expect : Expect) :
+    Except Error (OptionStep α) :=
+  if spec.eqVal? then
+    if token.startsWith (longLexeme name ++ "=") then
+      let raw := token.drop (longLexeme name ++ "=").length
+      takeOptionConcatPayload? spec token raw rest st expect
+    else if token = longLexeme name then
+      takeOptionDetachedValue? token rest st expect
+    else
+      takeOptionShortToken? spec token rest st expect
+  else if token = longLexeme name then
+    takeOptionDetachedValue? token rest st expect
+  else
+    takeOptionShortToken? spec token rest st expect
+
 /-- Attempt a single option parsing step, recording progress metadata. -/
 @[inline] def takeOptionStep?
     {α : Type} [ArgParse.FromArg α] (spec : OptSpec α) (st : State) :
@@ -336,65 +430,161 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
   | token :: rest =>
       let expect := expectOption spec
       match spec.long? with
+      | some name => takeOptionLongToken? spec name token rest st expect
+      | none => takeOptionShortToken? spec token rest st expect
+
+/-- Detached option values advance the cursor according to their recorded cost. -/
+@[simp] theorem takeOptionDetachedValue?_cursor
+    {α : Type} [FromArg α] {token : String} {rest : List String}
+    {st : State} {expect : Expect} {step : OptionStep α}
+    (h : takeOptionDetachedValue? token rest st expect = .ok step) :
+    step.state.cursor = st.cursor + step.consumed := by
+  classical
+  unfold takeOptionDetachedValue? at h
+  cases rest with
+  | nil =>
+      simp at h
+  | cons valueTok restTail =>
+      cases hRun : FromArg.run (α := α) valueTok with
+      | ok value =>
+          have hStep := h
+          simp [hRun] at hStep
+          cases hStep
+          simp [OptionStep.ofPre, State.withPre]
+      | error msg =>
+          simp [hRun] at h
+
+/-- Concatenated option payloads advance the cursor by one token. -/
+@[simp] theorem takeOptionConcatPayload?_cursor
+    {α : Type} [FromArg α] {spec : OptSpec α} {token raw : String}
+    {rest : List String} {st : State} {expect : Expect} {step : OptionStep α}
+    (h : takeOptionConcatPayload? spec token raw rest st expect = .ok step) :
+    step.state.cursor = st.cursor + step.consumed := by
+  classical
+  unfold takeOptionConcatPayload? at h
+  cases hParse : parseConcatValue spec token raw rest st expect with
+  | error err =>
+      simp [hParse] at h
+  | ok payloadState =>
+      rcases payloadState with ⟨payload, st'⟩
+      have hStep := h
+      simp [hParse] at hStep
+      cases hStep
+      have hCursor :=
+        parseConcatValue_cursor (spec := spec) (token := token) (raw := raw)
+          (pending := rest) (st := st) (expect := expect)
+          (payload := payload) (st' := st') hParse
+      simp [OptionStep.ofConcat, hCursor]
+
+/-- Cursor progression for short-option handling. -/
+@[simp] theorem takeOptionShortToken?_cursor
+    {α : Type} [FromArg α] {spec : OptSpec α} {token : String}
+    {rest : List String} {st : State} {expect : Expect} {step : OptionStep α}
+    (h : takeOptionShortToken? spec token rest st expect = .ok step) :
+    step.state.cursor = st.cursor + step.consumed := by
+  classical
+  unfold takeOptionShortToken? at h
+  cases hShort : spec.short? with
+  | none =>
+      simp [hShort] at h
+      cases h
+      simp [OptionStep.stay]
+  | some short =>
+      by_cases hEq : token = shortLexeme short
+      · have hBranch : takeOptionDetachedValue? token rest st expect = .ok step := by
+          simpa [hShort, hEq] using h
+        exact takeOptionDetachedValue?_cursor (token := token) (rest := rest)
+          (st := st) (expect := expect) (step := step) hBranch
+      · have hBranch := h
+        simp [hShort, hEq] at hBranch
+        cases hConcat : spec.concatVal? with
+        | false =>
+            simp [hConcat] at hBranch
+            cases hBranch
+            simp [OptionStep.stay]
+        | true =>
+            cases hStart : token.startsWith (shortLexeme short) with
+            | false =>
+                simp [hConcat, hStart] at hBranch
+                cases hBranch
+                simp [OptionStep.stay]
+            | true =>
+                have hPayload :
+                    takeOptionConcatPayload? spec token
+                        (token.drop (shortLexeme short).length) rest st expect = .ok step := by
+                  simpa [hConcat, hStart] using hBranch
+                exact takeOptionConcatPayload?_cursor (spec := spec) (token := token)
+                  (raw := token.drop (shortLexeme short).length) (rest := rest) (st := st)
+                  (expect := expect) (step := step) hPayload
+
+/-- Cursor progression for long-option handling. -/
+@[simp] theorem takeOptionLongToken?_cursor
+    {α : Type} [FromArg α] {spec : OptSpec α} {name token : String}
+    {rest : List String} {st : State} {expect : Expect} {step : OptionStep α}
+    (h : takeOptionLongToken? spec name token rest st expect = .ok step) :
+    step.state.cursor = st.cursor + step.consumed := by
+  classical
+  unfold takeOptionLongToken? at h
+  by_cases hEqVal : spec.eqVal?
+  · have hBranch := h
+    simp [hEqVal] at hBranch
+    by_cases hStart : token.startsWith (longLexeme name ++ "=")
+    · have hPayload :
+        takeOptionConcatPayload? spec token
+          (token.drop (longLexeme name ++ "=").length) rest st expect = .ok step := by
+        simpa [hStart] using hBranch
+      exact takeOptionConcatPayload?_cursor (spec := spec) (token := token)
+        (raw := token.drop (longLexeme name ++ "=").length) (rest := rest) (st := st)
+        (expect := expect) (step := step) hPayload
+    · have hBranch' := hBranch
+      simp [hStart] at hBranch'
+      by_cases hEq : token = longLexeme name
+      · have hDetached : takeOptionDetachedValue? token rest st expect = .ok step := by
+          simpa [hEq] using hBranch'
+        exact takeOptionDetachedValue?_cursor (token := token) (rest := rest)
+          (st := st) (expect := expect) (step := step) hDetached
+      · have hShort : takeOptionShortToken? spec token rest st expect = .ok step := by
+          simpa [hEq] using hBranch'
+        exact takeOptionShortToken?_cursor (spec := spec) (token := token)
+          (rest := rest) (st := st) (expect := expect) (step := step) hShort
+  · have hBranch := h
+    simp [hEqVal] at hBranch
+    by_cases hEq : token = longLexeme name
+    · have hDetached : takeOptionDetachedValue? token rest st expect = .ok step := by
+        simpa [hEq] using hBranch
+      exact takeOptionDetachedValue?_cursor (token := token) (rest := rest)
+        (st := st) (expect := expect) (step := step) hDetached
+    · have hShort : takeOptionShortToken? spec token rest st expect = .ok step := by
+        simpa [hEq] using hBranch
+      exact takeOptionShortToken?_cursor (spec := spec) (token := token)
+        (rest := rest) (st := st) (expect := expect) (step := step) hShort
+
+/-- Successful option steps advance the cursor by the recorded amount. -/
+@[simp] theorem takeOptionStep?_cursor
+    {α : Type} [FromArg α] {spec : OptSpec α} {st : State} {step : OptionStep α}
+    (h : takeOptionStep? spec st = .ok step) :
+    step.state.cursor = st.cursor + step.consumed := by
+  classical
+  unfold takeOptionStep? at h
+  cases hPre : st.pre with
+  | nil =>
+      simp [hPre] at h
+      cases h
+      simp [OptionStep.stay]
+  | cons token rest =>
+      have hStep := h
+      simp [hPre] at hStep
+      cases hLong : spec.long? with
       | some name =>
-          let longLex := longLexeme name
-          let eqPrefix := longLex ++ "="
-          if spec.eqVal? ∧ token.startsWith eqPrefix then
-            let raw := token.drop eqPrefix.length
-            match parseConcatValue spec token raw rest st expect with
-            | .ok (value?, st') =>
-                .ok (OptionStep.ofConcat value? st')
-            | .error err => .error err
-          else if token = longLex then
-            match rest with
-            | valueTok :: restTail =>
-                match FromArg.run valueTok with
-                | .ok value =>
-                    .ok (OptionStep.ofPre st restTail 2 (some value) (some valueTok))
-                | .error msg => .error (invalidValueError valueTok msg expect)
-            | [] => .error (missingValueError token expect)
-          else
-            match spec.short? with
-            | some short =>
-                let shortLex := shortLexeme short
-                if token = shortLex then
-                  match rest with
-                  | valueTok :: restTail =>
-                      match FromArg.run valueTok with
-                      | .ok value =>
-                          .ok (OptionStep.ofPre st restTail 2 (some value) (some valueTok))
-                      | .error msg => .error (invalidValueError valueTok msg expect)
-                  | [] => .error (missingValueError token expect)
-                else if spec.concatVal? ∧ token.startsWith shortLex then
-                  let raw := token.drop shortLex.length
-                  match parseConcatValue spec token raw rest st expect with
-                  | .ok (payload, st') =>
-                      .ok (OptionStep.ofConcat payload st')
-                  | .error err => .error err
-                else
-                  .ok (OptionStep.stay st)
-            | none => .ok (OptionStep.stay st)
+          have hBranch : takeOptionLongToken? spec name token rest st (expectOption spec) = .ok step := by
+            simpa [hLong] using hStep
+          exact takeOptionLongToken?_cursor (spec := spec) (name := name) (token := token)
+            (rest := rest) (st := st) (expect := expectOption spec) (step := step) hBranch
       | none =>
-          match spec.short? with
-          | some short =>
-              let shortLex := shortLexeme short
-              if token = shortLex then
-                match rest with
-                | valueTok :: restTail =>
-                    match FromArg.run valueTok with
-                    | .ok value =>
-                        .ok (OptionStep.ofPre st restTail 2 (some value) (some valueTok))
-                    | .error msg => .error (invalidValueError valueTok msg expect)
-                | [] => .error (missingValueError token expect)
-              else if spec.concatVal? ∧ token.startsWith shortLex then
-                let raw := token.drop shortLex.length
-                match parseConcatValue spec token raw rest st expect with
-                | .ok (payload, st') =>
-                    .ok (OptionStep.ofConcat payload st')
-                | .error err => .error err
-              else
-                .ok (OptionStep.stay st)
-          | none => .ok (OptionStep.stay st)
+          have hBranch : takeOptionShortToken? spec token rest st (expectOption spec) = .ok step := by
+            simpa [hLong] using hStep
+          exact takeOptionShortToken?_cursor (spec := spec) (token := token)
+            (rest := rest) (st := st) (expect := expectOption spec) (step := step) hBranch
 
 /-- Extract only the value/state pair from `takeOptionStep?`. -/
 @[inline] def takeOptionValue?
