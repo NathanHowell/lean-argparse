@@ -64,11 +64,12 @@
   - Mirrored the new option semantics with cursor/consumption lemmas (`takeOptionStep?_cursor`, `collectOptionStepsLoop_cursor`, `collectOptionSteps_cursor`) and guard coverage in `Tests/Unit.lean`.
   - Introduced `State.withPre`/`withPost` helpers in `ArgParse/Core/Combinators.lean` and rewired flag proofs to use them, so future cursor lemmas can reference a single definition.
   - Proved `parseConcatValue_cursor` in `ArgParse/Proofs/Totality.lean`, confirming concatenated options advance exactly one token with the refactored helpers.
-  - Next: strengthen `ArgParse/Proofs/Soundness.lean` by replacing the accumulator placeholders with lemmas showing `Partial` updates respect the Summary queries.
+  - Strengthened `ArgParse/Proofs/Soundness.lean` with accumulator lemmas so `Partial.add*` folds line up with `Summary` queries (last-write-wins for flags, append order for options/positionals).
+  - Next: thread these facts into the higher-level soundness proofs (command/app elaboration) and start peeling back the `True` placeholders in `Proofs/Soundness/Summary.lean`.
 
-- Soundness accumulator proofs (queued)
-  - Formalise the `Partial.add*` folding lemmas so `Partial.Summary` queries reflect last-write-wins and stable ordering, replacing the current `True` stubs.
-  - Add targeted unit guards (or quick property checks) validating the helper lemmas while proofs take shape.
+- ✅ Soundness accumulator proofs
+  - `ArgParse/Proofs/Soundness.lean` now describes how folding `Partial.add*` updates interacts with `Summary` lookups, replacing the previous `True` placeholders.
+  - Remaining TODO: add lightweight property tests if we need runtime reassurance, but the proof statements already cover the intended behaviour.
 
 - Tests expansion
   - Added coverage in `ArgParse/Tests/Unit.lean` for repeated arities (`.one`/`.many`/`.some`), bundled short flags, sentinel boundaries, missing/invalid option values, and interleaved subcommand success/failure cases.
@@ -91,6 +92,7 @@
 - Make small, focused commits (one file or closely-related files at a time) and record outcomes—positive or negative—in the Activity Log.
 
 ## Activity Log
+- 2025-09-30: Documented the accumulator soundness proofs in PLAN after landing the new lemmas in `ArgParse/Proofs/Soundness.lean`.
 - 2025-09-30: Recorded completion of option cursor lemmas/collectors in PLAN and queued `Proofs/Soundness` accumulator work.
 - 2025-09-30: Added interleaved subcommand regressions (success + missing-value failure) to `ArgParse/Tests/Unit.lean`, keeping totality lemmas intact; verified with `lake test`.
 - 2025-09-30: Introduced `Core.subcommand`, updated `Spec.Elab`/`Main.lean`, and adjusted runtime tests to match the new diagnostics; `lake build; lake test`.
