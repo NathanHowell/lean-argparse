@@ -221,20 +221,24 @@ namespace PartialSummary
 @[simp] theorem suggestionsWithSummary_merge_values
     (spec : AppSpec)
     (earlier later : Spec.Partial) :
-    let merged := (Spec.Partial.merge earlier later).toSummary
-    (suggestionsWithSummary spec (some merged)).eraseDups =
-      (describeApp spec |>.map (·.heading) ++
-        merged.flags.map (·.fst) ++
-        merged.options.foldr
-          (fun entry acc =>
-            match entry with
-            | (name, value) => s!"{name}={value}" :: acc)
-          [] ++
-        merged.positionals.foldr
-          (fun entry acc =>
-            match entry with
-            | (name, value) => s!"{name}:{value}" :: acc)
-          []).eraseDups := rfl
+    suggestionsWithSummary spec
+        (some (Spec.Partial.merge earlier later).toSummary) =
+      ((describeApp spec |>.map (·.heading)) ++
+        ((Spec.Partial.merge earlier later).toSummary.flags.map (·.fst) ++
+          (Spec.Partial.merge earlier later).toSummary.options.foldr
+            (fun entry acc =>
+              match entry with
+              | (name, values) =>
+                  values.foldr (fun value acc' => s!"{name}={value}" :: acc') acc)
+            [] ++
+          (Spec.Partial.merge earlier later).toSummary.positionals.foldr
+            (fun entry acc =>
+              match entry with
+              | (name, values) =>
+                  values.foldr (fun value acc' => s!"{name}:{value}" :: acc') acc)
+            [])).eraseDups := by
+      classical
+      simp [suggestionsWithSummary]
 
 end PartialSummary
 

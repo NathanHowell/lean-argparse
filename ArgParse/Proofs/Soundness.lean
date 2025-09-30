@@ -293,4 +293,24 @@ theorem mergesRight_addPositional (name : String) (raw : String) :
 
 end Partial
 
+open Partial
+
+theorem elaborateItem_flag_mergesRight
+    (spec : FlagSpec) (st : State)
+    {f : Spec.Partial → Spec.Partial} {st' : State}
+    (h : Spec.elaborateItem (.flag spec) st = Result.ok f st') :
+    mergesRight f := by
+  classical
+  unfold Spec.elaborateItem at h
+  cases hFlag : ArgParse.Core.flag spec st with
+  | err _ =>
+      have : False := by
+        simpa [Parser.map, hFlag] using h
+      exact this.elim
+  | ok value st₁ =>
+      have hParts := by
+        simpa [Parser.map, hFlag] using h
+      obtain ⟨hf, _⟩ := hParts
+      simpa [hf] using mergesRight_flag (name := spec.«meta».name) (value := value)
+
 end ArgParse.Proofs
