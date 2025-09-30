@@ -103,7 +103,7 @@ open ArgParse.Spec.Partial
   simp [Spec.Partial.Summary.positionalValues, Spec.Partial.toSummary,
         foldl_addPositional_positionals, List.filterMap_append]
 
-private def flagStep (name : String) : Option Bool → (String × Bool) → Option Bool :=
+@[simp] private def flagStep (name : String) : Option Bool → (String × Bool) → Option Bool :=
   fun latest entry => if entry.fst = name then some entry.snd else latest
 
 private theorem flagFold_from_some_ne_none
@@ -111,13 +111,13 @@ private theorem flagFold_from_some_ne_none
     entries.foldl (flagStep name) (some value) ≠ none := by
   classical
   induction entries generalizing value with
-  | nil => simp [flagStep]
+  | nil => simp
   | cons entry rest ih =>
       by_cases hMatch : entry.fst = name
       · have := ih entry.snd
-        simp [flagStep, List.foldl, hMatch, this]
+        simp [List.foldl, hMatch, this]
       · have := ih value
-        simp [flagStep, List.foldl, hMatch, this]
+        simp [List.foldl, hMatch, this]
 
 private theorem flagFold_override
     (name : String) :
@@ -131,7 +131,7 @@ private theorem flagFold_override
   induction entries with
   | nil =>
       intro init
-      simp [flagStep]
+      simp
   | cons entry rest ih =>
       intro init
       by_cases hMatch : entry.fst = name
@@ -139,11 +139,11 @@ private theorem flagFold_override
         have hNe := flagFold_from_some_ne_none name rest entry.snd
         cases hRes : rest.foldl (flagStep name) (some entry.snd) with
         | none =>
-            exact (hNe (by simpa [flagStep, List.foldl, hMatch] using hRes)).elim
+            exact (hNe (by simpa [List.foldl, hMatch] using hRes)).elim
         | some value =>
-            simp [flagStep, List.foldl, hMatch, hRes]
+            simp [List.foldl, hMatch, hRes]
       · have := ih init
-        simp [flagStep, List.foldl, hMatch, this]
+        simp [List.foldl, hMatch, this]
 
 /-- Summary lookup over a merged payload prefers entries from the right operand. -/
 @[simp] theorem flagValue?_merge (earlier later : Spec.Partial) (name : String) :
@@ -156,7 +156,7 @@ private theorem flagFold_override
   have := flagFold_override name later.flags
     (earlier.flags.foldl (flagStep name) none)
   simpa [Spec.Partial.merge, Spec.Partial.toSummary,
-    Spec.Partial.Summary.flagValue?, List.foldl_append, flagStep]
+    Spec.Partial.Summary.flagValue?, List.foldl_append]
     using this
 
 /-- Option summary values concatenate when merging partial payloads. -/
