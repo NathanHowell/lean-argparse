@@ -68,7 +68,8 @@
   - Replaced the `Proofs/Soundness/Summary` placeholders with real lemmas (runner mapping and doc helpers now reduce to `rfl`) after refactoring the runner to expose `RunOutcome.map`.
   - Added merge lemmas in `Proofs/Soundness.lean` (`flagValue?_merge`, `optionValues_merge`, `positionalValues_merge`) to explain how summaries combine when `Partial.merge` is used.
   - Replaced the determinism placeholder with a real extensionality lemma (`Proofs/Determinism.parser_ext`) to anchor future uniqueness proofs.
-  - Next: push these summary facts into the remaining soundness modules (`Proofs/Soundness` higher-level sections and CLI soundness) so we can retire the outstanding `True` stubs.
+  - Extended the documentation helpers: `runtimeLinesForSummary` now respects merged option/positional values using the new merge lemmas.
+  - Next: propagate these merge facts into the remaining soundness modules (command/app elaboration plus CLI summaries) so we can retire the outstanding `True` stubs.
 
 - ✅ Soundness accumulator proofs
   - `ArgParse/Proofs/Soundness.lean` now describes how folding `Partial.add*` updates interacts with `Summary` lookups, replacing the previous `True` placeholders.
@@ -97,6 +98,7 @@
 ## Activity Log
 - 2025-09-30: Rewired the runner to factor `RunOutcome.map` and proved the summary-level soundness lemmas (`ArgParse/Proofs/Soundness/Summary.lean`) so the placeholders are gone.
 - 2025-09-30: Documented the accumulator soundness proofs in PLAN after landing the new lemmas in `ArgParse/Proofs/Soundness.lean`.
+- 2025-09-30: Extended `runtimeLinesForSummary` to handle merged option/positional summaries via the new merge lemmas.
 - 2025-09-30: Added `Partial.merge` summary lemmas and replaced the determinism placeholder with a parser extensionality fact.
 - 2025-09-30: Recorded completion of option cursor lemmas/collectors in PLAN and queued `Proofs/Soundness` accumulator work.
 - 2025-09-30: Added interleaved subcommand regressions (success + missing-value failure) to `ArgParse/Tests/Unit.lean`, keeping totality lemmas intact; verified with `lake test`.
