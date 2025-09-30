@@ -103,6 +103,82 @@ open ArgParse.Spec.Partial
   simp [Spec.Partial.Summary.positionalValues, Spec.Partial.toSummary,
         foldl_addPositional_positionals, List.filterMap_append]
 
+private def flagStep (name : String) : Option Bool → (String × Bool) → Option Bool :=
+  fun latest entry => if entry.fst = name then some entry.snd else latest
+
+private theorem flagFold_from_some_ne_none
+    (name : String) (entries : List (String × Bool)) (value : Bool) :
+    entries.foldl (flagStep name) (some value) ≠ none := by
+  classical
+  induction entries generalizing value with
+  | nil => simp [flagStep]
+  | cons entry rest ih =>
+      by_cases hMatch : entry.fst = name
+      · have := ih entry.snd
+        simp [flagStep, List.foldl, hMatch, this]
+      · have := ih value
+        simp [flagStep, List.foldl, hMatch, this]
+
+private theorem flagFold_override
+    (name : String) :
+    ∀ (entries : List (String × Bool)) (init : Option Bool),
+      entries.foldl (flagStep name) init =
+        match entries.foldl (flagStep name) none with
+        | some value => some value
+        | none => init := by
+  classical
+  intro entries
+  induction entries with
+  | nil =>
+      intro init
+      simp [flagStep]
+  | cons entry rest ih =>
+      intro init
+      by_cases hMatch : entry.fst = name
+      ·
+        have hNe := flagFold_from_some_ne_none name rest entry.snd
+        cases hRes : rest.foldl (flagStep name) (some entry.snd) with
+        | none =>
+            exact (hNe (by simpa [flagStep, List.foldl, hMatch] using hRes)).elim
+        | some value =>
+            simp [flagStep, List.foldl, hMatch, hRes]
+      · have := ih init
+        simp [flagStep, List.foldl, hMatch, this]
+
+/-- Summary lookup over a merged payload prefers entries from the right operand. -/
+@[simp] theorem flagValue?_merge (earlier later : Spec.Partial) (name : String) :
+    Spec.Partial.Summary.flagValue?
+        ((Spec.Partial.merge earlier later).toSummary) name =
+      match Spec.Partial.Summary.flagValue? (Spec.Partial.toSummary later) name with
+      | some value => some value
+      | none => Spec.Partial.Summary.flagValue? (Spec.Partial.toSummary earlier) name := by
+  classical
+  have := flagFold_override name later.flags
+    (earlier.flags.foldl (flagStep name) none)
+  simpa [Spec.Partial.merge, Spec.Partial.toSummary,
+    Spec.Partial.Summary.flagValue?, List.foldl_append, flagStep]
+    using this
+
+/-- Option summary values concatenate when merging partial payloads. -/
+@[simp] theorem optionValues_merge (earlier later : Spec.Partial) (name : String) :
+    Spec.Partial.Summary.optionValues
+        ((Spec.Partial.merge earlier later).toSummary) name =
+      Spec.Partial.Summary.optionValues (Spec.Partial.toSummary earlier) name ++
+        Spec.Partial.Summary.optionValues (Spec.Partial.toSummary later) name := by
+  classical
+  simp [Spec.Partial.Summary.optionValues, Spec.Partial.merge, Spec.Partial.toSummary,
+        List.filterMap_append]
+
+/-- Positional summary values concatenate when merging partial payloads. -/
+@[simp] theorem positionalValues_merge (earlier later : Spec.Partial) (name : String) :
+    Spec.Partial.Summary.positionalValues
+        ((Spec.Partial.merge earlier later).toSummary) name =
+      Spec.Partial.Summary.positionalValues (Spec.Partial.toSummary earlier) name ++
+        Spec.Partial.Summary.positionalValues (Spec.Partial.toSummary later) name := by
+  classical
+  simp [Spec.Partial.Summary.positionalValues, Spec.Partial.merge, Spec.Partial.toSummary,
+        List.filterMap_append]
+
 end Partial
 
 end ArgParse.Proofs
