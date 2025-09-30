@@ -291,6 +291,69 @@ theorem mergesRight_addPositional (name : String) (raw : String) :
       · simp [Spec.Partial.merge, Spec.Partial.empty, addPositional_options]
       · simp [Spec.Partial.merge, Spec.Partial.empty, addPositional_positionals]
 
+/-- Composition of merge-compatible transformers remains merge-compatible. -/
+theorem mergesRight_comp
+    {g h : Spec.Partial → Spec.Partial}
+    (hg : mergesRight g) (hh : mergesRight h) :
+    mergesRight (fun p => h (g p)) := by
+  intro base
+  have hgBase := hg base
+  have hhBase := hh (g base)
+  have hhEmpty := hh (g Spec.Partial.empty)
+  calc
+    h (g base)
+        = Spec.Partial.merge (g base) (h Spec.Partial.empty) := by
+            simpa using hhBase
+    _ = Spec.Partial.merge (Spec.Partial.merge base (g Spec.Partial.empty))
+          (h Spec.Partial.empty) := by
+            simpa [hgBase]
+    _ = Spec.Partial.merge base
+          (Spec.Partial.merge (g Spec.Partial.empty) (h Spec.Partial.empty)) := by
+            simpa using
+              (merge_assoc base (g Spec.Partial.empty) (h Spec.Partial.empty))
+    _ = Spec.Partial.merge base (h (g Spec.Partial.empty)) := by
+            simpa [hhEmpty.symm]
+
+/-- Folding a list of option payloads preserves the merge-right property. -/
+theorem mergesRight_fold_addOption (name : String) :
+    ∀ (raws : List String),
+      mergesRight (fun p => raws.foldl (fun acc raw => acc.addOption name raw) p)
+  | [] => by
+      simpa using mergesRight_id
+  | raw :: rest => by
+      simpa [List.foldl_cons] using
+        (mergesRight_comp
+          (g := fun p => p.addOption name raw)
+          (h := fun p => rest.foldl (fun acc raw => acc.addOption name raw) p)
+          (hg := mergesRight_addOption (name := name) (raw := raw))
+          (hh := mergesRight_fold_addOption (name := name) rest))
+
+/-- Folding optional positional payloads preserves the merge-right property. -/
+theorem mergesRight_option_addPositional (name : String) :
+    ∀ (raw? : Option String), mergesRight
+      (fun p => match raw? with
+        | none => p
+        | some raw => p.addPositional name raw)
+  | none => by
+      simpa using mergesRight_id
+  | some raw => by
+      simpa using mergesRight_addPositional (name := name) (raw := raw)
+
+/-- Folding a list of positional payloads preserves the merge-right property. -/
+theorem mergesRight_fold_addPositional (name : String) :
+    ∀ (raws : List String),
+      mergesRight
+        (fun p => raws.foldl (fun acc raw => acc.addPositional name raw) p)
+  | [] => by
+      simpa using mergesRight_id
+  | raw :: rest => by
+      simpa [List.foldl_cons] using
+        (mergesRight_comp
+          (g := fun p => p.addPositional name raw)
+          (h := fun p => rest.foldl (fun acc raw => acc.addPositional name raw) p)
+          (hg := mergesRight_addPositional (name := name) (raw := raw))
+          (hh := mergesRight_fold_addPositional (name := name) rest))
+
 end Partial
 
 open Partial
@@ -312,5 +375,234 @@ theorem elaborateItem_flag_mergesRight
         simpa [Parser.map, hFlag] using h
       obtain ⟨hf, _⟩ := hParts
       simpa [hf] using mergesRight_flag (name := spec.«meta».name) (value := value)
+
+theorem elaborateItem_opt_zero_mergesRight
+    {α : Type} [ArgParse.FromArg α]
+    (spec : OptSpec α) (st : State)
+    {f : Spec.Partial → Spec.Partial} {st' : State}
+    (hArity : spec.arity = .zero)
+    (h : Spec.elaborateItem (.opt spec) st = Result.ok f st') :
+    mergesRight f := by
+  classical
+  unfold Spec.elaborateItem at h
+  simp [hArity] at h
+  cases h
+  simpa using mergesRight_id
+
+theorem elaborateItem_opt_one_mergesRight
+    {α : Type} [ArgParse.FromArg α]
+    (spec : OptSpec α) (st : State)
+    {f : Spec.Partial → Spec.Partial} {st' : State}
+    (hArity : spec.arity = .one)
+    (h : Spec.elaborateItem (.opt spec) st = Result.ok f st') :
+    mergesRight f := by
+  classical
+  unfold Spec.elaborateItem at h
+  simp [hArity] at h
+  cases hCollect : ArgParse.Core.collectOptionValues (α := α) spec st with
+  | error err =>
+      have : False := by
+        simpa [Parser.map, hCollect] using h
+      exact this.elim
+  | ok payload =>
+      rcases payload with ⟨values, raws, st₁⟩
+      have hParts := by
+        simpa [Parser.map, hCollect] using h
+      obtain ⟨hf, _⟩ := hParts
+      simpa [hf] using mergesRight_fold_addOption (name := spec.«meta».name) raws
+
+theorem elaborateItem_opt_many_mergesRight
+    {α : Type} [ArgParse.FromArg α]
+    (spec : OptSpec α) (st : State)
+    {f : Spec.Partial → Spec.Partial} {st' : State}
+    (hArity : spec.arity = .many)
+    (h : Spec.elaborateItem (.opt spec) st = Result.ok f st') :
+    mergesRight f := by
+  classical
+  unfold Spec.elaborateItem at h
+  simp [hArity] at h
+  cases hCollect : ArgParse.Core.collectOptionValues (α := α) spec st with
+  | error err =>
+      have : False := by
+        simpa [Parser.map, hCollect] using h
+      exact this.elim
+  | ok payload =>
+      rcases payload with ⟨values, raws, st₁⟩
+      have hParts := by
+        simpa [Parser.map, hCollect] using h
+      obtain ⟨hf, _⟩ := hParts
+      simpa [hf] using mergesRight_fold_addOption (name := spec.«meta».name) raws
+
+theorem elaborateItem_opt_some_mergesRight
+    {α : Type} [ArgParse.FromArg α]
+    (spec : OptSpec α) (st : State)
+    {f : Spec.Partial → Spec.Partial} {st' : State}
+    (hArity : spec.arity = .some)
+    (h : Spec.elaborateItem (.opt spec) st = Result.ok f st') :
+    mergesRight f := by
+  classical
+  unfold Spec.elaborateItem at h
+  simp [hArity] at h
+  cases hCollect : ArgParse.Core.collectOptionValues (α := α) spec st with
+  | error err =>
+      have : False := by
+        simpa [Parser.map, hCollect] using h
+      exact this.elim
+  | ok payload =>
+      rcases payload with ⟨values, raws, st₁⟩
+      cases hValues : values with
+      | nil =>
+          have : False := by
+            simpa [Parser.map, hCollect, hValues] using h
+          exact this.elim
+      | cons head tail =>
+          have hParts := by
+            simpa [Parser.map, hCollect, hValues] using h
+          obtain ⟨hf, _⟩ := hParts
+          simpa [hf] using mergesRight_fold_addOption (name := spec.«meta».name) raws
+
+theorem elaborateItem_pos_zero_mergesRight
+    {α : Type} [ArgParse.FromArg α]
+    (spec : PosSpec α) (st : State)
+    {f : Spec.Partial → Spec.Partial} {st' : State}
+    (hArity : spec.arity = .zero)
+    (h : Spec.elaborateItem (.pos spec) st = Result.ok f st') :
+    mergesRight f := by
+  classical
+  unfold Spec.elaborateItem at h
+  simp [hArity] at h
+  cases h
+  simpa using mergesRight_id
+
+theorem elaborateItem_pos_one_mergesRight
+    {α : Type} [ArgParse.FromArg α]
+    (spec : PosSpec α) (st : State)
+    {f : Spec.Partial → Spec.Partial} {st' : State}
+    (hArity : spec.arity = .one)
+    (h : Spec.elaborateItem (.pos spec) st = Result.ok f st') :
+    mergesRight f := by
+  classical
+  unfold Spec.elaborateItem at h
+  simp [hArity] at h
+  cases hTake : ArgParse.Core.takePositionalValue? (α := α) spec st with
+  | error err =>
+      have : False := by
+        simpa [Parser.map, hTake] using h
+      exact this.elim
+  | ok result =>
+      rcases result with ⟨ov, st₁⟩
+      have hParts := by
+        simpa [Parser.map, hTake] using h
+      obtain ⟨hf, _⟩ := hParts
+      cases ov with
+      | none =>
+          simpa [hf.symm] using mergesRight_id
+      | some pair =>
+          rcases pair with ⟨_, raw⟩
+          simpa [hf.symm] using
+            mergesRight_addPositional (name := spec.«meta».name) (raw := raw)
+
+theorem elaborateItem_pos_many_mergesRight
+    {α : Type} [ArgParse.FromArg α]
+    (spec : PosSpec α) (st : State)
+    {f : Spec.Partial → Spec.Partial} {st' : State}
+    (hArity : spec.arity = .many)
+    (h : Spec.elaborateItem (.pos spec) st = Result.ok f st') :
+    mergesRight f := by
+  classical
+  unfold Spec.elaborateItem at h
+  simp [hArity] at h
+  cases hCollect : ArgParse.Core.collectPositionalValues (α := α) spec st with
+  | error err =>
+      have : False := by
+        simpa [Parser.map, hCollect] using h
+      exact this.elim
+  | ok payload =>
+      rcases payload with ⟨values, raws, st₁⟩
+      have hParts := by
+        simpa [Parser.map, hCollect] using h
+      obtain ⟨hf, _⟩ := hParts
+      simpa [hf] using mergesRight_fold_addPositional (name := spec.«meta».name) raws
+
+theorem elaborateItem_pos_some_mergesRight
+    {α : Type} [ArgParse.FromArg α]
+    (spec : PosSpec α) (st : State)
+    {f : Spec.Partial → Spec.Partial} {st' : State}
+    (hArity : spec.arity = .some)
+    (h : Spec.elaborateItem (.pos spec) st = Result.ok f st') :
+    mergesRight f := by
+  classical
+  unfold Spec.elaborateItem at h
+  simp [hArity] at h
+  cases hCollect : ArgParse.Core.collectPositionalValues (α := α) spec st with
+  | error err =>
+      have : False := by
+        simpa [Parser.map, hCollect] using h
+      exact this.elim
+  | ok payload =>
+      rcases payload with ⟨values, raws, st₁⟩
+      have hParts := by
+        simpa [Parser.map, hCollect] using h
+      obtain ⟨hf, _⟩ := hParts
+      simpa [hf] using mergesRight_fold_addPositional (name := spec.«meta».name) raws
+
+theorem elaborateItem_opt_mergesRight
+    {α : Type} [ArgParse.FromArg α]
+    (spec : OptSpec α) (st : State)
+    {f : Spec.Partial → Spec.Partial} {st' : State}
+    (h : Spec.elaborateItem (.opt spec) st = Result.ok f st') :
+    mergesRight f := by
+  classical
+  cases hArity : spec.arity with
+  | zero =>
+      exact elaborateItem_opt_zero_mergesRight (spec := spec) (st := st) (f := f)
+        (st' := st') (hArity := hArity) h
+  | one =>
+      exact elaborateItem_opt_one_mergesRight (spec := spec) (st := st) (f := f)
+        (st' := st') (hArity := hArity) h
+  | many =>
+      exact elaborateItem_opt_many_mergesRight (spec := spec) (st := st) (f := f)
+        (st' := st') (hArity := hArity) h
+  | some =>
+      exact elaborateItem_opt_some_mergesRight (spec := spec) (st := st) (f := f)
+        (st' := st') (hArity := hArity) h
+
+theorem elaborateItem_pos_mergesRight
+    {α : Type} [ArgParse.FromArg α]
+    (spec : PosSpec α) (st : State)
+    {f : Spec.Partial → Spec.Partial} {st' : State}
+    (h : Spec.elaborateItem (.pos spec) st = Result.ok f st') :
+    mergesRight f := by
+  classical
+  cases hArity : spec.arity with
+  | zero =>
+      exact elaborateItem_pos_zero_mergesRight (spec := spec) (st := st) (f := f)
+        (st' := st') (hArity := hArity) h
+  | one =>
+      exact elaborateItem_pos_one_mergesRight (spec := spec) (st := st) (f := f)
+        (st' := st') (hArity := hArity) h
+  | many =>
+      exact elaborateItem_pos_many_mergesRight (spec := spec) (st := st) (f := f)
+        (st' := st') (hArity := hArity) h
+  | some =>
+      exact elaborateItem_pos_some_mergesRight (spec := spec) (st := st) (f := f)
+        (st' := st') (hArity := hArity) h
+
+theorem elaborateItem_mergesRight
+    (item : ItemSpec) (st : State)
+    {f : Spec.Partial → Spec.Partial} {st' : State}
+    (h : Spec.elaborateItem item st = Result.ok f st') :
+    mergesRight f := by
+  classical
+  cases item with
+  | flag spec =>
+      exact elaborateItem_flag_mergesRight (spec := spec) (st := st) (f := f)
+        (st' := st') h
+  | @opt α inst spec =>
+      exact elaborateItem_opt_mergesRight (spec := spec) (st := st) (f := f)
+        (st' := st') h
+  | @pos α inst spec =>
+      exact elaborateItem_pos_mergesRight (spec := spec) (st := st) (f := f)
+        (st' := st') h
 
 end ArgParse.Proofs

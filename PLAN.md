@@ -67,6 +67,7 @@
   - Strengthened `ArgParse/Proofs/Soundness.lean` with accumulator lemmas so `Partial.add*` folds line up with `Summary` queries (last-write-wins for flags, append order for options/positionals).
   - Replaced the `Proofs/Soundness/Summary` placeholders with real lemmas (runner mapping and doc helpers now reduce to `rfl`) after refactoring the runner to expose `RunOutcome.map`.
   - Added merge lemmas in `Proofs/Soundness.lean` (`flagValue?_merge`, `optionValues_merge`, `positionalValues_merge`) to explain how summaries combine when `Partial.merge` is used.
+  - Recorded merge-compatibility theorems for each `Spec.elaborateItem` arity (flags/options/positionals) and a top-level `elaborateItem_mergesRight` wrapper so elaboration proofs can reuse the helper lemmas directly.
   - Replaced the determinism placeholder with a real extensionality lemma (`Proofs/Determinism.parser_ext`) to anchor future uniqueness proofs.
   - Extended the documentation helpers: `runtimeLinesForSummary`, `runtimeParagraphs`, and completion extras now respect merged option/positional values using the new merge lemmas.
   - Recorded algebraic laws for `Partial.merge` (identities, associativity) so elaboration proofs can collapse nested merges.
