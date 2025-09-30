@@ -471,6 +471,43 @@ def option {α : Type} [ArgParse.FromArg α] (spec : OptSpec α) :
           | .error msg => .error (invalidValueError token msg expect)
       | none => .ok { value? := none, raw? := none, state := st, consumed := 0 }
 
+/-- Successful positional steps advance the cursor by the recorded amount. -/
+@[simp] theorem takePositionalStep?_cursor
+    {α : Type} [ArgParse.FromArg α] {spec : PosSpec α} {st : State}
+    {step : PosStep α}
+    (h : takePositionalStep? spec st = .ok step) :
+    step.state.cursor = st.cursor + step.consumed := by
+  classical
+  unfold takePositionalStep? at h
+  cases hPre : State.consumePre? st with
+  | some prePair =>
+      rcases prePair with ⟨token, st'⟩
+      cases hRun : FromArg.run (α := α) token with
+      | ok value =>
+          have hStep := h
+          simp [hPre, hRun] at hStep
+          cases hStep
+          simpa using State.consumePre?_cursor (st := st) (tok := token) (st' := st') hPre
+      | error msg =>
+          simp [hPre, hRun] at h
+  | none =>
+      cases hPost : State.consumePost? st with
+      | some postPair =>
+          rcases postPair with ⟨token, st'⟩
+          cases hRun : FromArg.run (α := α) token with
+          | ok value =>
+              have hStep := h
+              simp [hPre, hPost, hRun] at hStep
+              cases hStep
+              simpa using State.consumePost?_cursor (st := st) (tok := token) (st' := st') hPost
+          | error msg =>
+              simp [hPre, hPost, hRun] at h
+      | none =>
+          have hStep := h
+          simp [hPre, hPost] at hStep
+          cases hStep
+          simp
+
 /-- Extract only the value/state pair from `takePositionalStep?`. -/
 @[inline] def takePositionalValue?
     {α : Type} [ArgParse.FromArg α] (spec : PosSpec α) (st : State) :

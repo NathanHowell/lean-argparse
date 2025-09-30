@@ -138,6 +138,68 @@ theorem parseConcatValue_cursor
             subst st'
             simp [State.withPre]
 
+/-- Cursor alignment for the positional collection loop. -/
+theorem collectPositionalStepsLoop_cursor
+    {α : Type} [FromArg α] {spec : PosSpec α} :
+    ∀ fuel accVals accRaws consumed (st : State) (cursor0 : Nat)
+      {result : Core.CollectResult α},
+      st.cursor = cursor0 + consumed →
+      Core.collectPositionalStepsLoop spec fuel accVals accRaws consumed st = .ok result →
+      result.state.cursor = cursor0 + result.consumed := by
+  classical
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro accVals accRaws consumed st cursor0 result hCursor hLoop
+      simp [Core.collectPositionalStepsLoop] at hLoop
+      cases hLoop
+      simp [hCursor]
+  | succ fuel ih =>
+      intro accVals accRaws consumed st cursor0 result hCursor hLoop
+      simp [Core.collectPositionalStepsLoop] at hLoop
+      cases hStep : Core.takePositionalStep? spec st with
+      | error err =>
+          simp [hStep] at hLoop
+      | ok step =>
+          have hStepCursor :=
+            Core.takePositionalStep?_cursor (spec := spec) (st := st) (step := step) hStep
+          cases hValue : step.value? with
+          | none =>
+              simp [hStep, hValue] at hLoop
+              cases hLoop
+              simpa [hCursor]
+          | some value =>
+              cases hRaw : step.raw? with
+              | none =>
+                  simp [hStep, hValue, hRaw] at hLoop
+                  cases hLoop
+                  simpa [hCursor]
+              | some raw =>
+                  have hCursor' : step.state.cursor =
+                      cursor0 + (consumed + step.consumed) := by
+                    calc
+                      step.state.cursor = st.cursor + step.consumed := hStepCursor
+                      _ = (cursor0 + consumed) + step.consumed := by simpa [hCursor]
+                      _ = cursor0 + (consumed + step.consumed) :=
+                        by simpa [Nat.add_assoc] using
+                          (Nat.add_assoc cursor0 consumed step.consumed)
+                  have hLoop' := hLoop
+                  simp [hStep, hValue, hRaw] at hLoop'
+                  exact ih (value :: accVals) (raw :: accRaws)
+                    (consumed + step.consumed) step.state cursor0 hCursor' hLoop'
+
+/-- Cursor alignment for the positional collector. -/
+theorem collectPositionalSteps_cursor
+    {α : Type} [FromArg α] {spec : PosSpec α} {st : State}
+    {result : Core.CollectResult α}
+    (h : Core.collectPositionalSteps spec st = .ok result) :
+    result.state.cursor = st.cursor + result.consumed := by
+  classical
+  have hLoop := h
+  simp [Core.collectPositionalSteps] at hLoop
+  exact collectPositionalStepsLoop_cursor (fuel := st.pre.length + st.post.length + 1)
+    [] [] 0 st st.cursor rfl hLoop
+
 /-- Option parsers either succeed with a value/state or emit an error. -/
 @[simp] theorem option_result_cases
     {α : Type} [FromArg α] (spec : OptSpec α) (st : State) :
