@@ -79,6 +79,39 @@ namespace PartialSummary
     renderCompletionWithSummary spec (partial?.map Partial.toSummary) =
       renderCompletionWith spec partial? := rfl
 
+/-- Runtime annotations for a flag prefer the right-hand payload when partials are merged. -/
+@[simp] theorem runtimeLinesForSummary_merge_flag
+    (name : String) (lines : List String)
+    (earlier later : Spec.Partial) :
+    runtimeLinesForSummary
+        (some (Spec.Partial.merge earlier later).toSummary)
+        { heading := name, lines := lines, kind := EntryKind.flag } =
+      match Spec.Partial.Summary.flagValue? (Spec.Partial.toSummary later) name with
+      | some true => ["current: enabled"]
+      | some false => ["current: disabled"]
+      | none =>
+          match Spec.Partial.Summary.flagValue? (Spec.Partial.toSummary earlier) name with
+          | some true => ["current: enabled"]
+          | some false => ["current: disabled"]
+          | none => [] := by
+  classical
+  cases hLater :
+      Spec.Partial.Summary.flagValue? (Spec.Partial.toSummary later) name with
+  | none =>
+      cases hEarlier :
+          Spec.Partial.Summary.flagValue? (Spec.Partial.toSummary earlier) name with
+      | none =>
+          simp [runtimeLinesForSummary, hLater, hEarlier,
+            Partial.flagValue?_merge (earlier := earlier) (later := later) (name := name)]
+      | some prev =>
+          cases prev <;>
+            simp [runtimeLinesForSummary, hLater, hEarlier,
+              Partial.flagValue?_merge (earlier := earlier) (later := later) (name := name)]
+  | some value =>
+      cases value <;>
+        simp [runtimeLinesForSummary, hLater,
+          Partial.flagValue?_merge (earlier := earlier) (later := later) (name := name)]
+
 end PartialSummary
 
 end ArgParse.Proofs
