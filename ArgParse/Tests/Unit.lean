@@ -1,5 +1,6 @@
 import ArgParse.Core.Normalize
 import ArgParse.Core.Value
+import ArgParse.Core.Combinators
 import ArgParse.Spec.AST
 import ArgParse.Spec.Elab
 import ArgParse.Core.Runner
@@ -69,6 +70,49 @@ private def cmdOpt : CmdSpec := { name := "app", «meta» := mkMeta "app", args 
    let st := normalize ["-nfoo"]
    match p st with
    | .ok part _ => part.options.any (fun (k,_) => k = "name")
+    | _ => False)
+
+#guard
+  (let st := normalize ["--name=foo"]
+   match takeOptionStep? optShortLong st with
+   | .ok step =>
+       step.consumed = 1 ∧ step.state.cursor = st.cursor + 1 ∧
+       step.value? = some "foo" ∧ step.raw? = some "foo"
+   | _ => False)
+
+#guard
+  (let st := normalize ["--name", "foo"]
+   match takeOptionStep? optShortLong st with
+   | .ok step =>
+       step.consumed = 2 ∧ step.state.cursor = st.cursor + 2 ∧
+       step.value? = some "foo" ∧ step.raw? = some "foo"
+   | _ => False)
+
+private def shortOptOnly : OptSpec String :=
+  { short? := some shortN, «meta» := mkMeta "name" }
+
+#guard
+  (let st := normalize ["-nfoo"]
+   match takeOptionStep? shortOptOnly st with
+   | .ok step =>
+       step.consumed = 1 ∧ step.state.cursor = st.cursor + 1 ∧
+       step.value? = some "foo" ∧ step.raw? = some "foo"
+   | _ => False)
+
+#guard
+  (let st := normalize ["-n", "foo"]
+   match takeOptionStep? shortOptOnly st with
+   | .ok step =>
+       step.consumed = 2 ∧ step.state.cursor = st.cursor + 2 ∧
+       step.value? = some "foo" ∧ step.raw? = some "foo"
+   | _ => False)
+
+#guard
+  (let st := normalize ["--other"]
+   match takeOptionStep? optShortLong st with
+   | .ok step =>
+       step.consumed = 0 ∧ step.state.cursor = st.cursor ∧
+       step.value? = none ∧ step.raw? = none
    | _ => False)
 
 open ArgParse in
