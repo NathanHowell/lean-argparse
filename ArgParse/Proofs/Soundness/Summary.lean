@@ -217,6 +217,25 @@ namespace PartialSummary
     Partial.positionalValues_merge (earlier := earlier) (later := later) (name := name)
   simp [runtimeParagraphs, hMerged, List.isEmpty]
 
+/-- Completion suggestions retain the union of option/positional terms when partials merge. -/
+@[simp] theorem suggestionsWithSummary_merge_values
+    (spec : AppSpec)
+    (earlier later : Spec.Partial) :
+    let merged := (Spec.Partial.merge earlier later).toSummary
+    (suggestionsWithSummary spec (some merged)).eraseDups =
+      (describeApp spec |>.map (·.heading) ++
+        merged.flags.map (·.fst) ++
+        merged.options.foldr
+          (fun entry acc =>
+            match entry with
+            | (name, value) => s!"{name}={value}" :: acc)
+          [] ++
+        merged.positionals.foldr
+          (fun entry acc =>
+            match entry with
+            | (name, value) => s!"{name}:{value}" :: acc)
+          []).eraseDups := rfl
+
 end PartialSummary
 
 end ArgParse.Proofs
