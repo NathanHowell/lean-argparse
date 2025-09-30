@@ -148,6 +148,75 @@ namespace PartialSummary
     Partial.positionalValues_merge (earlier := earlier) (later := later) (name := name)
   simp [runtimeLinesForSummary, hMerged, List.isEmpty]
 
+/-- Flag paragraphs in the manpage renderer prefer the right-hand payload when partials merge. -/
+@[simp] theorem runtimeParagraphs_merge_flag
+    (name : String) (lines : List String)
+    (earlier later : Spec.Partial) :
+    runtimeParagraphs
+        (some (Spec.Partial.merge earlier later).toSummary)
+        { heading := name, lines := lines, kind := EntryKind.flag } =
+      match Spec.Partial.Summary.flagValue? (Spec.Partial.toSummary later) name with
+      | some true => [".Pp current: enabled"]
+      | some false => [".Pp current: disabled"]
+      | none =>
+          match Spec.Partial.Summary.flagValue? (Spec.Partial.toSummary earlier) name with
+          | some true => [".Pp current: enabled"]
+          | some false => [".Pp current: disabled"]
+          | none => [] := by
+  classical
+  cases hLater :
+      Spec.Partial.Summary.flagValue? (Spec.Partial.toSummary later) name with
+  | none =>
+      cases hEarlier :
+          Spec.Partial.Summary.flagValue? (Spec.Partial.toSummary earlier) name with
+      | none =>
+          simp [runtimeParagraphs, hLater, hEarlier,
+            Partial.flagValue?_merge (earlier := earlier) (later := later) (name := name)]
+      | some prev =>
+          cases prev <;>
+            simp [runtimeParagraphs, hLater, hEarlier,
+              Partial.flagValue?_merge (earlier := earlier) (later := later) (name := name)]
+  | some value =>
+      cases value <;>
+        simp [runtimeParagraphs, hLater,
+          Partial.flagValue?_merge (earlier := earlier) (later := later) (name := name)]
+
+/-- Option paragraphs reflect appended values when partials merge. -/
+@[simp] theorem runtimeParagraphs_merge_option
+    (name : String) (lines : List String)
+    (earlier later : Spec.Partial) :
+    runtimeParagraphs
+        (some (Spec.Partial.merge earlier later).toSummary)
+        { heading := name, lines := lines, kind := EntryKind.option } =
+      if (Spec.Partial.Summary.optionValues (Spec.Partial.toSummary earlier) name ++
+          Spec.Partial.Summary.optionValues (Spec.Partial.toSummary later) name).isEmpty then []
+      else
+        [s!".Pp current: {String.intercalate ", " (
+            Spec.Partial.Summary.optionValues (Spec.Partial.toSummary earlier) name ++
+            Spec.Partial.Summary.optionValues (Spec.Partial.toSummary later) name)}"] := by
+  classical
+  have hMerged :=
+    Partial.optionValues_merge (earlier := earlier) (later := later) (name := name)
+  simp [runtimeParagraphs, hMerged, List.isEmpty]
+
+/-- Positional paragraphs reflect appended values when partials merge. -/
+@[simp] theorem runtimeParagraphs_merge_positional
+    (name : String) (lines : List String)
+    (earlier later : Spec.Partial) :
+    runtimeParagraphs
+        (some (Spec.Partial.merge earlier later).toSummary)
+        { heading := name, lines := lines, kind := EntryKind.positional } =
+      if (Spec.Partial.Summary.positionalValues (Spec.Partial.toSummary earlier) name ++
+          Spec.Partial.Summary.positionalValues (Spec.Partial.toSummary later) name).isEmpty then []
+      else
+        [s!".Pp current: {String.intercalate ", " (
+            Spec.Partial.Summary.positionalValues (Spec.Partial.toSummary earlier) name ++
+            Spec.Partial.Summary.positionalValues (Spec.Partial.toSummary later) name)}"] := by
+  classical
+  have hMerged :=
+    Partial.positionalValues_merge (earlier := earlier) (later := later) (name := name)
+  simp [runtimeParagraphs, hMerged, List.isEmpty]
+
 end PartialSummary
 
 end ArgParse.Proofs
