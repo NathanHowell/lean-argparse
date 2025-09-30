@@ -112,6 +112,42 @@ namespace PartialSummary
         simp [runtimeLinesForSummary, hLater,
           Partial.flagValue?_merge (earlier := earlier) (later := later) (name := name)]
 
+/-- Option annotations reflect the appended values when partial payloads are merged. -/
+@[simp] theorem runtimeLinesForSummary_merge_option
+    (name : String) (lines : List String)
+    (earlier later : Spec.Partial) :
+    runtimeLinesForSummary
+        (some (Spec.Partial.merge earlier later).toSummary)
+        { heading := name, lines := lines, kind := EntryKind.option } =
+      if (Spec.Partial.Summary.optionValues (Spec.Partial.toSummary earlier) name ++
+          Spec.Partial.Summary.optionValues (Spec.Partial.toSummary later) name).isEmpty then []
+      else
+        [s!"current: {String.intercalate ", " (
+            Spec.Partial.Summary.optionValues (Spec.Partial.toSummary earlier) name ++
+            Spec.Partial.Summary.optionValues (Spec.Partial.toSummary later) name)}"] := by
+  classical
+  have hMerged :=
+    Partial.optionValues_merge (earlier := earlier) (later := later) (name := name)
+  simp [runtimeLinesForSummary, hMerged, List.isEmpty]
+
+/-- Positional annotations reflect the appended values when partial payloads are merged. -/
+@[simp] theorem runtimeLinesForSummary_merge_positional
+    (name : String) (lines : List String)
+    (earlier later : Spec.Partial) :
+    runtimeLinesForSummary
+        (some (Spec.Partial.merge earlier later).toSummary)
+        { heading := name, lines := lines, kind := EntryKind.positional } =
+      if (Spec.Partial.Summary.positionalValues (Spec.Partial.toSummary earlier) name ++
+          Spec.Partial.Summary.positionalValues (Spec.Partial.toSummary later) name).isEmpty then []
+      else
+        [s!"current: {String.intercalate ", " (
+            Spec.Partial.Summary.positionalValues (Spec.Partial.toSummary earlier) name ++
+            Spec.Partial.Summary.positionalValues (Spec.Partial.toSummary later) name)}"] := by
+  classical
+  have hMerged :=
+    Partial.positionalValues_merge (earlier := earlier) (later := later) (name := name)
+  simp [runtimeLinesForSummary, hMerged, List.isEmpty]
+
 end PartialSummary
 
 end ArgParse.Proofs
