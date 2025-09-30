@@ -95,12 +95,14 @@ theorem flag_cursor_bounds {spec : FlagSpec} {st : State} {b : Bool} {st' : Stat
   have := flag_cursor_progress (spec := spec) (st := st) (b := b) (st' := st') h
   cases this with
   | inl hEq =>
-      constructor <;> simpa [hEq]
+      constructor <;> simp [hEq]
   | inr hEq =>
       constructor
-      · have : st.cursor ≤ st.cursor + 1 := Nat.le_of_lt (Nat.lt_succ_self _)
-        simpa [hEq] using this
-      · simpa [hEq]
+      ·
+        have hBound : st.cursor ≤ st.cursor + 1 := Nat.le_of_lt (Nat.lt_succ_self _)
+        have hEqSymm := hEq.symm
+        exact hEqSymm ▸ hBound
+      · simp [hEq]
 
 /-- Cursor alignment for the positional collection loop. -/
 theorem collectPositionalStepsLoop_cursor
@@ -131,22 +133,23 @@ theorem collectPositionalStepsLoop_cursor
           | none =>
               simp [hStep, hValue] at hLoop
               cases hLoop
-              simpa [hCursor]
+              simp [hCursor]
           | some value =>
               cases hRaw : step.raw? with
               | none =>
                   simp [hStep, hValue, hRaw] at hLoop
                   cases hLoop
-                  simpa [hCursor]
+                  simp [hCursor]
               | some raw =>
                   have hCursor' : step.state.cursor =
                       cursor0 + (consumed + step.consumed) := by
                     calc
                       step.state.cursor = st.cursor + step.consumed := hStepCursor
-                      _ = (cursor0 + consumed) + step.consumed := by simpa [hCursor]
+                      _ = (cursor0 + consumed) + step.consumed := by simp [hCursor]
+                      _ = cursor0 + consumed + step.consumed := by
+                        simp [Nat.add_assoc]
                       _ = cursor0 + (consumed + step.consumed) :=
-                        by simpa [Nat.add_assoc] using
-                          (Nat.add_assoc cursor0 consumed step.consumed)
+                        Nat.add_assoc cursor0 consumed step.consumed
                   have hLoop' := hLoop
                   simp [hStep, hValue, hRaw] at hLoop'
                   exact ih (value :: accVals) (raw :: accRaws)
@@ -193,22 +196,23 @@ theorem collectOptionStepsLoop_cursor
           | none =>
               simp [hStep, hValue] at hLoop
               cases hLoop
-              simpa [hCursor]
+              simp [hCursor]
           | some value =>
               cases hRaw : step.raw? with
               | none =>
                   simp [hStep, hValue, hRaw] at hLoop
                   cases hLoop
-                  simpa [hCursor]
+                  simp [hCursor]
               | some raw =>
                   have hCursor' : step.state.cursor =
                       cursor0 + (consumed + step.consumed) := by
                     calc
                       step.state.cursor = st.cursor + step.consumed := hStepCursor
-                      _ = (cursor0 + consumed) + step.consumed := by simpa [hCursor]
+                      _ = (cursor0 + consumed) + step.consumed := by simp [hCursor]
+                      _ = cursor0 + consumed + step.consumed := by
+                        simp [Nat.add_assoc]
                       _ = cursor0 + (consumed + step.consumed) :=
-                        by simpa [Nat.add_assoc] using
-                          (Nat.add_assoc cursor0 consumed step.consumed)
+                        Nat.add_assoc cursor0 consumed step.consumed
                   have hLoop' := hLoop
                   simp [hStep, hValue, hRaw] at hLoop'
                   exact ih (value :: accVals) (raw :: accRaws)
