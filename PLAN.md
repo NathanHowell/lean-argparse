@@ -66,6 +66,8 @@
   - Proved `parseConcatValue_cursor` in `ArgParse/Proofs/Totality.lean`, confirming concatenated options advance exactly one token with the refactored helpers.
   - Strengthened `ArgParse/Proofs/Soundness.lean` with accumulator lemmas so `Partial.add*` folds line up with `Summary` queries (last-write-wins for flags, append order for options/positionals).
   - Replaced the `Proofs/Soundness/Summary` placeholders with real lemmas (runner mapping and doc helpers now reduce to `rfl`) after refactoring the runner to expose `RunOutcome.map`.
+  - Added merge lemmas in `Proofs/Soundness.lean` (`flagValue?_merge`, `optionValues_merge`, `positionalValues_merge`) to explain how summaries combine when `Partial.merge` is used.
+  - Replaced the determinism placeholder with a real extensionality lemma (`Proofs/Determinism.parser_ext`) to anchor future uniqueness proofs.
   - Next: push these summary facts into the remaining soundness modules (`Proofs/Soundness` higher-level sections and CLI soundness) so we can retire the outstanding `True` stubs.
 
 - ✅ Soundness accumulator proofs
@@ -95,6 +97,7 @@
 ## Activity Log
 - 2025-09-30: Rewired the runner to factor `RunOutcome.map` and proved the summary-level soundness lemmas (`ArgParse/Proofs/Soundness/Summary.lean`) so the placeholders are gone.
 - 2025-09-30: Documented the accumulator soundness proofs in PLAN after landing the new lemmas in `ArgParse/Proofs/Soundness.lean`.
+- 2025-09-30: Added `Partial.merge` summary lemmas and replaced the determinism placeholder with a parser extensionality fact.
 - 2025-09-30: Recorded completion of option cursor lemmas/collectors in PLAN and queued `Proofs/Soundness` accumulator work.
 - 2025-09-30: Added interleaved subcommand regressions (success + missing-value failure) to `ArgParse/Tests/Unit.lean`, keeping totality lemmas intact; verified with `lake test`.
 - 2025-09-30: Introduced `Core.subcommand`, updated `Spec.Elab`/`Main.lean`, and adjusted runtime tests to match the new diagnostics; `lake build; lake test`.
