@@ -692,7 +692,7 @@ theorem elaborateCommandCore_zero_result
 theorem elaborateCommandCore_mergesRight
     (fuel : Nat) (cmd : CmdSpec) (st : State)
     {p : Spec.Partial} {st' : State}
-    (h : Spec.elaborateCommandCore fuel cmd st = Result.ok p st') :
+    (_h : Spec.elaborateCommandCore fuel cmd st = Result.ok p st') :
     mergesRight (fun base => Spec.Partial.merge base p) :=
   mergesRight_merge_const p
 
