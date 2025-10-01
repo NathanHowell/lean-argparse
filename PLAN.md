@@ -65,7 +65,8 @@
   - Exposed `runNormalizedRawCore` and added merge witnesses for `runNormalizedRaw`/`runRaw`, demonstrating that successful runner invocations compose with `Partial.merge` just like the elaborator proofs.
   - Lifted the merge witness through the summary wrappers (`runNormalizedSummary`, `runSummary`), showing that the public CLI helpers still surface payloads compatible with `Partial.merge`.
   - Added merge-aware completion render lemmas (`renderCompletionWithSummary_merge_values` plus the CLI wrapper) so shell completions expose the combined option/positional payload order.
-  - Next: extend the same reasoning to the help/man renderers so their runtime annotations share the merge guarantees.
+  - Extended the same reasoning to the help/man renderers (`renderHelpWithSummary_merge_values`, `renderManWithSummary_merge_values` plus CLI wrappers) so runtime annotations remain merge-compatible.
+  - Next: thread these lemmas into higher-level soundness proofs (builder/CLI layers) and consider lightweight regression tests for annotated help/man output.
 
 - Rebuild proof basics (small and steady)
   - `ArgParse/Proofs/Totality.lean` now establishes totality cases for flags/options/positionals and elaboration (`flag_result_ok`, `option_result_cases`, etc.).

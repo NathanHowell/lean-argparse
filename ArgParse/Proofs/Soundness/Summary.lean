@@ -404,6 +404,116 @@ collector suggestions. -/
   classical
   simp [ArgParse.CLI.renderCompletionsWithSummary, renderCompletionWithSummary_merge_values]
 
+@[simp] private def helpRuntimeMerged
+    (entry : DocEntry) (earlier later : Spec.Partial) : List String :=
+  (runtimeLinesForSummary
+      (some (Spec.Partial.merge earlier later).toSummary) entry).map
+    (fun line => s!"  {line}")
+
+@[simp] private def helpEntryMerged
+    (entry : DocEntry) (earlier later : Spec.Partial) : String :=
+  String.intercalate "\n"
+    (entry.heading ::
+      entry.lines.map (fun line => s!"  {line}") ++
+      helpRuntimeMerged entry earlier later)
+
+@[simp] private def manRuntimeMerged
+    (entry : DocEntry) (earlier later : Spec.Partial) : List String :=
+  runtimeParagraphs
+    (some (Spec.Partial.merge earlier later).toSummary) entry
+
+@[simp] private def manSectionMerged
+    (entry : DocEntry) (earlier later : Spec.Partial) : String :=
+  String.intercalate "\n"
+    (s!".Sh {entry.heading}" ::
+      entry.lines.map (fun line => s!".Pp {line}") ++
+      manRuntimeMerged entry earlier later)
+
+@[simp] theorem renderEntryWithSummary_merge
+    (entry : DocEntry)
+    (earlier later : Spec.Partial) :
+    renderEntryWithSummary entry
+        (some (Spec.Partial.merge earlier later).toSummary) =
+      helpEntryMerged entry earlier later := by
+  classical
+  cases entry with
+  | mk heading lines kind =>
+      cases kind <;>
+        simp [renderEntryWithSummary, helpEntryMerged,
+              runtimeLinesForSummary_merge_flag,
+              runtimeLinesForSummary_merge_option,
+              runtimeLinesForSummary_merge_positional,
+              runtimeLinesForSummary, List.map]
+
+@[simp] theorem renderSectionWithSummary_merge
+    (entry : DocEntry)
+    (earlier later : Spec.Partial) :
+    renderSectionWithSummary entry
+        (some (Spec.Partial.merge earlier later).toSummary) =
+      manSectionMerged entry earlier later := by
+  classical
+  cases entry with
+  | mk heading lines kind =>
+      cases kind <;>
+        simp [renderSectionWithSummary, manSectionMerged,
+              runtimeParagraphs_merge_flag,
+              runtimeParagraphs_merge_option,
+              runtimeParagraphs_merge_positional,
+              runtimeParagraphs, List.map]
+
+/-- Help rendering over a merged payload combines the per-entry annotations produced by
+`helpEntryMerged`. -/
+@[simp] theorem renderHelpWithSummary_merge_values
+    (spec : AppSpec)
+    (earlier later : Spec.Partial) :
+    renderHelpWithSummary spec
+        (some (Spec.Partial.merge earlier later).toSummary) =
+      String.intercalate "\n\n"
+        ((describeApp spec).map
+          (fun entry => helpEntryMerged entry earlier later)) := by
+  classical
+  simp [renderHelpWithSummary, renderEntryWithSummary_merge]
+
+/-- CLI help rendering inherits the merge-aware annotations. -/
+@[simp] theorem CLI.renderHelpWithSummary_merge_values
+    (spec : AppSpec)
+    (earlier later : Spec.Partial) :
+    ArgParse.CLI.renderHelpWithSummary spec
+        (some (Spec.Partial.merge earlier later).toSummary) =
+      String.intercalate "\n\n"
+        ((describeApp spec).map
+          (fun entry => helpEntryMerged entry earlier later)) := by
+  classical
+  simp [ArgParse.CLI.renderHelpWithSummary, renderHelpWithSummary_merge_values]
+
+/-- Manpage rendering over a merged payload combines the per-section annotations produced by
+`manSectionMerged`. -/
+@[simp] theorem renderManWithSummary_merge_values
+    (spec : AppSpec)
+    (earlier later : Spec.Partial) :
+    renderManWithSummary spec
+        (some (Spec.Partial.merge earlier later).toSummary) =
+      String.intercalate "\n"
+        (let header := s!".Dd Generated\n.Dt {spec.name}\n.Os"
+         let sections := (describeApp spec).map
+            (fun entry => manSectionMerged entry earlier later)
+         header :: sections) := by
+  classical
+  simp [renderManWithSummary, renderSectionWithSummary_merge, manSectionMerged]
+
+/-- CLI manpage rendering inherits the merge-aware annotations. -/
+@[simp] theorem CLI.renderManWithSummary_merge_values
+    (spec : AppSpec)
+    (earlier later : Spec.Partial) :
+    ArgParse.CLI.renderManWithSummary spec
+        (some (Spec.Partial.merge earlier later).toSummary) =
+      String.intercalate "\n"
+        (let header := s!".Dd Generated\n.Dt {spec.name}\n.Os"
+         let sections := (describeApp spec).map
+            (fun entry => manSectionMerged entry earlier later)
+         header :: sections) := by
+  classical
+  simp [ArgParse.CLI.renderManWithSummary, renderManWithSummary_merge_values]
 end PartialSummary
 
 end ArgParse.Proofs
