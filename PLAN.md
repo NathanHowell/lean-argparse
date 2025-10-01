@@ -64,7 +64,8 @@
 - ✅ Runner merge propagation
   - Exposed `runNormalizedRawCore` and added merge witnesses for `runNormalizedRaw`/`runRaw`, demonstrating that successful runner invocations compose with `Partial.merge` just like the elaborator proofs.
   - Lifted the merge witness through the summary wrappers (`runNormalizedSummary`, `runSummary`), showing that the public CLI helpers still surface payloads compatible with `Partial.merge`.
-  - Next: thread these facts into the CLI/documentation soundness lemmas so help/man/completion renderers inherit the same guarantees.
+  - Added merge-aware completion render lemmas (`renderCompletionWithSummary_merge_values` plus the CLI wrapper) so shell completions expose the combined option/positional payload order.
+  - Next: extend the same reasoning to the help/man renderers so their runtime annotations share the merge guarantees.
 
 - Rebuild proof basics (small and steady)
   - `ArgParse/Proofs/Totality.lean` now establishes totality cases for flags/options/positionals and elaboration (`flag_result_ok`, `option_result_cases`, etc.).

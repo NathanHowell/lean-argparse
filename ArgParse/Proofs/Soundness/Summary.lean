@@ -355,6 +355,55 @@ theorem runSummary_mergesRight
       classical
       simp [suggestionsWithSummary]
 
+/-- Rendering completion output after merging partial payloads reflects the combined
+collector suggestions. -/
+@[simp] theorem renderCompletionWithSummary_merge_values
+    (spec : AppSpec)
+    (earlier later : Spec.Partial) :
+    renderCompletionWithSummary spec
+        (some (Spec.Partial.merge earlier later).toSummary) =
+      String.intercalate "\n"
+        (((describeApp spec |>.map (·.heading)) ++
+          ((Spec.Partial.merge earlier later).toSummary.flags.map (·.fst) ++
+            (Spec.Partial.merge earlier later).toSummary.options.foldr
+              (fun entry acc =>
+                match entry with
+                | (name, values) =>
+                    values.foldr (fun value acc' => s!"{name}={value}" :: acc') acc)
+              [] ++
+            (Spec.Partial.merge earlier later).toSummary.positionals.foldr
+              (fun entry acc =>
+                match entry with
+                | (name, values) =>
+                    values.foldr (fun value acc' => s!"{name}:{value}" :: acc') acc)
+              [])).eraseDups) := by
+  classical
+  simp [renderCompletionWithSummary, suggestionsWithSummary_merge_values]
+
+/-- The CLI wrapper inherits the merge-aware completion rendering behaviour. -/
+@[simp] theorem CLI.renderCompletionsWithSummary_merge_values
+    (spec : AppSpec)
+    (earlier later : Spec.Partial) :
+    ArgParse.CLI.renderCompletionsWithSummary spec
+        (some (Spec.Partial.merge earlier later).toSummary) =
+      String.intercalate "\n"
+        (((describeApp spec |>.map (·.heading)) ++
+          ((Spec.Partial.merge earlier later).toSummary.flags.map (·.fst) ++
+            (Spec.Partial.merge earlier later).toSummary.options.foldr
+              (fun entry acc =>
+                match entry with
+                | (name, values) =>
+                    values.foldr (fun value acc' => s!"{name}={value}" :: acc') acc)
+              [] ++
+            (Spec.Partial.merge earlier later).toSummary.positionals.foldr
+              (fun entry acc =>
+                match entry with
+                | (name, values) =>
+                    values.foldr (fun value acc' => s!"{name}:{value}" :: acc') acc)
+              [])).eraseDups) := by
+  classical
+  simp [ArgParse.CLI.renderCompletionsWithSummary, renderCompletionWithSummary_merge_values]
+
 end PartialSummary
 
 end ArgParse.Proofs
