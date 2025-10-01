@@ -314,6 +314,16 @@ theorem mergesRight_comp
     _ = Spec.Partial.merge base (h (g Spec.Partial.empty)) := by
             simpa [hhEmpty.symm]
 
+/-- Merging a fixed payload on the right is merge-compatible. -/
+theorem mergesRight_merge_const (child : Spec.Partial) :
+    mergesRight (fun base => Spec.Partial.merge base child) := by
+  intro base
+  have hEmpty : Spec.Partial.merge Spec.Partial.empty child = child := by
+    simpa using merge_empty_left (p := child)
+  simpa [hEmpty] using
+    (rfl : Spec.Partial.merge base child =
+      Spec.Partial.merge base (Spec.Partial.merge Spec.Partial.empty child))
+
 /-- Folding a list of option payloads preserves the merge-right property. -/
 theorem mergesRight_fold_addOption (name : String) :
     ∀ (raws : List String),
