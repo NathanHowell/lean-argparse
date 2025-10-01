@@ -324,6 +324,170 @@ theorem mergesRight_merge_const (child : Spec.Partial) :
     (rfl : Spec.Partial.merge base child =
       Spec.Partial.merge base (Spec.Partial.merge Spec.Partial.empty child))
 
+/-- Merge-compatibility for the internal `subcommand.loop`. -/
+theorem subcommand_loop_mergesRight
+    (expects : List Expect) :
+    ∀ entries,
+      (∀ entry ∈ entries,
+        ∀ st {p : Spec.Partial} {st' : State},
+          entry.parser st = Result.ok p st' →
+            mergesRight (fun base => Spec.Partial.merge base p)) →
+      ∀ st (token : String) (rest : List String)
+        {child : Spec.Partial} {st' : State},
+        ArgParse.Core.subcommand.loop expects st token rest entries =
+            Result.ok child st' →
+        mergesRight (fun base => Spec.Partial.merge base child)
+  | [], hEntries, st, token, rest, child, st', h => by
+      have : False := by
+        simpa [ArgParse.Core.subcommand.loop] using h
+      exact this.elim
+  | entry :: tail, hEntries, st, token, rest, child, st', h => by
+      have hEntry :
+          ∀ st {p : Spec.Partial} {st' : State},
+            entry.parser st = Result.ok p st' →
+              mergesRight (fun base => Spec.Partial.merge base p) :=
+        hEntries entry (by simp)
+      have hTailEntries :
+          ∀ entry' ∈ tail,
+            ∀ st {p : Spec.Partial} {st' : State},
+              entry'.parser st = Result.ok p st' →
+                mergesRight (fun base => Spec.Partial.merge base p) := by
+        intro entry' hMem stChild pChild stChild' hParse
+        exact hEntries entry' (List.mem_cons_of_mem _ hMem) stChild hParse
+      have hBranch :
+          (if token = entry.name then
+              entry.parser (ArgParse.Core.State.withPre st rest 1)
+           else
+              ArgParse.Core.subcommand.loop expects st token rest tail)
+            = Result.ok child st' := by
+        simpa [ArgParse.Core.subcommand.loop] using h
+      by_cases hMatch : token = entry.name
+      · have hEntryOk :
+            entry.parser (ArgParse.Core.State.withPre st rest 1) =
+              Result.ok child st' := by
+          simpa [hMatch] using hBranch
+        exact hEntry (ArgParse.Core.State.withPre st rest 1) hEntryOk
+      · have hTailOk :
+            ArgParse.Core.subcommand.loop expects st token rest tail =
+              Result.ok child st' := by
+          simpa [hMatch] using hBranch
+        exact
+          subcommand_loop_mergesRight expects tail hTailEntries st token rest hTailOk
+
+/-- Merge-compatibility for the public `subcommand` parser. -/
+theorem subcommand_mergesRight
+    : ∀ entries,
+      (∀ entry ∈ entries,
+        ∀ st {p : Spec.Partial} {st' : State},
+          entry.parser st = Result.ok p st' →
+            mergesRight (fun base => Spec.Partial.merge base p)) →
+      ∀ st {child : Spec.Partial} {st' : State},
+        ArgParse.Core.subcommand entries st = Result.ok child st' →
+        mergesRight (fun base => Spec.Partial.merge base child)
+  | [], hEntries, st, child, st', h => by
+      have : False := by
+        simpa [ArgParse.Core.subcommand] using h
+      exact this.elim
+  | entry :: tail, hEntries, st, child, st', h => by
+      have hEntry :
+          ∀ st {p : Spec.Partial} {st' : State},
+            entry.parser st = Result.ok p st' →
+              mergesRight (fun base => Spec.Partial.merge base p) :=
+        hEntries entry (by simp)
+      have hTailEntries :
+          ∀ entry' ∈ tail,
+            ∀ st {p : Spec.Partial} {st' : State},
+              entry'.parser st = Result.ok p st' →
+                mergesRight (fun base => Spec.Partial.merge base p) := by
+        intro entry' hMem stChild pChild stChild' hParse
+        exact hEntries entry' (List.mem_cons_of_mem _ hMem) stChild hParse
+      cases hPre : st.pre with
+      | nil =>
+          have : False := by
+            simpa [ArgParse.Core.subcommand, hPre] using h
+          exact this.elim
+      | cons token rest =>
+          let expects := (entry :: tail).map (fun e => Expect.subcommand e.name)
+          have hLoop :
+              ArgParse.Core.subcommand.loop expects st token rest (entry :: tail) =
+                Result.ok child st' := by
+            simpa [ArgParse.Core.subcommand, hPre, expects] using h
+          have hEntriesAll :
+              ∀ entry' ∈ entry :: tail,
+                ∀ st {p : Spec.Partial} {st' : State},
+                  entry'.parser st = Result.ok p st' →
+                    mergesRight (fun base => Spec.Partial.merge base p) := by
+            intro entry' hMem stChild pChild stChild' hParse
+            by_cases hHead : entry' = entry
+            · cases hHead
+              exact hEntry stChild hParse
+            · have hTail : entry' ∈ tail := by
+                have : entry' ∈ entry :: tail := hMem
+                simpa [List.mem_cons, hHead] using this
+              exact hTailEntries entry' hTail stChild hParse
+          exact
+          subcommand_loop_mergesRight expects (entry :: tail) hEntriesAll st token rest hLoop
+
+/-- Helper: the child-parser branch in `elaborateCommandCore` preserves merge-compatibility. -/
+theorem commandChildren_mergesRight
+    (childParsers : List (ArgParse.Core.Subcommand Spec.Partial))
+    (hEntries :
+      ∀ entry ∈ childParsers,
+        ∀ st {p : Spec.Partial} {st' : State},
+          entry.parser st = Result.ok p st' →
+            mergesRight (fun base => Spec.Partial.merge base p))
+    (st : State) {child : Spec.Partial} {st' : State}
+    (h :
+      (match childParsers with
+      | [] => Parser.pure Spec.Partial.empty
+      | _ =>
+          fun st =>
+            match st.pre with
+            | token :: _ =>
+                if token.startsWith "-" then
+                  Result.ok Spec.Partial.empty st
+                else
+                  ArgParse.Core.subcommand childParsers st
+            | [] => Result.ok Spec.Partial.empty st) st
+        = Result.ok child st') :
+    mergesRight (fun base => Spec.Partial.merge base child) := by
+  classical
+  cases childParsers with
+  | nil =>
+      have hEval : Result.ok Spec.Partial.empty st = Result.ok child st' := by
+        simpa [Parser.pure] using h
+      cases hEval
+      simpa using mergesRight_merge_const Spec.Partial.empty
+  | cons entry rest =>
+      cases hPre : st.pre with
+      | nil =>
+          have hEval : Result.ok Spec.Partial.empty st = Result.ok child st' := by
+            simpa [hPre] using h
+          cases hEval
+          simpa using mergesRight_merge_const Spec.Partial.empty
+      | cons token remaining =>
+          have hBranch :
+              (if token.startsWith "-" then
+                  Result.ok Spec.Partial.empty st
+               else
+                  ArgParse.Core.subcommand (entry :: rest) st)
+              = Result.ok child st' := by
+            simpa [hPre] using h
+          by_cases hStarts : token.startsWith "-"
+          · have hEval : Result.ok Spec.Partial.empty st = Result.ok child st' := by
+              simpa [hStarts] using hBranch
+            cases hEval
+            simpa using mergesRight_merge_const Spec.Partial.empty
+          · have hSub :
+                ArgParse.Core.subcommand (entry :: rest) st = Result.ok child st' := by
+              simpa [hStarts] using hBranch
+            exact
+              subcommand_mergesRight (entry :: rest)
+                (by
+                  intro entry' hMem stChild p st'' hParser
+                  exact hEntries entry' hMem stChild hParser)
+                st hSub
+
 /-- Folding a list of option payloads preserves the merge-right property. -/
 theorem mergesRight_fold_addOption (name : String) :
     ∀ (raws : List String),
@@ -690,11 +854,107 @@ theorem elaborateCommandCore_zero_result
 
 /-- Successful command elaboration (any fuel) always yields a merge-compatible payload. -/
 theorem elaborateCommandCore_mergesRight
-    (fuel : Nat) (cmd : CmdSpec) (st : State)
-    {p : Spec.Partial} {st' : State}
-    (_h : Spec.elaborateCommandCore fuel cmd st = Result.ok p st') :
-    mergesRight (fun base => Spec.Partial.merge base p) :=
-  mergesRight_merge_const p
+    : ∀ fuel (cmd : CmdSpec) (st : State)
+        {p : Spec.Partial} {st' : State},
+        Spec.elaborateCommandCore fuel cmd st = Result.ok p st' →
+        mergesRight (fun base => Spec.Partial.merge base p)
+  | 0, cmd, st, p, st', h => by
+      obtain ⟨hp, _⟩ :=
+        elaborateCommandCore_zero_result (cmd := cmd) (st := st)
+          (p := p) (st' := st') h
+      subst hp
+      simpa using mergesRight_merge_const Spec.Partial.empty
+  | fuel+1, cmd, st, p, st', h => by
+      classical
+      let itemsP := Spec.elaborateItems cmd.args
+      let childParsers :=
+        cmd.subs.map fun child =>
+          { name := child.name
+            , parser := Spec.elaborateCommandCore fuel child :
+                ArgParse.Core.Subcommand Spec.Partial }
+      let subP :=
+        match childParsers with
+        | [] => Parser.pure Spec.Partial.empty
+        | _ =>
+            fun st =>
+              match st.pre with
+              | token :: _ =>
+                  if token.startsWith "-" then
+                    Result.ok Spec.Partial.empty st
+                  else
+                    ArgParse.Core.subcommand childParsers st
+              | [] => Result.ok Spec.Partial.empty st
+      have hSeq :
+          Parser.seq
+              (Parser.map
+                (fun f => fun (child : Spec.Partial) =>
+                  Spec.Partial.merge (f Spec.Partial.empty) child)
+                itemsP)
+              (fun _ => subP) st = Result.ok p st' := by
+        simpa [Spec.elaborateCommandCore, itemsP, childParsers, subP]
+          using h
+      cases hItems : itemsP st with
+      | err err =>
+          have : Result.ok p st' ≠ Result.err err := by simp
+          simpa [Parser.seq, Parser.map, hItems] using hSeq
+      | ok itemsFun stItems =>
+          simp [Parser.seq, Parser.map, hItems] at hSeq
+          cases hSub : subP stItems with
+          | err err =>
+              have : Result.ok p st' ≠ Result.err err := by simp
+              simpa [Parser.seq, Parser.map, hSub] using hSeq
+          | ok childPayload stChild =>
+              have hSeqOk :
+                  Result.ok
+                      (Spec.Partial.merge (itemsFun Spec.Partial.empty) childPayload)
+                      stChild = Result.ok p st' := by
+                simpa [Parser.seq, Parser.map, hSub] using hSeq
+              have hItemsMerge : mergesRight itemsFun :=
+              elaborateItems_mergesRight cmd.args st
+                  (f := itemsFun) (st' := stItems)
+                  (by simpa [itemsP] using hItems)
+              have hEntries :
+                  ∀ entry ∈ childParsers,
+                    ∀ stChild {q : Spec.Partial} {st'' : State},
+                      entry.parser stChild = Result.ok q st'' →
+                        mergesRight (fun base => Spec.Partial.merge base q) := by
+                intro entry hMem stChild q st'' hEntry
+                rcases List.mem_map.1 (by simpa [childParsers] using hMem) with
+                ⟨childSpec, hChildMem, hEntryEq⟩
+                cases hEntryEq
+                exact
+                  elaborateCommandCore_mergesRight fuel childSpec stChild hEntry
+              have hChildMerge :
+                  mergesRight (fun base => Spec.Partial.merge base childPayload) :=
+                commandChildren_mergesRight childParsers hEntries stItems
+                  (by simpa [subP] using hSub)
+              have hCombined :=
+                mergesRight_comp
+                  (g := itemsFun)
+                  (h := fun base => Spec.Partial.merge base childPayload)
+                  hItemsMerge hChildMerge
+              have hp :
+                  p = Spec.Partial.merge (itemsFun Spec.Partial.empty) childPayload := by
+                cases hSeqOk
+                rfl
+              have hFunEq :
+                  (fun base =>
+                      Spec.Partial.merge base
+                        (Spec.Partial.merge (itemsFun Spec.Partial.empty) childPayload)) =
+                    (fun base => Spec.Partial.merge (itemsFun base) childPayload) := by
+                funext base
+                have := hCombined base
+                simpa using this.symm
+              have hCombined' :
+                  mergesRight
+                    (fun base =>
+                      Spec.Partial.merge base
+                        (Spec.Partial.merge (itemsFun Spec.Partial.empty) childPayload)) := by
+                simpa [hFunEq] using hCombined
+              have hResult :
+                  mergesRight (fun base => Spec.Partial.merge base p) := by
+                simpa [hp] using hCombined'
+              exact hResult
 
 /-- Successful command elaboration yields a merge-compatible payload. -/
 theorem elaborateCommand_mergesRight
