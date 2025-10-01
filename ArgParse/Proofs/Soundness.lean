@@ -696,4 +696,18 @@ theorem elaborateCommandCore_mergesRight
     mergesRight (fun base => Spec.Partial.merge base p) :=
   mergesRight_merge_const p
 
+/-- Successful command elaboration yields a merge-compatible payload. -/
+theorem elaborateCommand_mergesRight
+    (cmd : CmdSpec) (st : State)
+    {p : Spec.Partial} {st' : State}
+    (h : Spec.elaborateCommand cmd st = Result.ok p st') :
+    mergesRight (fun base => Spec.Partial.merge base p) := by
+  classical
+  let fuel := st.pre.length + st.post.length + 1
+  have hCore : Spec.elaborateCommandCore fuel cmd st = Result.ok p st' := by
+    simpa [Spec.elaborateCommand, fuel] using h
+  simpa [fuel] using
+    elaborateCommandCore_mergesRight (fuel := fuel) (cmd := cmd) (st := st)
+      (p := p) (st' := st') hCore
+
 end ArgParse.Proofs
