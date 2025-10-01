@@ -668,4 +668,14 @@ theorem elaborateItems_mergesRight
               cases hSeqOk
               exact mergesRight_comp (g := headFun) (h := tailFun) hHeadMerge hTailMerge
 
+theorem elaborateCommandCore_zero_result
+    (cmd : CmdSpec) (st : State)
+    {p : Spec.Partial} {st' : State}
+    (h : Spec.elaborateCommandCore 0 cmd st = Result.ok p st') :
+    p = Spec.Partial.empty ∧ st' = st := by
+  have hEval : Result.ok Spec.Partial.empty st = Result.ok p st' := by
+    simpa [Spec.elaborateCommandCore_zero, Parser.pure] using h
+  cases hEval
+  exact ⟨rfl, rfl⟩
+
 end ArgParse.Proofs

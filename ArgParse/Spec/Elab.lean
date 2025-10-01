@@ -167,7 +167,7 @@ def elaborateItems (items : List ItemSpec) : Parser (Partial → Partial) :=
         Parser.seq (Parser.map (fun f => fun (g : Partial → Partial) => g ∘ f) head) (fun _ => tail)
   go items
 
-private def elaborateCommandCore : (fuel : Nat) → CmdSpec → Parser Partial
+def elaborateCommandCore : (fuel : Nat) → CmdSpec → Parser Partial
   | 0, _ => Parser.pure Partial.empty
   | fuel+1, cmd =>
       let itemsP := elaborateItems cmd.args
@@ -190,6 +190,9 @@ private def elaborateCommandCore : (fuel : Nat) → CmdSpec → Parser Partial
       Parser.seq
         (Parser.map (fun (f : Partial → Partial) => fun (child : Partial) => Partial.merge (f Partial.empty) child) itemsP)
         (fun _ => subP)
+
+@[simp] theorem elaborateCommandCore_zero (cmd : CmdSpec) :
+    elaborateCommandCore 0 cmd = Parser.pure Partial.empty := rfl
 
 
 /-- Elaborate a command by folding its items into an initial `Partial`. -/
