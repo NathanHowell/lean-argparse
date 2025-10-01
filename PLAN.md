@@ -61,8 +61,10 @@
 - ✅ Command merge soundness
   - Strengthened `elaborateCommandCore_mergesRight` and recorded `elaborateApp_mergesRight`, using the new subcommand helpers so command/app elaboration preserves merge compatibility across fuel-driven recursion.
 
-- 🔄 Runner merge propagation
-  - Investigated how the runner wrappers (`runNormalizedRaw`, `runRaw`) surface the parser result; proved command/app elaboration is merge-compatible, but the runner helpers call a private core function so extracting the `.ok` branch cleanly requires either a mirror helper in proofs or a local wrapper. Next step is to expose a non-private helper (or reproduce the match in the proof) so we can show successful runs inherit the same merge witness before moving on to higher layers.
+- ✅ Runner merge propagation
+  - Exposed `runNormalizedRawCore` and added merge witnesses for `runNormalizedRaw`/`runRaw`, demonstrating that successful runner invocations compose with `Partial.merge` just like the elaborator proofs.
+  - Lifted the merge witness through the summary wrappers (`runNormalizedSummary`, `runSummary`), showing that the public CLI helpers still surface payloads compatible with `Partial.merge`.
+  - Next: thread these facts into the CLI/documentation soundness lemmas so help/man/completion renderers inherit the same guarantees.
 
 - Rebuild proof basics (small and steady)
   - `ArgParse/Proofs/Totality.lean` now establishes totality cases for flags/options/positionals and elaboration (`flag_result_ok`, `option_result_cases`, etc.).

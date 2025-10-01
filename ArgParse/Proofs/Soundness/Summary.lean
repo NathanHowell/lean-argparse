@@ -61,6 +61,121 @@ namespace PartialSummary
     ArgParse.runSummary app tokens =
       map Spec.Partial.toSummary (ArgParse.runRaw app tokens) := rfl
 
+theorem runNormalizedSummary_ok_exists_partial
+    (app : AppSpec) (st : State)
+    {summary : Spec.Partial.Summary} {st' : State}
+    (h : ArgParse.runNormalizedSummary app st = RunOutcome.ok summary st') :
+    ∃ payload : Spec.Partial,
+      summary = Spec.Partial.toSummary payload ∧
+        ArgParse.runNormalizedRaw app st = RunOutcome.ok payload st' := by
+  classical
+  cases hRaw : ArgParse.runNormalizedRaw app st with
+  | mk result st₀ =>
+      cases result with
+      | ok payload =>
+          have : RunOutcome.ok (Spec.Partial.toSummary payload) st₀ =
+              RunOutcome.ok summary st' := by
+            simpa [runNormalizedSummary_matches_raw, hRaw]
+              using h
+          cases this
+          refine ⟨payload, rfl, ?_⟩
+          simpa [hRaw]
+      | help text =>
+          have : ⟨RunResult.help text, st₀⟩ =
+              RunOutcome.ok summary st' := by
+            simpa [runNormalizedSummary_matches_raw, hRaw]
+              using h
+          cases this
+      | man text =>
+          have : ⟨RunResult.man text, st₀⟩ =
+              RunOutcome.ok summary st' := by
+            simpa [runNormalizedSummary_matches_raw, hRaw]
+              using h
+          cases this
+      | completions text =>
+          have : ⟨RunResult.completions text, st₀⟩ =
+              RunOutcome.ok summary st' := by
+            simpa [runNormalizedSummary_matches_raw, hRaw]
+              using h
+          cases this
+      | err err =>
+          have : RunOutcome.err err st₀ = RunOutcome.ok summary st' := by
+            simpa [runNormalizedSummary_matches_raw, hRaw] using h
+          cases this
+
+theorem runSummary_ok_exists_partial
+    (app : AppSpec) (tokens : Tokens)
+    {summary : Spec.Partial.Summary} {st' : State}
+    (h : ArgParse.runSummary app tokens = RunOutcome.ok summary st') :
+    ∃ payload : Spec.Partial,
+      summary = Spec.Partial.toSummary payload ∧
+        ArgParse.runRaw app tokens = RunOutcome.ok payload st' := by
+  classical
+  cases hRaw : ArgParse.runRaw app tokens with
+  | mk result st₀ =>
+      cases result with
+      | ok payload =>
+          have : RunOutcome.ok (Spec.Partial.toSummary payload) st₀ =
+              RunOutcome.ok summary st' := by
+            simpa [runSummary_matches_raw, hRaw] using h
+          cases this
+          refine ⟨payload, rfl, ?_⟩
+          simpa [hRaw]
+      | help text =>
+          have : ⟨RunResult.help text, st₀⟩ =
+              RunOutcome.ok summary st' := by
+            simpa [runSummary_matches_raw, hRaw] using h
+          cases this
+      | man text =>
+          have : ⟨RunResult.man text, st₀⟩ =
+              RunOutcome.ok summary st' := by
+            simpa [runSummary_matches_raw, hRaw] using h
+          cases this
+      | completions text =>
+          have : ⟨RunResult.completions text, st₀⟩ =
+              RunOutcome.ok summary st' := by
+            simpa [runSummary_matches_raw, hRaw] using h
+          cases this
+      | err err =>
+          have : RunOutcome.err err st₀ = RunOutcome.ok summary st' := by
+            simpa [runSummary_matches_raw, hRaw] using h
+          cases this
+
+theorem runNormalizedSummary_mergesRight
+    (app : AppSpec) (st : State)
+    {summary : Spec.Partial.Summary} {st' : State}
+    (h : ArgParse.runNormalizedSummary app st = RunOutcome.ok summary st') :
+    ∃ payload : Spec.Partial,
+      summary = Spec.Partial.toSummary payload ∧
+        _root_.ArgParse.Proofs.Partial.mergesRight
+          (fun base => Spec.Partial.merge base payload) := by
+  classical
+  obtain ⟨payload, hSummary, hRaw⟩ :=
+    runNormalizedSummary_ok_exists_partial (app := app) (st := st)
+      (summary := summary) (st' := st') h
+  refine ⟨payload, hSummary, ?_⟩
+  exact
+    _root_.ArgParse.Proofs.runNormalizedRaw_mergesRight (app := app) (st := st)
+      (payload := payload) (st' := st') hRaw
+
+theorem runSummary_mergesRight
+    (app : AppSpec) (tokens : Tokens)
+    {summary : Spec.Partial.Summary} {st' : State}
+    (h : ArgParse.runSummary app tokens = RunOutcome.ok summary st') :
+    ∃ payload : Spec.Partial,
+      summary = Spec.Partial.toSummary payload ∧
+        _root_.ArgParse.Proofs.Partial.mergesRight
+          (fun base => Spec.Partial.merge base payload) := by
+  classical
+  obtain ⟨payload, hSummary, hRaw⟩ :=
+    runSummary_ok_exists_partial (app := app) (tokens := tokens)
+      (summary := summary) (st' := st') h
+  refine ⟨payload, hSummary, ?_⟩
+  exact
+    _root_.ArgParse.Proofs.runRaw_mergesRight (app := app) (tokens := tokens)
+      (payload := payload) (st' := st') hRaw
+
+
 /-- Rendering help with a summary argument agrees with the partial-based helper. -/
 @[simp] theorem renderHelpWithSummary_eq_partial
     (spec : AppSpec) (partial? : Option Spec.Partial) :
