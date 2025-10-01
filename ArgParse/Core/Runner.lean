@@ -72,7 +72,7 @@ end RunOutcome
   | _ => none
 
 /-- Core runner producing the raw `Partial` payload. -/
-@[inline] private def runNormalizedRawCore (app : AppSpec) (st : State) :
+@[inline] def runNormalizedRawCore (app : AppSpec) (st : State) :
     RunOutcome Spec.Partial :=
   match builtinOutcome? (α := Spec.Partial) app st with
   | some outcome => outcome

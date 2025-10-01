@@ -970,4 +970,105 @@ theorem elaborateCommand_mergesRight
     elaborateCommandCore_mergesRight (fuel := fuel) (cmd := cmd) (st := st)
       (p := p) (st' := st') hCore
 
+theorem elaborateApp_mergesRight
+    (app : AppSpec) (st : State)
+    {p : Spec.Partial} {st' : State}
+    (h : Spec.elaborateApp app st = Result.ok p st') :
+    mergesRight (fun base => Spec.Partial.merge base p) := by
+  classical
+  unfold Spec.elaborateApp at h
+  simpa using
+    elaborateCommand_mergesRight (cmd := app.root) (st := st)
+      (p := p) (st' := st') h
+
+theorem builtinOutcome?_ok_false
+    (app : AppSpec) (st : State)
+    {payload : α} {st' : State}
+    (h : ArgParse.builtinOutcome? (α := α) app st =
+      some (RunOutcome.ok payload st')) :
+    False := by
+  classical
+  unfold ArgParse.builtinOutcome? at h
+  cases hPre : st.pre with
+  | nil =>
+      simpa [hPre] using h
+  | cons head tail =>
+      by_cases hHelp : head = "--help"
+      · subst hHelp
+        simp [hPre] at h
+      · by_cases hMan : head = "--man"
+        · subst hMan
+          simp [hPre] at h
+        · by_cases hGen : head = "--generate-completions"
+          · subst hGen
+            simp [hPre] at h
+          · simp [hPre, hHelp, hMan, hGen] at h
+
+theorem runNormalizedRaw_mergesRight
+    (app : AppSpec) (st : State)
+    {payload : Spec.Partial} {st' : State}
+    (h : ArgParse.runNormalizedRaw app st = RunOutcome.ok payload st') :
+    mergesRight (fun base => Spec.Partial.merge base payload) := by
+  classical
+  have hCore :
+      ArgParse.runNormalizedRawCore app st = RunOutcome.ok payload st' := by
+    simpa [ArgParse.runNormalizedRaw] using h
+  unfold ArgParse.runNormalizedRawCore at hCore
+  cases hBuiltin : ArgParse.builtinOutcome? (α := Spec.Partial) app st with
+  | some outcome =>
+      have hOutcome : outcome = RunOutcome.ok payload st' := by
+        simpa [hBuiltin] using hCore
+      have hSome :
+          ArgParse.builtinOutcome? (α := Spec.Partial) app st =
+            some (RunOutcome.ok payload st') := by
+        simpa [hOutcome] using hBuiltin
+      have : False :=
+        builtinOutcome?_ok_false (app := app) (st := st)
+          (payload := payload) (st' := st') hSome
+      exact this.elim
+  | none =>
+      cases hApp : Spec.elaborateApp app st with
+      | err error =>
+          have : RunOutcome.err error st = RunOutcome.ok payload st' := by
+            simpa [hBuiltin, hApp] using hCore
+          cases this
+      | ok payload₀ st₀ =>
+          have hIf :
+              (if st₀.pre ≠ [] ∨ st₀.post ≠ [] then
+                RunOutcome.err
+                  { kind := .leftover
+                    , context := st₀.pre ++ st₀.post
+                    , expect := [.endOfInput] }
+                  st₀
+              else
+                RunOutcome.ok payload₀ st₀) =
+              RunOutcome.ok payload st' := by
+            simpa [hBuiltin, hApp] using hCore
+          by_cases hLeftover : st₀.pre ≠ [] ∨ st₀.post ≠ []
+          · have : False := by
+              simpa [hLeftover] using hIf
+            exact this.elim
+          · have hOk : RunOutcome.ok payload₀ st₀ = RunOutcome.ok payload st' := by
+              simpa [hLeftover] using hIf
+            cases hOk
+            have hAppOk : Spec.elaborateApp app st = Result.ok payload st' := by
+              simpa using hApp
+            exact
+              elaborateApp_mergesRight (app := app) (st := st)
+                (p := payload) (st' := st') hAppOk
+
+theorem runRaw_mergesRight
+    (app : AppSpec) (tokens : Tokens)
+    {payload : Spec.Partial} {st' : State}
+    (h : ArgParse.runRaw app tokens = RunOutcome.ok payload st') :
+    mergesRight (fun base => Spec.Partial.merge base payload) := by
+  classical
+  have hNorm :
+      ArgParse.runNormalizedRaw app (ArgParse.Core.normalize tokens) =
+        RunOutcome.ok payload st' := by
+    simpa [ArgParse.runRaw, ArgParse.runNormalizedRaw] using h
+  exact
+    runNormalizedRaw_mergesRight (app := app)
+      (st := ArgParse.Core.normalize tokens) hNorm
+
 end ArgParse.Proofs
