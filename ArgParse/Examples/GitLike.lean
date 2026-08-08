@@ -10,7 +10,7 @@ private def rootMeta : Meta :=
 private def rootCmd : CmdSpec :=
   { name := "git-like", «meta» := rootMeta }
 
-/-- Specification for the git-like example (placeholder). -/
+/-- Minimal specification for the git-like subcommand example. -/
 def gitLikeSpec : AppSpec :=
   { name := "git-like", root := rootCmd }
 

@@ -126,49 +126,38 @@ private def missingOptionError {α : Type} [ArgParse.FromArg α] (spec : OptSpec
 private def expectPositional {α : Type} [ArgParse.FromArg α] (spec : PosSpec α) : Expect :=
   .positional spec.«meta».name
 
-/--- Result of attempting to consume an option token. -/
-structure OptionStep (α : Type) where
+/--- Result of attempting to consume one option or positional token. -/
+structure CollectStep (α : Type) where
   /-- Parsed value, if the token provided one. -/
   value? : Option α
   /-- Raw token string associated with the parsed value. -/
   raw?   : Option String
   /-- Parser state after processing the token. -/
   state : State
-  /-- Number of tokens consumed while handling the option. -/
+  /-- Number of tokens consumed while handling the token. -/
   consumed : Nat
 
-namespace OptionStep
+namespace CollectStep
 
-@[inline] def stay {α : Type} (st : State) : OptionStep α :=
+@[inline] def stay {α : Type} (st : State) : CollectStep α :=
   { value? := none, raw? := none, state := st, consumed := 0 }
 
 @[inline] def ofPre {α : Type}
     (st : State) (rest : List String) (delta : Nat)
-    (value? : Option α) (raw? : Option String) : OptionStep α :=
+    (value? : Option α) (raw? : Option String) : CollectStep α :=
   { value? := value?
   , raw? := raw?
   , state := State.withPre st rest delta
   , consumed := delta }
 
 @[inline] def ofConcat {α : Type}
-    (payload : Option (α × String)) (state : State) : OptionStep α :=
+    (payload : Option (α × String)) (state : State) : CollectStep α :=
   { value? := payload.map Prod.fst
   , raw? := payload.map Prod.snd
   , state := state
   , consumed := 1 }
 
-end OptionStep
-
-/--- Result of attempting to consume a positional argument. -/
-structure PosStep (α : Type) where
-  /-- Parsed value, when the positional was present. -/
-  value? : Option α
-  /-- Raw token string associated with the parsed value. -/
-  raw?   : Option String
-  /-- Parser state after moving past the positional. -/
-  state : State
-  /-- Number of tokens consumed while handling the positional. -/
-  consumed : Nat
+end CollectStep
 
 /--- Accumulator output used by the multi-value collectors. -/
 structure CollectResult (α : Type) where
@@ -365,12 +354,12 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
 @[inline] def takeOptionDetachedValue?
     {α : Type} [ArgParse.FromArg α]
     (token : String) (rest : List String) (st : State) (expect : Expect) :
-    Except Error (OptionStep α) :=
+    Except Error (CollectStep α) :=
   match rest with
   | valueTok :: restTail =>
       match FromArg.run valueTok with
       | .ok value =>
-          .ok (OptionStep.ofPre st restTail 2 (some value) (some valueTok))
+          .ok (CollectStep.ofPre st restTail 2 (some value) (some valueTok))
       | .error msg => .error (invalidValueError valueTok msg expect)
   | [] => .error (missingValueError token expect)
 
@@ -378,16 +367,16 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
 @[inline] def takeOptionConcatPayload?
     {α : Type} [ArgParse.FromArg α] (spec : OptSpec α)
     (token raw : String) (rest : List String) (st : State) (expect : Expect) :
-    Except Error (OptionStep α) :=
+    Except Error (CollectStep α) :=
   match parseConcatValue spec token raw rest st expect with
-  | .ok (payload, st') => .ok (OptionStep.ofConcat payload st')
+  | .ok (payload, st') => .ok (CollectStep.ofConcat payload st')
   | .error err => .error err
 
 /-- Handle short option tokens, accounting for detached and concatenated forms. -/
 @[inline] def takeOptionShortToken?
     {α : Type} [ArgParse.FromArg α] (spec : OptSpec α)
     (token : String) (rest : List String) (st : State) (expect : Expect) :
-    Except Error (OptionStep α) :=
+    Except Error (CollectStep α) :=
   match spec.short? with
   | some short =>
       if token = shortLexeme short then
@@ -399,15 +388,15 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
             | true =>
                 let raw := token.drop (shortLexeme short).length
                 takeOptionConcatPayload? spec token raw rest st expect
-            | false => .ok (OptionStep.stay st)
-        | false => .ok (OptionStep.stay st)
-  | none => .ok (OptionStep.stay st)
+            | false => .ok (CollectStep.stay st)
+        | false => .ok (CollectStep.stay st)
+  | none => .ok (CollectStep.stay st)
 
 /-- Handle long option tokens, delegating to short-token logic when needed. -/
 @[inline] def takeOptionLongToken?
     {α : Type} [ArgParse.FromArg α] (spec : OptSpec α)
     (name token : String) (rest : List String) (st : State) (expect : Expect) :
-    Except Error (OptionStep α) :=
+    Except Error (CollectStep α) :=
   if spec.eqVal? then
     if token.startsWith (longLexeme name ++ "=") then
       let raw := token.drop (longLexeme name ++ "=").length
@@ -424,9 +413,9 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
 /-- Attempt a single option parsing step, recording progress metadata. -/
 @[inline] def takeOptionStep?
     {α : Type} [ArgParse.FromArg α] (spec : OptSpec α) (st : State) :
-    Except Error (OptionStep α) :=
+    Except Error (CollectStep α) :=
   match st.pre with
-  | [] => .ok (OptionStep.stay st)
+  | [] => .ok (CollectStep.stay st)
   | token :: rest =>
       let expect := expectOption spec
       match spec.long? with
@@ -436,7 +425,7 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
 /-- Detached option values advance the cursor according to their recorded cost. -/
 @[simp] theorem takeOptionDetachedValue?_cursor
     {α : Type} [FromArg α] {token : String} {rest : List String}
-    {st : State} {expect : Expect} {step : OptionStep α}
+    {st : State} {expect : Expect} {step : CollectStep α}
     (h : takeOptionDetachedValue? token rest st expect = .ok step) :
     step.state.cursor = st.cursor + step.consumed := by
   classical
@@ -450,14 +439,14 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
           have hStep := h
           simp [hRun] at hStep
           cases hStep
-          simp [OptionStep.ofPre, State.withPre]
+          simp [CollectStep.ofPre, State.withPre]
       | error msg =>
           simp [hRun] at h
 
 /-- Concatenated option payloads advance the cursor by one token. -/
 @[simp] theorem takeOptionConcatPayload?_cursor
     {α : Type} [FromArg α] {spec : OptSpec α} {token raw : String}
-    {rest : List String} {st : State} {expect : Expect} {step : OptionStep α}
+    {rest : List String} {st : State} {expect : Expect} {step : CollectStep α}
     (h : takeOptionConcatPayload? spec token raw rest st expect = .ok step) :
     step.state.cursor = st.cursor + step.consumed := by
   classical
@@ -474,12 +463,12 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
         parseConcatValue_cursor (spec := spec) (token := token) (raw := raw)
           (pending := rest) (st := st) (expect := expect)
           (payload := payload) (st' := st') hParse
-      simp [OptionStep.ofConcat, hCursor]
+      simp [CollectStep.ofConcat, hCursor]
 
 /-- Cursor progression for short-option handling. -/
 @[simp] theorem takeOptionShortToken?_cursor
     {α : Type} [FromArg α] {spec : OptSpec α} {token : String}
-    {rest : List String} {st : State} {expect : Expect} {step : OptionStep α}
+    {rest : List String} {st : State} {expect : Expect} {step : CollectStep α}
     (h : takeOptionShortToken? spec token rest st expect = .ok step) :
     step.state.cursor = st.cursor + step.consumed := by
   classical
@@ -488,7 +477,7 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
   | none =>
       simp [hShort] at h
       cases h
-      simp [OptionStep.stay]
+      simp [CollectStep.stay]
   | some short =>
       by_cases hEq : token = shortLexeme short
       · have hBranch : takeOptionDetachedValue? token rest st expect = .ok step := by
@@ -501,13 +490,13 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
         | false =>
             simp [hConcat] at hBranch
             cases hBranch
-            simp [OptionStep.stay]
+            simp [CollectStep.stay]
         | true =>
             cases hStart : token.startsWith (shortLexeme short) with
             | false =>
                 simp [hConcat, hStart] at hBranch
                 cases hBranch
-                simp [OptionStep.stay]
+                simp [CollectStep.stay]
             | true =>
                 have hPayload :
                     takeOptionConcatPayload? spec token
@@ -520,7 +509,7 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
 /-- Cursor progression for long-option handling. -/
 @[simp] theorem takeOptionLongToken?_cursor
     {α : Type} [FromArg α] {spec : OptSpec α} {name token : String}
-    {rest : List String} {st : State} {expect : Expect} {step : OptionStep α}
+    {rest : List String} {st : State} {expect : Expect} {step : CollectStep α}
     (h : takeOptionLongToken? spec name token rest st expect = .ok step) :
     step.state.cursor = st.cursor + step.consumed := by
   classical
@@ -561,7 +550,7 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
 
 /-- Successful option steps advance the cursor by the recorded amount. -/
 @[simp] theorem takeOptionStep?_cursor
-    {α : Type} [FromArg α] {spec : OptSpec α} {st : State} {step : OptionStep α}
+    {α : Type} [FromArg α] {spec : OptSpec α} {st : State} {step : CollectStep α}
     (h : takeOptionStep? spec st = .ok step) :
     step.state.cursor = st.cursor + step.consumed := by
   classical
@@ -570,7 +559,7 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
   | nil =>
       simp [hPre] at h
       cases h
-      simp [OptionStep.stay]
+      simp [CollectStep.stay]
   | cons token rest =>
       have hStep := h
       simp [hPre] at hStep
@@ -599,20 +588,20 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
       .ok (combo, step.state)
   | .error err => .error err
 
-/-- Tail-recursive worker that gathers option values until the specification ceases to match. -/
-@[specialize] def collectOptionStepsLoop
-    {α : Type} [ArgParse.FromArg α] (spec : OptSpec α) :
+/-- Tail-recursive worker that gathers values from `takeStep` until it stops yielding them. -/
+@[specialize] def collectStepsLoop {α : Type}
+    (takeStep : State → Except Error (CollectStep α)) :
     Nat → List α → List String → Nat → State → Except Error (CollectResult α)
   | 0, accVals, accRaws, consumed, st =>
       .ok { values := accVals.reverse, raws := accRaws.reverse, state := st, consumed := consumed }
   | Nat.succ fuel, accVals, accRaws, consumed, st =>
-      match takeOptionStep? spec st with
+      match takeStep st with
       | .error err => .error err
       | .ok step =>
           let consumed' := consumed + step.consumed
           match step.value?, step.raw? with
           | some value, some raw =>
-              collectOptionStepsLoop spec fuel (value :: accVals) (raw :: accRaws) consumed' step.state
+              collectStepsLoop takeStep fuel (value :: accVals) (raw :: accRaws) consumed' step.state
           | some _, none =>
               .ok { values := accVals.reverse, raws := accRaws.reverse, state := st, consumed := consumed }
           | none, _ => .ok { values := accVals.reverse, raws := accRaws.reverse, state := st, consumed := consumed }
@@ -621,7 +610,7 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
 @[inline] def collectOptionSteps
     {α : Type} [ArgParse.FromArg α] (spec : OptSpec α) (st : State) : Except Error (CollectResult α) :=
   let fuel := st.pre.length + st.post.length + 1
-  collectOptionStepsLoop spec fuel [] [] 0 st
+  collectStepsLoop (takeOptionStep? spec) fuel [] [] 0 st
 
 /-- Collect concrete option values alongside the updated parser state. -/
 @[inline] def collectOptionValues
@@ -659,7 +648,7 @@ def option {α : Type} [ArgParse.FromArg α] (spec : OptSpec α) :
 /-- Attempt a single positional parsing step, capturing progress metadata. -/
 @[inline] def takePositionalStep?
     {α : Type} [ArgParse.FromArg α] (spec : PosSpec α) (st : State) :
-    Except Error (PosStep α) :=
+    Except Error (CollectStep α) :=
   let expect := expectPositional spec
   match State.consumePre? st with
   | some (token, st') =>
@@ -677,7 +666,7 @@ def option {α : Type} [ArgParse.FromArg α] (spec : OptSpec α) :
 /-- Successful positional steps advance the cursor by the recorded amount. -/
 @[simp] theorem takePositionalStep?_cursor
     {α : Type} [ArgParse.FromArg α] {spec : PosSpec α} {st : State}
-    {step : PosStep α}
+    {step : CollectStep α}
     (h : takePositionalStep? spec st = .ok step) :
     step.state.cursor = st.cursor + step.consumed := by
   classical
@@ -724,29 +713,11 @@ def option {α : Type} [ArgParse.FromArg α] (spec : OptSpec α) :
       .ok (combo, step.state)
   | .error err => .error err
 
-/-- Tail-recursive worker that gathers positional values until the specification ceases to match. -/
-@[specialize] def collectPositionalStepsLoop
-    {α : Type} [ArgParse.FromArg α] (spec : PosSpec α) :
-    Nat → List α → List String → Nat → State → Except Error (CollectResult α)
-  | 0, accVals, accRaws, consumed, st =>
-      .ok { values := accVals.reverse, raws := accRaws.reverse, state := st, consumed := consumed }
-  | Nat.succ fuel, accVals, accRaws, consumed, st =>
-      match takePositionalStep? spec st with
-      | .error err => .error err
-      | .ok step =>
-          let consumed' := consumed + step.consumed
-          match step.value?, step.raw? with
-          | some value, some raw =>
-              collectPositionalStepsLoop spec fuel (value :: accVals) (raw :: accRaws) consumed' step.state
-          | some _, none =>
-              .ok { values := accVals.reverse, raws := accRaws.reverse, state := st, consumed := consumed }
-          | none, _ => .ok { values := accVals.reverse, raws := accRaws.reverse, state := st, consumed := consumed }
-
 /-- Collect positional parsing steps while the specification continues to match. -/
 @[inline] def collectPositionalSteps
     {α : Type} [ArgParse.FromArg α] (spec : PosSpec α) (st : State) : Except Error (CollectResult α) :=
   let fuel := st.pre.length + st.post.length + 1
-  collectPositionalStepsLoop spec fuel [] [] 0 st
+  collectStepsLoop (takePositionalStep? spec) fuel [] [] 0 st
 
 /-- Collect positional argument values alongside the updated parser state. -/
 @[inline] def collectPositionalValues

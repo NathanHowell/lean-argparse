@@ -104,40 +104,43 @@ theorem flag_cursor_bounds {spec : FlagSpec} {st : State} {b : Bool} {st' : Stat
         exact hEqSymm ▸ hBound
       · simp [hEq]
 
-/-- Cursor alignment for the positional collection loop. -/
-theorem collectPositionalStepsLoop_cursor
-    {α : Type} [FromArg α] {spec : PosSpec α} :
+/-- Cursor alignment for the generic collection loop: whenever the supplied
+step function advances the cursor by exactly the tokens it consumes, so does
+the whole loop. -/
+theorem collectStepsLoop_cursor
+    {α : Type} {takeStep : State → Except Error (Core.CollectStep α)}
+    (hStep : ∀ st (step : Core.CollectStep α), takeStep st = .ok step →
+      step.state.cursor = st.cursor + step.consumed) :
     ∀ fuel accVals accRaws consumed (st : State) (cursor0 : Nat)
       {result : Core.CollectResult α},
       st.cursor = cursor0 + consumed →
-      Core.collectPositionalStepsLoop spec fuel accVals accRaws consumed st = .ok result →
+      Core.collectStepsLoop takeStep fuel accVals accRaws consumed st = .ok result →
       result.state.cursor = cursor0 + result.consumed := by
   classical
   intro fuel
   induction fuel with
   | zero =>
       intro accVals accRaws consumed st cursor0 result hCursor hLoop
-      simp [Core.collectPositionalStepsLoop] at hLoop
+      simp [Core.collectStepsLoop] at hLoop
       cases hLoop
       simp [hCursor]
   | succ fuel ih =>
       intro accVals accRaws consumed st cursor0 result hCursor hLoop
-      simp [Core.collectPositionalStepsLoop] at hLoop
-      cases hStep : Core.takePositionalStep? spec st with
+      simp [Core.collectStepsLoop] at hLoop
+      cases hStepEq : takeStep st with
       | error err =>
-          simp [hStep] at hLoop
+          simp [hStepEq] at hLoop
       | ok step =>
-          have hStepCursor :=
-            Core.takePositionalStep?_cursor (spec := spec) (st := st) (step := step) hStep
+          have hStepCursor := hStep st step hStepEq
           cases hValue : step.value? with
           | none =>
-              simp [hStep, hValue] at hLoop
+              simp [hStepEq, hValue] at hLoop
               cases hLoop
               simp [hCursor]
           | some value =>
               cases hRaw : step.raw? with
               | none =>
-                  simp [hStep, hValue, hRaw] at hLoop
+                  simp [hStepEq, hValue, hRaw] at hLoop
                   cases hLoop
                   simp [hCursor]
               | some raw =>
@@ -146,12 +149,10 @@ theorem collectPositionalStepsLoop_cursor
                     calc
                       step.state.cursor = st.cursor + step.consumed := hStepCursor
                       _ = (cursor0 + consumed) + step.consumed := by simp [hCursor]
-                      _ = cursor0 + consumed + step.consumed := by
-                        simp [Nat.add_assoc]
                       _ = cursor0 + (consumed + step.consumed) :=
                         Nat.add_assoc cursor0 consumed step.consumed
                   have hLoop' := hLoop
-                  simp [hStep, hValue, hRaw] at hLoop'
+                  simp [hStepEq, hValue, hRaw] at hLoop'
                   exact ih (value :: accVals) (raw :: accRaws)
                     (consumed + step.consumed) step.state cursor0 hCursor' hLoop'
 
@@ -164,59 +165,10 @@ theorem collectPositionalSteps_cursor
   classical
   have hLoop := h
   simp [Core.collectPositionalSteps] at hLoop
-  exact collectPositionalStepsLoop_cursor (fuel := st.pre.length + st.post.length + 1)
-    [] [] 0 st st.cursor rfl hLoop
-
-/-- Cursor alignment for the option collection loop. -/
-theorem collectOptionStepsLoop_cursor
-    {α : Type} [FromArg α] {spec : OptSpec α} :
-    ∀ fuel accVals accRaws consumed (st : State) (cursor0 : Nat)
-      {result : Core.CollectResult α},
-      st.cursor = cursor0 + consumed →
-      Core.collectOptionStepsLoop spec fuel accVals accRaws consumed st = .ok result →
-      result.state.cursor = cursor0 + result.consumed := by
-  classical
-  intro fuel
-  induction fuel with
-  | zero =>
-      intro accVals accRaws consumed st cursor0 result hCursor hLoop
-      simp [Core.collectOptionStepsLoop] at hLoop
-      cases hLoop
-      simp [hCursor]
-  | succ fuel ih =>
-      intro accVals accRaws consumed st cursor0 result hCursor hLoop
-      simp [Core.collectOptionStepsLoop] at hLoop
-      cases hStep : Core.takeOptionStep? spec st with
-      | error err =>
-          simp [hStep] at hLoop
-      | ok step =>
-          have hStepCursor :=
-            Core.takeOptionStep?_cursor (spec := spec) (st := st) (step := step) hStep
-          cases hValue : step.value? with
-          | none =>
-              simp [hStep, hValue] at hLoop
-              cases hLoop
-              simp [hCursor]
-          | some value =>
-              cases hRaw : step.raw? with
-              | none =>
-                  simp [hStep, hValue, hRaw] at hLoop
-                  cases hLoop
-                  simp [hCursor]
-              | some raw =>
-                  have hCursor' : step.state.cursor =
-                      cursor0 + (consumed + step.consumed) := by
-                    calc
-                      step.state.cursor = st.cursor + step.consumed := hStepCursor
-                      _ = (cursor0 + consumed) + step.consumed := by simp [hCursor]
-                      _ = cursor0 + consumed + step.consumed := by
-                        simp [Nat.add_assoc]
-                      _ = cursor0 + (consumed + step.consumed) :=
-                        Nat.add_assoc cursor0 consumed step.consumed
-                  have hLoop' := hLoop
-                  simp [hStep, hValue, hRaw] at hLoop'
-                  exact ih (value :: accVals) (raw :: accRaws)
-                    (consumed + step.consumed) step.state cursor0 hCursor' hLoop'
+  exact collectStepsLoop_cursor
+    (fun st step hStep =>
+      Core.takePositionalStep?_cursor (spec := spec) (st := st) (step := step) hStep)
+    (st.pre.length + st.post.length + 1) [] [] 0 st st.cursor rfl hLoop
 
 /-- Cursor alignment for the option collector. -/
 theorem collectOptionSteps_cursor
@@ -227,8 +179,10 @@ theorem collectOptionSteps_cursor
   classical
   have hLoop := h
   simp [Core.collectOptionSteps] at hLoop
-  exact collectOptionStepsLoop_cursor (fuel := st.pre.length + st.post.length + 1)
-    [] [] 0 st st.cursor rfl hLoop
+  exact collectStepsLoop_cursor
+    (fun st step hStep =>
+      Core.takeOptionStep?_cursor (spec := spec) (st := st) (step := step) hStep)
+    (st.pre.length + st.post.length + 1) [] [] 0 st st.cursor rfl hLoop
 
 end Totality
 

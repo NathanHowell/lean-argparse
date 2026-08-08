@@ -20,9 +20,9 @@ import ArgParse.Proofs.Totality
 import ArgParse.Proofs.Determinism
 
 /-!
-Aggregated ArgParse module.  Importing every subsystem ensures the library
-build brings along the runtime, documentation helpers, and placeholder proof
-suites while the SPEC-aligned rewrite is in flight.
+Aggregated ArgParse module. Importing every subsystem brings along the
+runtime, the documentation helpers, and the proof suite (lawful instances,
+totality/progress, determinism, sentinel handling, and merge soundness).
 -/
 
 namespace ArgParse

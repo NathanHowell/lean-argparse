@@ -8,8 +8,8 @@ import ArgParse.CLI.Print
 
 Convenience wrappers around elaborated parsers, following the `SPEC.md` API sketch.
 
-The runtime still returns raw `Spec.Partial` payloads; higher-level folding into
-user-defined records will be implemented once the builder layer is complete.
+The runtime produces raw `Spec.Partial` payloads; `run`/`runNormalized` accept a
+caller-supplied fold for shaping them into user-defined records.
 -/
 
 namespace ArgParse

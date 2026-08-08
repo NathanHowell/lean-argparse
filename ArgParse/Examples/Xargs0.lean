@@ -10,7 +10,7 @@ private def rootMeta : Meta :=
 private def rootCmd : CmdSpec :=
   { name := "xargs0", «meta» := rootMeta }
 
-/-- Specification for the xargs example (placeholder). -/
+/-- Minimal specification for the xargs-style example. -/
 def xargsSpec : AppSpec :=
   { name := "xargs0", root := rootCmd }
 

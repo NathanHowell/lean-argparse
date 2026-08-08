@@ -1,153 +1,126 @@
 # lean-argparse
 
-`lean-argparse` provides an applicative command line argument parser for Lean 4, inspired by Haskell's [`optparse-applicative`](https://hackage.haskell.org/package/optparse-applicative). In addition to the core parser, the toolkit ships usage rendering, shell completion generators, man page output, and a lint driver for keeping documentation in sync.
+An applicative command-line argument parser for Lean 4, in the spirit of
+Haskell's [`optparse-applicative`](https://hackage.haskell.org/package/optparse-applicative) —
+with a machine-checked proof suite covering the parser laws, runtime progress,
+determinism, `--` sentinel handling, and merge soundness.
+
+A CLI is driven by one set of specification records (`AppSpec`, `CmdSpec`,
+`FlagSpec`, `OptSpec`, `PosSpec`): they feed the documentation renderers, the
+shell-completion generator, and the built-in `--help`/`--man`/
+`--generate-completions` handlers, while the applicative `Parser` combinators
+(or the spec elaborator) produce typed results from the same metadata.
 
 ## Highlights
 
-- Applicative combinators (`Parser`, `<*>`, `map`) with built-in `Functor`/`Applicative` instances
-- Primitive parsers for options, flags, switches, positional arguments, and subcommands
-- Usage metadata with automatic help text rendering (including a default `-h/--help` entry)
-- Structured error reporting (missing arguments, invalid values, unexpected leftovers)
-- Convenience value readers plus builder-style modifiers (`OptionSpec`, `FlagSpec`, `ParserInfo`)
-- Higher-level combinators such as `many`, `some`, `choice`, `flag'`, and ready-made option helpers (`strOption`, `natOption`, …)
-- Lightweight tests expressed via `#guard`
-- Built-in helpers for shell completions, man page generation, and a `lake lint` driver
+- Applicative `Parser` core with proved `LawfulFunctor`/`LawfulApplicative` instances
+- Flags with short-name bundling; options with `--name value`, `--name=value`,
+  and `-n5` concatenation plus `.one`/`.many`/`.some` arities; positionals;
+  recursive subcommands
+- `--` sentinel handling with proved token-factorization lemmas
+- Structured errors (`unknownLong`, `missingValue`, `leftover`, …) carrying
+  context tokens and expectation metadata
+- Help text, mdoc man pages, and completion suggestions rendered from the spec,
+  optionally annotated with runtime values via `Partial.Summary`
+- A proof suite with no `sorry`, no extra axioms, and a lint-clean build
 
 ## Example
 
-The executable bundled with the project demonstrates a small CLI.
+`Main.lean` ships a demo with `greet` and `repeat` subcommands. Abridged:
 
 ```lean
 import ArgParse
+open ArgParse ArgParse.Spec ArgParse.Core
 
-open ArgParse
-
-structure Config where
+structure GreetConfig where
   verbose : Bool
-  count : Nat
-  name : String
+  count   : Nat
+  name    : String
 
-def configParser : Parser Config :=
-  pure Config.mk
-    <*> switch "verbose" (short? := some 'v') (help? := some "Enable verbose output")
-    <*> Parser.withDefault
-          (natOption [
-            OptionSpec.long "count",
-            OptionSpec.short 'n',
-            OptionSpec.setMetavar "COUNT",
-            OptionSpec.help "How many times to greet",
-            OptionSpec.showDefault "1"
-          ])
-          1
-    <*> rawArgument "NAME" (help? := some "Name to greet")
+def greetVerboseFlag : FlagSpec :=
+  { short? := some ⟨'v', by decide⟩
+  , long?  := some "verbose"
+  , «meta» := { name := "verbose", help? := some "Enable verbose output." } }
 
-def info : ParserInfo Config :=
-  ParserInfo.build configParser [
-    ParserInfo.withProgName "lean-argparse",
-    ParserInfo.withProgDesc "Demonstrates the Lean applicative argument parser"
-  ]
+def greetCountOpt : OptSpec Nat :=
+  { short? := some ⟨'n', by decide⟩
+  , long?  := some "count"
+  , «meta» := { name := "count", metavar? := some "COUNT", default? := some "1" }
+  , arity  := .one }
 
-def main (args : List String) : IO Unit :=
-  match ArgParse.ParserInfo.exec info args with
-  | .success cfg => IO.println s!"Hello, {cfg.name}! (count := {cfg.count}, verbose := {cfg.verbose})"
-  | .showHelp => IO.println (ArgParse.ParserInfo.renderHelp info)
-  | .failure err => do
-      IO.eprintln (ArgParse.ParserInfo.renderFailure info err)
-      IO.Process.exit 1
+def greetParser : Parser GreetConfig :=
+  pure GreetConfig.mk
+    <*> Core.flag greetVerboseFlag
+    <*> Parser.map (·.getD 1) (Core.option greetCountOpt)
+    <*> greetNameParser  -- positional NAME
 
-def bashCompletionScript : String :=
-  ArgParse.ParserInfo.renderBashCompletion info
-
-def zshCompletionScript : String :=
-  ArgParse.ParserInfo.renderZshCompletion info
-
-def fishCompletionScript : String :=
-  ArgParse.ParserInfo.renderFishCompletion info
+def appParser : Parser AppCommand :=
+  Core.subcommand
+    [ { name := "greet",  parser := AppCommand.greet  <$> greetParser }
+    , { name := "repeat", parser := AppCommand.repeat <$> repeatParser } ]
 ```
 
-Running the compiled executable yields:
+The entry point normalizes argv, lets `builtinOutcome?` intercept
+`--help`/`--man`/`--generate-completions`, runs the parser, and reports
+leftover tokens as structured errors:
 
 ```
-$ lake build
-$ ./build/bin/lean-argparse Alice
-Hello, Alice!
+$ lake exe argparse greet -v --count 2 Alice
+Hello, Alice! (verbose)
+Hello, Alice! (verbose)
 
-$ ./build/bin/lean-argparse --count 3 -v Bob
-Hello, Bob! (verbose)
-Hello, Bob! (verbose)
-Hello, Bob! (verbose)
-
-$ ./build/bin/lean-argparse --help
-Lean argparse example
-Usage: lean-argparse [--verbose] [--count COUNT] NAME
-...
+$ lake exe argparse greet
+error: missing value
+  expected: argument NAME
 ```
 
-## Payload summaries
+Parsing is front-of-stream and applicative: arguments are consumed in the
+order the parser is composed.
 
-The low-level runner now exposes `runSummary`/`runNormalizedSummary`, which fold the
-raw `Partial` accumulator into a `Partial.Summary`. This grouped view retains the
-last-seen flag values and the latest-first lists for options and positionals, while
-remaining stable under future refactors. Summary-aware helpers are available across
-the CLI modules (`renderHelpWithSummary`, `renderManWithSummary`,
-`renderCompletionsWithSummary`), so downstream tools can surface the same runtime
-state without manipulating the internal lists directly. See
-`ArgParse.Examples.GitLike.helpWithSummary` (and the `Xargs0` companion) for a
-complete example of feeding a summary into the renderers.
+## Runtime summaries
+
+The runner exposes `runSummary`/`runNormalizedSummary`, folding the raw
+`Partial` accumulator into a `Partial.Summary` (last-write-wins flag lookups,
+chronological option/positional lists). The renderers accept a summary to
+annotate output with current values (`renderHelpWithSummary`,
+`renderManWithSummary`, `renderCompletionsWithSummary`).
+
+## What is proved
+
+All theorems live under `ArgParse/Proofs/` and build with zero warnings:
+
+- **Laws** (`Proofs/Laws.lean`) — `LawfulFunctor` and `LawfulApplicative` for
+  `Parser`, by case analysis on results.
+- **Totality/progress** (`Proofs/Totality.lean`) — flag parsers always succeed
+  with explicit witnesses (`flag_result_ok`); the generic collector loop
+  advances the cursor by exactly the tokens it consumes
+  (`collectStepsLoop_cursor` and its option/positional corollaries).
+- **Determinism** (`Proofs/Determinism.lean`) — successful runner outcomes are
+  unique (`runRaw_ok_unique`, `run_ok_unique`, `runSummary_ok_unique`), and
+  parsing depends only on the normalized token stream
+  (`runRaw_congr_normalize`).
+- **Sentinel** (`Proofs/Sentinel.lean`) — `normalize` factors tokens around
+  the first `--` (`sentinel_present_normalize`, `sentinel_absent_post_nil`).
+- **Soundness** (`Proofs/Soundness.lean`, `Proofs/Soundness/Summary.lean`) —
+  summaries are faithful to the parsed payload
+  (`runSummary_ok_exists_partial`); `Partial.merge` forms a monoid-like
+  algebra; merge-compatibility is carried from item elaboration through
+  subcommand recursion, the runner, and the help/man/completion renderers.
+
+The roadmap (see `PLAN.md`) targets the remaining big results: completeness
+(conforming argv always parses) and fuel adequacy for the elaborator.
 
 ## Development
 
-- Build the library and example executable:
-  ```sh
-  lake build
-  ```
-
-- Run the lightweight unit tests:
-  ```sh
-  lake test
-  ```
-
-Tests are located under `Tests/` and use `#guard` checks; compiling the test executable verifies the expectations without shipping test modules with the library.
-
-- Run the project-wide lint driver:
-  ```sh
-  lake lint
-  ```
-
-The lint driver re-elaborates every module to ensure public declarations carry docstrings and standard linters stay satisfied.
-
-- Generate HTML documentation (after running `lake update doc-gen4` once inside `docbuild/`):
-  ```sh
-  cd docbuild
-  DOCGEN_SRC=file lake build ArgParse:docs
-  ```
-
-## Shell Completions
-
-Use the renderer that matches your shell to produce a completion script:
-
-```lean
-#eval IO.println (ArgParse.ParserInfo.renderBashCompletion info)
-#eval IO.println (ArgParse.ParserInfo.renderZshCompletion info)
-#eval IO.println (ArgParse.ParserInfo.renderFishCompletion info)
+```sh
+lake build   # library + demo executable
+lake test    # #guard-style unit and golden tests
+lake lint    # docstring and simp-hygiene linting
 ```
 
-Redirect the output to a file and source it (or copy it into the appropriate completion directory) to enable tab completion for options and subcommands.
+Generate HTML documentation:
 
-## Man Pages
-
-Generate a basic troff man page directly from your parser metadata:
-
-```lean
-#eval IO.println (ArgParse.ParserInfo.renderManpage info)
-
--- With simple metadata overrides:
-#eval IO.println (ArgParse.ParserInfo.renderManpage info { sectionName := "1", manual? := some "Lean Tools" })
+```sh
+cd docbuild
+DOCGEN_SRC=file lake build ArgParse:docs
 ```
-
-Pipe the output into `man -l` or write it to disk for installation alongside your executable.
-
-- `many`, `some`, `choice`, and `many1` allow repeated or alternative argument parsing without leaving the applicative world.
-- Builder helpers (e.g. `OptionSpec.long`, `FlagSpec.long`, `ParserInfo.withProgDesc`) make it easy to mirror the ergonomic modifiers from `optparse-applicative`.
-- Convenience wrappers (`strOption`, `natOption`, `intOption`, `flag'`) remove most manual record instantiations.
-- Shell completion generators (`renderBashCompletion`, `renderZshCompletion`, `renderFishCompletion`) produce scripts for popular shells.

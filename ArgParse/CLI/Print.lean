@@ -5,7 +5,7 @@ import ArgParse.Doc.Completion
 /-!
 # ArgParse.CLI.Print
 
-Stub helpers that expose help/man/completion entry points.
+Thin CLI-facing wrappers over the `Doc` renderers for help/man/completion output.
 -/
 
 namespace ArgParse.CLI
