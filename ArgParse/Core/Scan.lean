@@ -144,6 +144,33 @@ def optionScan {α : Type} [ArgParse.FromArg α] (spec : OptSpec α) :
                      , expect := [.optionVal spec.«meta».name] }
           | _ => .ok values st'
 
+/-! ### Syntactic token classification
+
+`optionToken?` decides, by inspecting a token alone, whether the option would
+claim it. It mirrors the branch structure of `takeOptionStep?` exactly, which
+is what lets the proofs in `Proofs/Scan.lean` turn a syntactic statement about
+argv into a statement about parser behaviour. -/
+
+/-- Whether the token is claimed by the option's short form. -/
+def optionTokenShort? {α : Type} [ArgParse.FromArg α]
+    (spec : OptSpec α) (token : String) : Bool :=
+  match spec.short? with
+  | some short =>
+      token == shortLexeme short ||
+        (spec.concatVal? && token.startsWith (shortLexeme short))
+  | none => false
+
+/-- Whether the option would claim this token in any of its accepted forms
+(`--name`, `--name=value`, `-x`, `-xVALUE`). -/
+def optionToken? {α : Type} [ArgParse.FromArg α]
+    (spec : OptSpec α) (token : String) : Bool :=
+  match spec.long? with
+  | some name =>
+      (spec.eqVal? && token.startsWith (longLexeme name ++ "=")) ||
+        token == longLexeme name ||
+        optionTokenShort? spec token
+  | none => optionTokenShort? spec token
+
 /-- Split a token list at the first occurrence of any of the given names. -/
 def splitAtFirst (names : List String) : List String → List String × List String
   | [] => ([], [])

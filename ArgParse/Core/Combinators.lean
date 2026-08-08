@@ -102,10 +102,12 @@ def consumePost? (st : State) : Option (String × State) :=
 
 end State
 
-private def shortLexeme (short : Short) : String :=
+/-- Surface lexeme for a short-form name (`-x`). -/
+def shortLexeme (short : Short) : String :=
   "-" ++ String.singleton short.c
 
-private def longLexeme (name : String) : String :=
+/-- Surface lexeme for a long-form name (`--name`). -/
+def longLexeme (name : String) : String :=
   "--" ++ name
 
 private def expectFlag (spec : FlagSpec) : Expect :=

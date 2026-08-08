@@ -25,7 +25,8 @@ next; the historical play-by-play lives in git history.
   normalization congruence); sentinel factorization; accumulator/summary
   soundness; `Partial.merge` identity/associativity; merge-compatibility
   threaded through elaborator → runner → renderers; scan/front-of-stream
-  agreement on canonically ordered argv (`Proofs/Scan.lean`).
+  agreement on syntactically canonical argv (`Proofs/Scan.lean`, unconditional
+  given `Canonical`, with a computed non-vacuity witness).
 - **Tooling**: demo CLI in `Main.lean` (greet/repeat), unit + golden tests,
   docstring/simp lint driver, doc-gen4 setup under `docbuild/`.
 
@@ -42,10 +43,10 @@ next; the historical play-by-play lives in git history.
    help/man output.
 5. **Bundle-splitting edge cases** — inline bundles like `-n5v` with
    non-`String` payloads.
-6. **Scan canonicality by construction** — `Proofs/Scan.lean` reduces scanning
-   to front-of-stream parsing under the `StepsAgreeAt` invariant; deriving that
-   invariant from a syntactic condition on argv (rather than assuming it) is
-   the remaining step.
+6. **Scan agreement for flags and bundles** — `Canonical` covers options;
+   the analogous syntactic canonicality story for flag scanning (and for
+   `=`-form/concatenated option tokens, whose classification the kernel cannot
+   evaluate because `String.startsWith` is opaque) is still open.
 
 ## Design notes / decisions pending
 

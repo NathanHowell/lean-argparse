@@ -116,11 +116,13 @@ All theorems live under `ArgParse/Proofs/` and build with zero warnings:
   parsing depends only on the normalized token stream
   (`runRaw_congr_normalize`).
 - **Scan agreement** (`Proofs/Scan.lean`) — the scanning combinators reduce to
-  the front-of-stream ones on canonically ordered argv: `flagScan_eq_flag_of_head`
-  and `flagScan_eq_flag_of_scan_none` for flags, and `optionScan_eq_option` for
-  options under `StepsAgreeAt`, a state invariant discharged wherever the option
-  matches at the head (`stepsAgreeAt_of_head`) or the stream is exhausted.
-  Scanning also propagates head errors identically (`takeOptionScanStep?_error`).
+  the front-of-stream ones on canonically ordered argv, where "canonical" is a
+  syntactic condition on the token stream (`Canonical`, built on the token
+  classifier `optionToken?`) rather than an assumption:
+  `optionScan_eq_option_of_canonical` carries no further hypothesis, and
+  `canonicalExample` witnesses it for a real named option. Flags are covered by
+  `flagScan_eq_flag_of_head` and `flagScan_eq_flag_of_scan_none`; head errors
+  propagate identically (`takeOptionScanStep?_error`).
 - **Sentinel** (`Proofs/Sentinel.lean`) — `normalize` factors tokens around
   the first `--` (`sentinel_present_normalize`, `sentinel_absent_post_nil`).
 - **Soundness** (`Proofs/Soundness.lean`, `Proofs/Soundness/Summary.lean`) —
