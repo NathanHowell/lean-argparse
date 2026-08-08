@@ -101,7 +101,7 @@ def appSpec : AppSpec :=
 /-! ### Applicative parser helpers -/
 
 def greetCountParser : Parser Nat :=
-  Parser.map (fun opt => opt.getD 1) (Core.option greetCountOpt)
+  Parser.map (fun opt => opt.getD 1) (Core.optionScan greetCountOpt)
 
 def greetNameParser : Parser String := fun st =>
   match Core.positional greetNamePos st with
@@ -115,7 +115,7 @@ def greetNameParser : Parser String := fun st =>
       .err err
 
 def repeatTimesParser : Parser Nat :=
-  Parser.map (fun opt => opt.getD 2) (Core.option repeatTimesOpt)
+  Parser.map (fun opt => opt.getD 2) (Core.optionScan repeatTimesOpt)
 
 def repeatMessageParser : Parser String := fun st =>
   match Core.positional repeatMessagePos st with
@@ -131,7 +131,7 @@ def repeatMessageParser : Parser String := fun st =>
 /-- Parser for the `greet` subcommand payload. -/
 def greetParser : Parser GreetConfig :=
   pure GreetConfig.mk
-    <*> Core.flag greetVerboseFlag
+    <*> Core.flagScan greetVerboseFlag
     <*> greetCountParser
     <*> greetNameParser
 

@@ -170,6 +170,28 @@ theorem collectPositionalSteps_cursor
       Core.takePositionalStep?_cursor (spec := spec) (st := st) (step := step) hStep)
     (st.pre.length + st.post.length + 1) [] [] 0 st st.cursor rfl hLoop
 
+/-- Scanning flag parsers never fail: they always return an `.ok` result. -/
+@[simp] theorem flagScan_result_ok (spec : FlagSpec) (st : State) :
+    ∃ (b : Bool) (st' : State), Core.flagScan spec st = Result.ok b st' := by
+  classical
+  cases h : Core.scanFlagPre spec st.pre with
+  | none => exact ⟨false, st, by simp [Core.flagScan, h]⟩
+  | some pre' => exact ⟨true, State.withPre st pre' 1, by simp [Core.flagScan, h]⟩
+
+/-- Cursor alignment for the scanning option collector. -/
+theorem collectOptionScanSteps_cursor
+    {α : Type} [FromArg α] {spec : OptSpec α} {st : State}
+    {result : Core.CollectResult α}
+    (h : Core.collectOptionScanSteps spec st = .ok result) :
+    result.state.cursor = st.cursor + result.consumed := by
+  classical
+  have hLoop := h
+  simp [Core.collectOptionScanSteps] at hLoop
+  exact collectStepsLoop_cursor
+    (fun st step hStep =>
+      Core.takeOptionScanStep?_cursor (spec := spec) (st := st) (step := step) hStep)
+    (st.pre.length + st.post.length + 1) [] [] 0 st st.cursor rfl hLoop
+
 /-- Cursor alignment for the option collector. -/
 theorem collectOptionSteps_cursor
     {α : Type} [FromArg α] {spec : OptSpec α} {st : State}

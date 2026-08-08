@@ -17,6 +17,10 @@ shell-completion generator, and the built-in `--help`/`--man`/
 - Flags with short-name bundling; options with `--name value`, `--name=value`,
   and `-n5` concatenation plus `.one`/`.many`/`.some` arities; positionals;
   recursive subcommands
+- Order-insensitive parsing: scanning combinators (`Core.flagScan`,
+  `Core.optionScan`) match flags and options anywhere in a command's argument
+  segment, so `greet --count 2 -v Alice` and `greet Alice -v --count 2` parse
+  identically
 - `--` sentinel handling with proved token-factorization lemmas
 - Structured errors (`unknownLong`, `missingValue`, `leftover`, …) carrying
   context tokens and expectation metadata
@@ -50,8 +54,8 @@ def greetCountOpt : OptSpec Nat :=
 
 def greetParser : Parser GreetConfig :=
   pure GreetConfig.mk
-    <*> Core.flag greetVerboseFlag
-    <*> Parser.map (·.getD 1) (Core.option greetCountOpt)
+    <*> Core.flagScan greetVerboseFlag
+    <*> Parser.map (·.getD 1) (Core.optionScan greetCountOpt)
     <*> greetNameParser  -- positional NAME
 
 def appParser : Parser AppCommand :=
@@ -69,13 +73,23 @@ $ lake exe argparse greet -v --count 2 Alice
 Hello, Alice! (verbose)
 Hello, Alice! (verbose)
 
+$ lake exe argparse greet Alice --count 2 -v   # any argument order works
+Hello, Alice! (verbose)
+Hello, Alice! (verbose)
+
 $ lake exe argparse greet
 error: missing value
   expected: argument NAME
 ```
 
-Parsing is front-of-stream and applicative: arguments are consumed in the
-order the parser is composed.
+Flags and options are *scanned* out of the argument stream rather than
+consumed front-of-stream, so their position relative to positionals (and to
+each other) doesn't matter. Scanning is confined to the current command's
+segment — a parent's options never reach past a subcommand name — and never
+crosses the `--` sentinel, so post-sentinel tokens stay positional
+(`greet --count 1 -- -v` greets `-v`). One documented ambiguity: a detached
+option value that looks like a defined flag (`--message -v`) is claimed by the
+flag scan first; use `--message=-v` to force the value reading.
 
 ## Runtime summaries
 
@@ -91,10 +105,12 @@ All theorems live under `ArgParse/Proofs/` and build with zero warnings:
 
 - **Laws** (`Proofs/Laws.lean`) — `LawfulFunctor` and `LawfulApplicative` for
   `Parser`, by case analysis on results.
-- **Totality/progress** (`Proofs/Totality.lean`) — flag parsers always succeed
-  with explicit witnesses (`flag_result_ok`); the generic collector loop
-  advances the cursor by exactly the tokens it consumes
-  (`collectStepsLoop_cursor` and its option/positional corollaries).
+- **Totality/progress** (`Proofs/Totality.lean`) — flag parsers (front-of-stream
+  and scanning) always succeed with explicit witnesses (`flag_result_ok`,
+  `flagScan_result_ok`); the generic collector loop advances the cursor by
+  exactly the tokens it consumes (`collectStepsLoop_cursor` and its
+  option/positional/scanning corollaries, backed by
+  `takeOptionScanStep?_cursor`).
 - **Determinism** (`Proofs/Determinism.lean`) — successful runner outcomes are
   unique (`runRaw_ok_unique`, `run_ok_unique`, `runSummary_ok_unique`), and
   parsing depends only on the normalized token stream

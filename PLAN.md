@@ -8,9 +8,13 @@ next; the historical play-by-play lives in git history.
 - **Runtime**: argv normalization with `--` sentinel splitting; flag parsers
   with short-name bundling; option parsers with `--name value`, `--name=value`,
   inline `-n5` concatenation, and `.one`/`.many`/`.some` arities (last value
-  wins for `.one`); positional parsers over pre/post streams; recursive
-  subcommand dispatch (`Core.subcommand`); fuelled spec elaborator
-  (`Spec.Elab`) folding into the `Partial` accumulator; runner with
+  wins for `.one`); order-insensitive scanning combinators (`Core.flagScan`,
+  `Core.optionScan` in `Core/Scan.lean`) that match anywhere in the pre
+  stream, with `scopedPre` restricting a command's scan to the segment before
+  the first subcommand name; positional parsers over pre/post streams;
+  recursive subcommand dispatch (`Core.subcommand`); fuelled spec elaborator
+  (`Spec.Elab`) folding into the `Partial` accumulator — items reordered by
+  `orderItems` so scans run before positionals; runner with
   `--help`/`--man`/`--generate-completions` built-ins, leftover detection, and
   summary projection (`runSummary`).
 - **Docs**: help/man/completion renderers driven by `Spec.Describe`, sharing
@@ -37,6 +41,9 @@ next; the historical play-by-play lives in git history.
    help/man output.
 5. **Bundle-splitting edge cases** — inline bundles like `-n5v` with
    non-`String` payloads.
+6. **Scan/front-of-stream agreement** — prove the scanning combinators agree
+   with the baseline combinators on canonically ordered argv (flags/options
+   before positionals).
 
 ## Design notes / decisions pending
 
@@ -44,8 +51,12 @@ next; the historical play-by-play lives in git history.
   chronological lists.
 - `Partial` payloads are string-typed today; a typed variant is deferred
   until the builder layer needs richer folding.
-- Parsing is front-of-stream applicative: composition order dictates argument
-  order. Interleaved-order parsing would need a scanning combinator layer.
+- Scanning semantics: flags/options match anywhere within the current
+  command's segment (bounded by the first subcommand name and the `--`
+  sentinel); positionals stay front-of-stream over the residual tokens.
+  Known ambiguity: a detached option value that lexes as a defined flag
+  (`--message -v`) is claimed by the flag scan — `--name=value` forces the
+  value reading. Elaboration order breaks remaining ties.
 
 ## Process guardrails
 

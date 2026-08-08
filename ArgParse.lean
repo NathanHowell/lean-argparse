@@ -3,6 +3,7 @@ import ArgParse.Core.Value
 import ArgParse.Core.Normalize
 import ArgParse.Core.Parser
 import ArgParse.Core.Combinators
+import ArgParse.Core.Scan
 import ArgParse.Core.Runner
 import ArgParse.Spec.AST
 import ArgParse.Spec.Describe

@@ -67,14 +67,27 @@ private def tokens : List String :=
   , "--leaf-mode", "delta"
   , "--", "payload" ]
 
+/-- Same command tree, but flags/options shuffled within each command's segment
+and the leaf positional supplied mid-stream: order-insensitive scanning must
+produce the same summary as `tokens`. -/
+private def shuffledTokens : List String :=
+  [ "--root-mode", "alpha"
+  , "child"
+  , "--child-mode", "beta"
+  , "--switch"
+  , "--child-mode", "gamma"
+  , "grand"
+  , "payload"
+  , "--leaf-mode", "delta" ]
+
 private def verify (cond : Bool) (msg : String) : IO Bool :=
   if cond then
     pure true
   else
     IO.eprintln msg *> pure false
 
-private def testNestedSubcommand : IO Bool := do
-  let outcome := ArgParse.runSummary sampleApp tokens
+private def testNestedSubcommand (label : String) (argv : List String) : IO Bool := do
+  let outcome := ArgParse.runSummary sampleApp argv
   match outcome.result with
   | .ok summary =>
       let rootVals := Partial.Summary.optionValues summary "root-mode"
@@ -83,18 +96,18 @@ private def testNestedSubcommand : IO Bool := do
       let payloadVals := Partial.Summary.positionalValues summary "payload"
       let switchSeen := Partial.Summary.flagValue? summary "child-switch"
       let checks ←
-        [ verify (rootVals = ["alpha"]) "expected root-mode=alpha"
-        , verify (childVals = ["beta", "gamma"]) "expected child-mode beta then gamma"
-        , verify (childVals.getLast? = some "gamma") "expected last child-mode to win"
-        , verify (leafVals = ["delta"]) "expected leaf-mode=delta"
-        , verify (payloadVals = ["payload"]) "expected positional payload"
-        , verify (switchSeen = some true) "expected child-switch flag to be set" ]
+        [ verify (rootVals = ["alpha"]) s!"{label}: expected root-mode=alpha"
+        , verify (childVals = ["beta", "gamma"]) s!"{label}: expected child-mode beta then gamma"
+        , verify (childVals.getLast? = some "gamma") s!"{label}: expected last child-mode to win"
+        , verify (leafVals = ["delta"]) s!"{label}: expected leaf-mode=delta"
+        , verify (payloadVals = ["payload"]) s!"{label}: expected positional payload"
+        , verify (switchSeen = some true) s!"{label}: expected child-switch flag to be set" ]
           |>.mapM id
       return checks.all id
   | .err err =>
-      IO.eprintln s!"unexpected parse error: {repr err}" *> pure false
+      IO.eprintln s!"{label}: unexpected parse error: {repr err}" *> pure false
   | other =>
-      IO.eprintln s!"unexpected runner result: {repr other}" *> pure false
+      IO.eprintln s!"{label}: unexpected runner result: {repr other}" *> pure false
 
 private def runCheck (label : String) (check : Except String Unit) : IO Bool :=
   match check with
@@ -104,6 +117,7 @@ private def runCheck (label : String) (check : Except String Unit) : IO Bool :=
 
 def main : IO UInt32 := do
   let unitChecks ← ArgParse.Tests.runtimeChecks.mapM (fun (label, chk) => runCheck label chk)
-  let nestedOk ← testNestedSubcommand
-  let allOk := nestedOk && unitChecks.all id
+  let nestedOk ← testNestedSubcommand "nested" tokens
+  let shuffledOk ← testNestedSubcommand "shuffled" shuffledTokens
+  let allOk := nestedOk && shuffledOk && unitChecks.all id
   pure <| if allOk then 0 else 1

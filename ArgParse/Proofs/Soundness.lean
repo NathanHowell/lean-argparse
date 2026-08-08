@@ -536,7 +536,7 @@ theorem elaborateItem_flag_mergesRight
     mergesRight f := by
   classical
   unfold Spec.elaborateItem at h
-  cases hFlag : ArgParse.Core.flag spec st with
+  cases hFlag : ArgParse.Core.flagScan spec st with
   | err _ =>
       have : False := by
         simp [Parser.map, hFlag] at h
@@ -570,7 +570,7 @@ theorem elaborateItem_opt_one_mergesRight
   classical
   unfold Spec.elaborateItem at h
   simp [hArity] at h
-  cases hCollect : ArgParse.Core.collectOptionValues (α := α) spec st with
+  cases hCollect : ArgParse.Core.collectOptionScanValues (α := α) spec st with
   | error err =>
       have : False := by
         simp [Parser.map, hCollect] at h
@@ -592,7 +592,7 @@ theorem elaborateItem_opt_many_mergesRight
   classical
   unfold Spec.elaborateItem at h
   simp [hArity] at h
-  cases hCollect : ArgParse.Core.collectOptionValues (α := α) spec st with
+  cases hCollect : ArgParse.Core.collectOptionScanValues (α := α) spec st with
   | error err =>
       have : False := by
         simp [Parser.map, hCollect] at h
@@ -614,7 +614,7 @@ theorem elaborateItem_opt_some_mergesRight
   classical
   unfold Spec.elaborateItem at h
   simp [hArity] at h
-  cases hCollect : ArgParse.Core.collectOptionValues (α := α) spec st with
+  cases hCollect : ArgParse.Core.collectOptionScanValues (α := α) spec st with
   | error err =>
       have : False := by
         simp [Parser.map, hCollect] at h
@@ -836,6 +836,24 @@ theorem elaborateItems_mergesRight
               cases hSeqOk
               exact mergesRight_comp (g := headFun) (h := tailFun) hHeadMerge hTailMerge
 
+/-- A successful scoped run comes from a successful inner run on the segment. -/
+theorem scopedPre_ok_inner
+    {α : Type} {names : List String} {p : Parser α} {st : State}
+    {a : α} {st' : State}
+    (h : ArgParse.Core.scopedPre names p st = Result.ok a st') :
+    ∃ stOut, p { st with pre := (ArgParse.Core.splitAtFirst names st.pre).fst }
+      = Result.ok a stOut := by
+  classical
+  unfold ArgParse.Core.scopedPre at h
+  cases hInner : p { st with pre := (ArgParse.Core.splitAtFirst names st.pre).fst } with
+  | ok a' st'' =>
+      simp [hInner] at h
+      obtain ⟨ha, -⟩ := h
+      subst ha
+      exact ⟨st'', rfl⟩
+  | err e =>
+      simp [hInner] at h
+
 theorem elaborateCommandCore_zero_result
     (cmd : CmdSpec) (st : State)
     {p : Spec.Partial} {st' : State}
@@ -860,7 +878,9 @@ theorem elaborateCommandCore_mergesRight
       simpa using mergesRight_merge_const Spec.Partial.empty
   | fuel+1, cmd, st, p, st', h => by
       classical
-      let itemsP := Spec.elaborateItems cmd.args
+      let itemsP :=
+        ArgParse.Core.scopedPre (cmd.subs.map (·.name))
+          (Spec.elaborateItems (Spec.orderItems cmd.args))
       let childParsers :=
         cmd.subs.map fun child =>
           { name := child.name
@@ -901,10 +921,16 @@ theorem elaborateCommandCore_mergesRight
                       (Spec.Partial.merge (itemsFun Spec.Partial.empty) childPayload)
                       stChild = Result.ok p st' := by
                 simpa [Parser.seq, Parser.map, hSub] using hSeq
-              have hItemsMerge : mergesRight itemsFun :=
-              elaborateItems_mergesRight cmd.args st
-                  (f := itemsFun) (st' := stItems)
-                  (by simpa [itemsP] using hItems)
+              have hItemsMerge : mergesRight itemsFun := by
+                have hScoped :
+                    ArgParse.Core.scopedPre (cmd.subs.map (·.name))
+                        (Spec.elaborateItems (Spec.orderItems cmd.args)) st =
+                      Result.ok itemsFun stItems := by
+                  simpa [itemsP] using hItems
+                obtain ⟨stOut, hInner⟩ := scopedPre_ok_inner hScoped
+                exact
+                  elaborateItems_mergesRight (Spec.orderItems cmd.args) _
+                    (f := itemsFun) (st' := stOut) hInner
               have hEntries :
                   ∀ entry ∈ childParsers,
                     ∀ stChild {q : Spec.Partial} {st'' : State},

@@ -1,5 +1,6 @@
 import ArgParse.Core.Parser
 import ArgParse.Core.Combinators
+import ArgParse.Core.Scan
 import ArgParse.Spec.AST
 
 namespace ArgParse.Spec
@@ -92,8 +93,8 @@ private def stateFuel (st : ArgParse.State) : Nat :=
 /-- Elaborate a single item specification into a transformer over `Partial`. -/
 def elaborateItem : ItemSpec → Parser (Partial → Partial)
   | .flag spec =>
-      -- Parse a boolean flag and record the result under the meta name.
-      ArgParse.Core.flag spec |>.map (fun b => fun p => if b then p.addFlag spec.«meta».name true else p)
+      -- Scan for the flag anywhere in the stream and record it under the meta name.
+      ArgParse.Core.flagScan spec |>.map (fun b => fun p => if b then p.addFlag spec.«meta».name true else p)
   | @ItemSpec.opt α _ spec =>
       -- Handle options by arity; values are recorded using `repr`.
       match spec.arity with
@@ -105,7 +106,7 @@ def elaborateItem : ItemSpec → Parser (Partial → Partial)
             let raws := payload.snd
             fun p => raws.foldl (fun acc raw => acc.addOption spec.«meta».name raw) p)
             (fun st =>
-            match ArgParse.Core.collectOptionValues (α := α) spec st with
+            match ArgParse.Core.collectOptionScanValues (α := α) spec st with
             | .ok (values, raws, st') => ArgParse.Result.ok (values, raws) st'
             | .error err => ArgParse.Result.err err))
       | .many =>
@@ -113,7 +114,7 @@ def elaborateItem : ItemSpec → Parser (Partial → Partial)
             let raws := payload.snd
             fun p => raws.foldl (fun acc raw => acc.addOption spec.«meta».name raw) p)
             (fun st =>
-            match ArgParse.Core.collectOptionValues (α := α) spec st with
+            match ArgParse.Core.collectOptionScanValues (α := α) spec st with
             | .ok (values, raws, st') => ArgParse.Result.ok (values, raws) st'
             | .error err => ArgParse.Result.err err))
       | .some =>
@@ -121,7 +122,7 @@ def elaborateItem : ItemSpec → Parser (Partial → Partial)
             let raws := payload.snd
             fun p => raws.foldl (fun acc raw => acc.addOption spec.«meta».name raw) p)
             (fun st =>
-            match ArgParse.Core.collectOptionValues (α := α) spec st with
+            match ArgParse.Core.collectOptionScanValues (α := α) spec st with
             | .ok (values, raws, st') =>
                 match values with
                 | [] => ArgParse.Result.err (missingOptionError spec)
@@ -156,6 +157,14 @@ def elaborateItem : ItemSpec → Parser (Partial → Partial)
             | .ok (values, raws, st') => ArgParse.Result.ok (values, raws) st'
             | .error err => ArgParse.Result.err err))
 
+/-- Reorder items so scanning flags/options run before front-of-stream
+positionals, making item declaration order irrelevant to token order. -/
+def orderItems (items : List ItemSpec) : List ItemSpec :=
+  let isPos : ItemSpec → Bool
+    | @ItemSpec.pos _ _ _ => true
+    | _ => false
+  items.filter (fun item => !(isPos item)) ++ items.filter isPos
+
 /-- Elaborate a list of items, sequencing their transformers left-to-right. -/
 def elaborateItems (items : List ItemSpec) : Parser (Partial → Partial) :=
   let rec go : List ItemSpec → Parser (Partial → Partial)
@@ -170,7 +179,11 @@ def elaborateItems (items : List ItemSpec) : Parser (Partial → Partial) :=
 def elaborateCommandCore : (fuel : Nat) → CmdSpec → Parser Partial
   | 0, _ => Parser.pure Partial.empty
   | fuel+1, cmd =>
-      let itemsP := elaborateItems cmd.args
+      -- Restrict item scanning to the segment before the first subcommand name
+      -- so a parent's flags/options never reach into a child's arguments.
+      let itemsP :=
+        ArgParse.Core.scopedPre (cmd.subs.map (·.name))
+          (elaborateItems (orderItems cmd.args))
       let childParsers : List (ArgParse.Core.Subcommand Partial) :=
         cmd.subs.map fun child =>
           { name := child.name
