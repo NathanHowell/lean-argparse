@@ -81,7 +81,7 @@
   - Replaced the determinism placeholder with a real extensionality lemma (`Proofs/Determinism.parser_ext`) to anchor future uniqueness proofs.
   - Extended the documentation helpers: `runtimeLinesForSummary`, `runtimeParagraphs`, and completion extras now respect merged option/positional values using the new merge lemmas.
   - Recorded algebraic laws for `Partial.merge` (identities, associativity) so elaboration proofs can collapse nested merges.
-  - Next: propagate these merge facts into the remaining soundness modules (command/app elaboration plus CLI summaries) so we can retire the outstanding `True` stubs.
+  - ✅ Propagated these merge facts into the remaining soundness modules (command/app elaboration plus CLI summaries); the outstanding `True` stubs are retired (2026-08-07).
 
 - ✅ Soundness accumulator proofs
   - `ArgParse/Proofs/Soundness.lean` now describes how folding `Partial.add*` updates interacts with `Summary` lookups, replacing the previous `True` placeholders.

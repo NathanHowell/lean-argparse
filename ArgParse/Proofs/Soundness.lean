@@ -251,7 +251,7 @@ def mergesRight (f : Spec.Partial → Spec.Partial) : Prop :=
 theorem mergesRight_id : mergesRight (fun p => p) := by
   intro base
   symm
-  simpa using (merge_empty_right (p := base))
+  exact merge_empty_right (p := base)
 
 /-- Recording a flag is merge-compatible. -/
 theorem mergesRight_flag (name : String) (value : Bool) :
@@ -260,7 +260,7 @@ theorem mergesRight_flag (name : String) (value : Bool) :
   cases value with
   | false =>
       symm
-      simpa [Spec.Partial.merge, Spec.Partial.empty]
+      simp [Spec.Partial.merge, Spec.Partial.empty]
   | true =>
       cases base with
       | mk flags options positionals =>
@@ -306,23 +306,20 @@ theorem mergesRight_comp
             simpa using hhBase
     _ = Spec.Partial.merge (Spec.Partial.merge base (g Spec.Partial.empty))
           (h Spec.Partial.empty) := by
-            simpa [hgBase]
+            simp [hgBase]
     _ = Spec.Partial.merge base
           (Spec.Partial.merge (g Spec.Partial.empty) (h Spec.Partial.empty)) := by
-            simpa using
-              (merge_assoc base (g Spec.Partial.empty) (h Spec.Partial.empty))
+            exact merge_assoc base (g Spec.Partial.empty) (h Spec.Partial.empty)
     _ = Spec.Partial.merge base (h (g Spec.Partial.empty)) := by
-            simpa [hhEmpty.symm]
+            simp [hhEmpty.symm]
 
 /-- Merging a fixed payload on the right is merge-compatible. -/
 theorem mergesRight_merge_const (child : Spec.Partial) :
     mergesRight (fun base => Spec.Partial.merge base child) := by
   intro base
-  have hEmpty : Spec.Partial.merge Spec.Partial.empty child = child := by
-    simpa using merge_empty_left (p := child)
-  simpa [hEmpty] using
-    (rfl : Spec.Partial.merge base child =
-      Spec.Partial.merge base (Spec.Partial.merge Spec.Partial.empty child))
+  have hEmpty : Spec.Partial.merge Spec.Partial.empty child = child :=
+    merge_empty_left (p := child)
+  simp [hEmpty]
 
 /-- Merge-compatibility for the internal `subcommand.loop`. -/
 theorem subcommand_loop_mergesRight
@@ -339,7 +336,7 @@ theorem subcommand_loop_mergesRight
         mergesRight (fun base => Spec.Partial.merge base child)
   | [], hEntries, st, token, rest, child, st', h => by
       have : False := by
-        simpa [ArgParse.Core.subcommand.loop] using h
+        simp [ArgParse.Core.subcommand.loop] at h
       exact this.elim
   | entry :: tail, hEntries, st, token, rest, child, st', h => by
       have hEntry :
@@ -386,7 +383,7 @@ theorem subcommand_mergesRight
         mergesRight (fun base => Spec.Partial.merge base child)
   | [], hEntries, st, child, st', h => by
       have : False := by
-        simpa [ArgParse.Core.subcommand] using h
+        simp [ArgParse.Core.subcommand] at h
       exact this.elim
   | entry :: tail, hEntries, st, child, st', h => by
       have hEntry :
@@ -404,7 +401,7 @@ theorem subcommand_mergesRight
       cases hPre : st.pre with
       | nil =>
           have : False := by
-            simpa [ArgParse.Core.subcommand, hPre] using h
+            simp [ArgParse.Core.subcommand, hPre] at h
           exact this.elim
       | cons token rest =>
           let expects := (entry :: tail).map (fun e => Expect.subcommand e.name)
@@ -542,7 +539,7 @@ theorem elaborateItem_flag_mergesRight
   cases hFlag : ArgParse.Core.flag spec st with
   | err _ =>
       have : False := by
-        simpa [Parser.map, hFlag] using h
+        simp [Parser.map, hFlag] at h
       exact this.elim
   | ok value st₁ =>
       have hParts := by
@@ -576,7 +573,7 @@ theorem elaborateItem_opt_one_mergesRight
   cases hCollect : ArgParse.Core.collectOptionValues (α := α) spec st with
   | error err =>
       have : False := by
-        simpa [Parser.map, hCollect] using h
+        simp [Parser.map, hCollect] at h
       exact this.elim
   | ok payload =>
       rcases payload with ⟨values, raws, st₁⟩
@@ -598,7 +595,7 @@ theorem elaborateItem_opt_many_mergesRight
   cases hCollect : ArgParse.Core.collectOptionValues (α := α) spec st with
   | error err =>
       have : False := by
-        simpa [Parser.map, hCollect] using h
+        simp [Parser.map, hCollect] at h
       exact this.elim
   | ok payload =>
       rcases payload with ⟨values, raws, st₁⟩
@@ -620,14 +617,14 @@ theorem elaborateItem_opt_some_mergesRight
   cases hCollect : ArgParse.Core.collectOptionValues (α := α) spec st with
   | error err =>
       have : False := by
-        simpa [Parser.map, hCollect] using h
+        simp [Parser.map, hCollect] at h
       exact this.elim
   | ok payload =>
       rcases payload with ⟨values, raws, st₁⟩
       cases hValues : values with
       | nil =>
           have : False := by
-            simpa [Parser.map, hCollect, hValues] using h
+            simp [Parser.map, hCollect, hValues] at h
           exact this.elim
       | cons head tail =>
           have hParts := by
@@ -661,7 +658,7 @@ theorem elaborateItem_pos_one_mergesRight
   cases hTake : ArgParse.Core.takePositionalValue? (α := α) spec st with
   | error err =>
       have : False := by
-        simpa [Parser.map, hTake] using h
+        simp [Parser.map, hTake] at h
       exact this.elim
   | ok result =>
       rcases result with ⟨ov, st₁⟩
@@ -689,7 +686,7 @@ theorem elaborateItem_pos_many_mergesRight
   cases hCollect : ArgParse.Core.collectPositionalValues (α := α) spec st with
   | error err =>
       have : False := by
-        simpa [Parser.map, hCollect] using h
+        simp [Parser.map, hCollect] at h
       exact this.elim
   | ok payload =>
       rcases payload with ⟨values, raws, st₁⟩
@@ -711,7 +708,7 @@ theorem elaborateItem_pos_some_mergesRight
   cases hCollect : ArgParse.Core.collectPositionalValues (α := α) spec st with
   | error err =>
       have : False := by
-        simpa [Parser.map, hCollect] using h
+        simp [Parser.map, hCollect] at h
       exact this.elim
   | ok payload =>
       rcases payload with ⟨values, raws, st₁⟩
@@ -818,24 +815,21 @@ theorem elaborateItems_mergesRight
       -- analyse the head parser's outcome
       cases hItem : Spec.elaborateItem item st with
       | err err =>
-          have : Result.ok f st' ≠ Result.err err := by simp
-          simpa [Parser.seq, Parser.map, hItem] using hSeq
+          simp [Parser.seq, Parser.map, hItem] at hSeq
       | ok headFun st₁ =>
           -- evaluate the sequential composition in the success case
           simp [Parser.seq, Parser.map, hItem] at hSeq
           -- evaluate the tail parser on the updated state
           cases hTail : Spec.elaborateItems rest st₁ with
           | err err =>
-              have : Result.ok f st' ≠ Result.err err := by simp
-              simpa [Parser.seq, Parser.map, hTail] using hSeq
+              simp [hTail] at hSeq
           | ok tailFun st₂ =>
               -- identify the final transformer emitted by the sequence
               have hSeqOk : Result.ok (tailFun ∘ headFun) st₂ = Result.ok f st' := by
                 simpa [Parser.seq, Parser.map, hTail] using hSeq
               have hHeadMerge : mergesRight headFun :=
                 elaborateItem_mergesRight (item := item) (st := st) (f := headFun)
-                  (st' := st₁)
-                  (by simpa [hItem])
+                  (st' := st₁) hItem
               have hTailMerge : mergesRight tailFun :=
                 elaborateItems_mergesRight rest st₁ (f := tailFun) (st' := st₂)
                   (by simpa using hTail)
@@ -895,14 +889,12 @@ theorem elaborateCommandCore_mergesRight
           using h
       cases hItems : itemsP st with
       | err err =>
-          have : Result.ok p st' ≠ Result.err err := by simp
-          simpa [Parser.seq, Parser.map, hItems] using hSeq
+          simp [Parser.seq, Parser.map, hItems] at hSeq
       | ok itemsFun stItems =>
           simp [Parser.seq, Parser.map, hItems] at hSeq
           cases hSub : subP stItems with
           | err err =>
-              have : Result.ok p st' ≠ Result.err err := by simp
-              simpa [Parser.seq, Parser.map, hSub] using hSeq
+              simp [hSub] at hSeq
           | ok childPayload stChild =>
               have hSeqOk :
                   Result.ok
@@ -991,7 +983,7 @@ theorem builtinOutcome?_ok_false
   unfold ArgParse.builtinOutcome? at h
   cases hPre : st.pre with
   | nil =>
-      simpa [hPre] using h
+      simp [hPre] at h
   | cons head tail =>
       by_cases hHelp : head = "--help"
       · subst hHelp
@@ -1029,9 +1021,7 @@ theorem runNormalizedRaw_mergesRight
   | none =>
       cases hApp : Spec.elaborateApp app st with
       | err error =>
-          have : RunOutcome.err error st = RunOutcome.ok payload st' := by
-            simpa [hBuiltin, hApp] using hCore
-          cases this
+          simp [hBuiltin, hApp] at hCore
       | ok payload₀ st₀ =>
           have hIf :
               (if st₀.pre ≠ [] ∨ st₀.post ≠ [] then
@@ -1046,7 +1036,7 @@ theorem runNormalizedRaw_mergesRight
             simpa [hBuiltin, hApp] using hCore
           by_cases hLeftover : st₀.pre ≠ [] ∨ st₀.post ≠ []
           · have : False := by
-              simpa [hLeftover] using hIf
+              simp [hLeftover] at hIf
             exact this.elim
           · have hOk : RunOutcome.ok payload₀ st₀ = RunOutcome.ok payload st' := by
               simpa [hLeftover] using hIf

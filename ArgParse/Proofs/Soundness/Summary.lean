@@ -79,29 +79,15 @@ theorem runNormalizedSummary_ok_exists_partial
               using h
           cases this
           refine ⟨payload, rfl, ?_⟩
-          simpa [hRaw]
+          simp
       | help text =>
-          have : ⟨RunResult.help text, st₀⟩ =
-              RunOutcome.ok summary st' := by
-            simpa [runNormalizedSummary_matches_raw, hRaw]
-              using h
-          cases this
+          simp [runNormalizedSummary_matches_raw, hRaw] at h
       | man text =>
-          have : ⟨RunResult.man text, st₀⟩ =
-              RunOutcome.ok summary st' := by
-            simpa [runNormalizedSummary_matches_raw, hRaw]
-              using h
-          cases this
+          simp [runNormalizedSummary_matches_raw, hRaw] at h
       | completions text =>
-          have : ⟨RunResult.completions text, st₀⟩ =
-              RunOutcome.ok summary st' := by
-            simpa [runNormalizedSummary_matches_raw, hRaw]
-              using h
-          cases this
+          simp [runNormalizedSummary_matches_raw, hRaw] at h
       | err err =>
-          have : RunOutcome.err err st₀ = RunOutcome.ok summary st' := by
-            simpa [runNormalizedSummary_matches_raw, hRaw] using h
-          cases this
+          simp [runNormalizedSummary_matches_raw, hRaw] at h
 
 theorem runSummary_ok_exists_partial
     (app : AppSpec) (tokens : Tokens)
@@ -120,26 +106,15 @@ theorem runSummary_ok_exists_partial
             simpa [runSummary_matches_raw, hRaw] using h
           cases this
           refine ⟨payload, rfl, ?_⟩
-          simpa [hRaw]
+          simp
       | help text =>
-          have : ⟨RunResult.help text, st₀⟩ =
-              RunOutcome.ok summary st' := by
-            simpa [runSummary_matches_raw, hRaw] using h
-          cases this
+          simp [runSummary_matches_raw, hRaw] at h
       | man text =>
-          have : ⟨RunResult.man text, st₀⟩ =
-              RunOutcome.ok summary st' := by
-            simpa [runSummary_matches_raw, hRaw] using h
-          cases this
+          simp [runSummary_matches_raw, hRaw] at h
       | completions text =>
-          have : ⟨RunResult.completions text, st₀⟩ =
-              RunOutcome.ok summary st' := by
-            simpa [runSummary_matches_raw, hRaw] using h
-          cases this
+          simp [runSummary_matches_raw, hRaw] at h
       | err err =>
-          have : RunOutcome.err err st₀ = RunOutcome.ok summary st' := by
-            simpa [runSummary_matches_raw, hRaw] using h
-          cases this
+          simp [runSummary_matches_raw, hRaw] at h
 
 theorem runNormalizedSummary_mergesRight
     (app : AppSpec) (st : State)
@@ -439,11 +414,7 @@ collector suggestions. -/
   cases entry with
   | mk heading lines kind =>
       cases kind <;>
-        simp [renderEntryWithSummary, helpEntryMerged,
-              runtimeLinesForSummary_merge_flag,
-              runtimeLinesForSummary_merge_option,
-              runtimeLinesForSummary_merge_positional,
-              runtimeLinesForSummary, List.map]
+        simp [renderEntryWithSummary, helpEntryMerged, runtimeLinesForSummary]
 
 @[simp] theorem renderSectionWithSummary_merge
     (entry : DocEntry)
@@ -455,11 +426,7 @@ collector suggestions. -/
   cases entry with
   | mk heading lines kind =>
       cases kind <;>
-        simp [renderSectionWithSummary, manSectionMerged,
-              runtimeParagraphs_merge_flag,
-              runtimeParagraphs_merge_option,
-              runtimeParagraphs_merge_positional,
-              runtimeParagraphs, List.map]
+        simp [renderSectionWithSummary, manSectionMerged, runtimeParagraphs]
 
 /-- Help rendering over a merged payload combines the per-entry annotations produced by
 `helpEntryMerged`. -/
@@ -484,7 +451,7 @@ collector suggestions. -/
         ((describeApp spec).map
           (fun entry => helpEntryMerged entry earlier later)) := by
   classical
-  simp [ArgParse.CLI.renderHelpWithSummary, renderHelpWithSummary_merge_values]
+  simp [ArgParse.CLI.renderHelpWithSummary]
 
 /-- Manpage rendering over a merged payload combines the per-section annotations produced by
 `manSectionMerged`. -/
@@ -513,7 +480,7 @@ collector suggestions. -/
             (fun entry => manSectionMerged entry earlier later)
          header :: sections) := by
   classical
-  simp [ArgParse.CLI.renderManWithSummary, renderManWithSummary_merge_values]
+  simp [ArgParse.CLI.renderManWithSummary]
 end PartialSummary
 
 end ArgParse.Proofs
