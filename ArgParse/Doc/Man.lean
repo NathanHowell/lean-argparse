@@ -1,5 +1,6 @@
 import ArgParse.Spec.Describe
 import ArgParse.Spec.Elab
+import ArgParse.Doc.Runtime
 
 /-!
 # ArgParse.Doc.Man
@@ -17,24 +18,7 @@ open ArgParse.Spec.EntryKind
 /-- Runtime annotations inserted into the rendered manpage for the entry. -/
 def runtimeParagraphs (summary? : Option Spec.Partial.Summary) (entry : DocEntry) :
     List String :=
-  match summary? with
-  | none => []
-  | some summary =>
-      match entry.kind with
-      | .flag =>
-          match summary.flagValue? entry.heading with
-          | some true => [".Pp current: enabled"]
-          | some false => [".Pp current: disabled"]
-          | none => []
-      | .option =>
-          let values := summary.optionValues entry.heading
-          if values.isEmpty then []
-          else [s!".Pp current: {String.intercalate ", " values}"]
-      | .positional =>
-          let values := summary.positionalValues entry.heading
-          if values.isEmpty then []
-          else [s!".Pp current: {String.intercalate ", " values}"]
-      | .command => []
+  runtimeAnnotations (fun line => s!".Pp {line}") summary? entry
 
 /-- Render a minimal mdoc-style section for a documentation entry. -/
 def renderSectionWithSummary (entry : DocEntry)

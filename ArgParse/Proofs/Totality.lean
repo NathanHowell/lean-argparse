@@ -7,9 +7,9 @@ import ArgParse.Spec.Elab
 /-!
 # ArgParse.Proofs.Totality
 
-Totality lemmas showing that the rebuilt runtime never produces undefined
-results; combinators and elaborators either succeed with a value/state pair or
-raise a structured error.
+Progress lemmas for the rebuilt runtime: flag parsers always succeed with an
+explicit witness, and the option/positional collectors advance the cursor in
+lockstep with the tokens they consume.
 -/
 
 namespace ArgParse.Proofs
@@ -229,60 +229,6 @@ theorem collectOptionSteps_cursor
   simp [Core.collectOptionSteps] at hLoop
   exact collectOptionStepsLoop_cursor (fuel := st.pre.length + st.post.length + 1)
     [] [] 0 st st.cursor rfl hLoop
-
-/-- Option parsers either succeed with a value/state or emit an error. -/
-@[simp] theorem option_result_cases
-    {α : Type} [FromArg α] (spec : OptSpec α) (st : State) :
-    (∃ value st', Core.option spec st = Result.ok value st') ∨
-    (∃ err, Core.option spec st = Result.err err) := by
-  classical
-  cases Core.option spec st with
-  | ok value st' => exact Or.inl ⟨value, st', rfl⟩
-  | err err => exact Or.inr ⟨err, rfl⟩
-
-/-- Positional parsers either succeed with a value/state or emit an error. -/
-@[simp] theorem positional_result_cases
-    {α : Type} [FromArg α] (spec : PosSpec α) (st : State) :
-    (∃ value st', Core.positional spec st = Result.ok value st') ∨
-    (∃ err, Core.positional spec st = Result.err err) := by
-  classical
-  cases Core.positional spec st with
-  | ok value st' => exact Or.inl ⟨value, st', rfl⟩
-  | err err => exact Or.inr ⟨err, rfl⟩
-
-/-- Elaboration of a single item yields either a transformer/state or an error. -/
-@[simp] theorem elaborateItem_result_cases
-    (item : ItemSpec) (st : State) :
-    (∃ f st', Spec.elaborateItem item st = Result.ok f st') ∨
-    (∃ err, Spec.elaborateItem item st = Result.err err) := by
-  classical
-  cases Spec.elaborateItem item st with
-  | ok f st' => exact Or.inl ⟨f, st', rfl⟩
-  | err err => exact Or.inr ⟨err, rfl⟩
-
-/-- Elaborating a command is total modulo the underlying option/positional errors. -/
-@[simp] theorem elaborateCommand_result_cases (cmd : CmdSpec) (st : State) :
-    (∃ payload st', Spec.elaborateCommand cmd st = Result.ok payload st') ∨
-    (∃ err, Spec.elaborateCommand cmd st = Result.err err) := by
-  classical
-  cases Spec.elaborateCommand cmd st with
-  | ok payload st' => exact Or.inl ⟨payload, st', rfl⟩
-  | err err => exact Or.inr ⟨err, rfl⟩
-
-/-- Application elaboration is likewise total up to the underlying parser errors. -/
-@[simp] theorem elaborateApp_result_cases (app : AppSpec) (st : State) :
-    (∃ payload st', Spec.elaborateApp app st = Result.ok payload st') ∨
-    (∃ err, Spec.elaborateApp app st = Result.err err) := by
-  classical
-  cases Spec.elaborateApp app st with
-  | ok payload st' => exact Or.inl ⟨payload, st', rfl⟩
-  | err err => exact Or.inr ⟨err, rfl⟩
-
-/-- Runner execution always yields a concrete `RunOutcome`. -/
-@[simp] theorem runNormalized_cases {α : Type}
-    (app : AppSpec) (fold : Spec.Partial → α)
-    (st : State) :
-    ∃ outcome, outcome = ArgParse.runNormalized app fold st := ⟨_, rfl⟩
 
 end Totality
 

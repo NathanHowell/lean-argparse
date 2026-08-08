@@ -7,6 +7,7 @@ import ArgParse.Core.Runner
 import ArgParse.Spec.AST
 import ArgParse.Spec.Describe
 import ArgParse.Spec.Elab
+import ArgParse.Doc.Runtime
 import ArgParse.Doc.Help
 import ArgParse.Doc.Man
 import ArgParse.Doc.Completion

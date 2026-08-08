@@ -169,20 +169,21 @@ theorem runSummary_mergesRight
     renderCompletionWithSummary spec (partial?.map Partial.toSummary) =
       renderCompletionWith spec partial? := rfl
 
-/-- Runtime annotations for a flag prefer the right-hand payload when partials are merged. -/
-@[simp] theorem runtimeLinesForSummary_merge_flag
-    (name : String) (lines : List String)
+/-- Merged flag annotations prefer the right-hand payload, for any line format.
+Instantiate `fmt` with `id` for help lines or the `.Pp` prefixer for manpages. -/
+@[simp] theorem runtimeAnnotations_merge_flag
+    (fmt : String → String) (name : String) (lines : List String)
     (earlier later : Spec.Partial) :
-    runtimeLinesForSummary
+    runtimeAnnotations fmt
         (some (Spec.Partial.merge earlier later).toSummary)
         { heading := name, lines := lines, kind := EntryKind.flag } =
       match Spec.Partial.Summary.flagValue? (Spec.Partial.toSummary later) name with
-      | some true => ["current: enabled"]
-      | some false => ["current: disabled"]
+      | some true => [fmt "current: enabled"]
+      | some false => [fmt "current: disabled"]
       | none =>
           match Spec.Partial.Summary.flagValue? (Spec.Partial.toSummary earlier) name with
-          | some true => ["current: enabled"]
-          | some false => ["current: disabled"]
+          | some true => [fmt "current: enabled"]
+          | some false => [fmt "current: disabled"]
           | none => [] := by
   classical
   cases hLater :
@@ -191,121 +192,52 @@ theorem runSummary_mergesRight
       cases hEarlier :
           Spec.Partial.Summary.flagValue? (Spec.Partial.toSummary earlier) name with
       | none =>
-          simp [runtimeLinesForSummary, hLater, hEarlier,
+          simp [runtimeAnnotations, hLater, hEarlier,
             Partial.flagValue?_merge (earlier := earlier) (later := later) (name := name)]
       | some prev =>
           cases prev <;>
-            simp [runtimeLinesForSummary, hLater, hEarlier,
+            simp [runtimeAnnotations, hLater, hEarlier,
               Partial.flagValue?_merge (earlier := earlier) (later := later) (name := name)]
   | some value =>
       cases value <;>
-        simp [runtimeLinesForSummary, hLater,
+        simp [runtimeAnnotations, hLater,
           Partial.flagValue?_merge (earlier := earlier) (later := later) (name := name)]
 
-/-- Option annotations reflect the appended values when partial payloads are merged. -/
-@[simp] theorem runtimeLinesForSummary_merge_option
-    (name : String) (lines : List String)
+/-- Merged option annotations append payloads in order, for any line format. -/
+@[simp] theorem runtimeAnnotations_merge_option
+    (fmt : String → String) (name : String) (lines : List String)
     (earlier later : Spec.Partial) :
-    runtimeLinesForSummary
+    runtimeAnnotations fmt
         (some (Spec.Partial.merge earlier later).toSummary)
         { heading := name, lines := lines, kind := EntryKind.option } =
       if (Spec.Partial.Summary.optionValues (Spec.Partial.toSummary earlier) name ++
           Spec.Partial.Summary.optionValues (Spec.Partial.toSummary later) name).isEmpty then []
       else
-        [s!"current: {String.intercalate ", " (
+        [fmt s!"current: {String.intercalate ", " (
             Spec.Partial.Summary.optionValues (Spec.Partial.toSummary earlier) name ++
             Spec.Partial.Summary.optionValues (Spec.Partial.toSummary later) name)}"] := by
   classical
   have hMerged :=
     Partial.optionValues_merge (earlier := earlier) (later := later) (name := name)
-  simp [runtimeLinesForSummary, hMerged, List.isEmpty]
+  simp [runtimeAnnotations, hMerged, List.isEmpty]
 
-/-- Positional annotations reflect the appended values when partial payloads are merged. -/
-@[simp] theorem runtimeLinesForSummary_merge_positional
-    (name : String) (lines : List String)
+/-- Merged positional annotations append payloads in order, for any line format. -/
+@[simp] theorem runtimeAnnotations_merge_positional
+    (fmt : String → String) (name : String) (lines : List String)
     (earlier later : Spec.Partial) :
-    runtimeLinesForSummary
+    runtimeAnnotations fmt
         (some (Spec.Partial.merge earlier later).toSummary)
         { heading := name, lines := lines, kind := EntryKind.positional } =
       if (Spec.Partial.Summary.positionalValues (Spec.Partial.toSummary earlier) name ++
           Spec.Partial.Summary.positionalValues (Spec.Partial.toSummary later) name).isEmpty then []
       else
-        [s!"current: {String.intercalate ", " (
+        [fmt s!"current: {String.intercalate ", " (
             Spec.Partial.Summary.positionalValues (Spec.Partial.toSummary earlier) name ++
             Spec.Partial.Summary.positionalValues (Spec.Partial.toSummary later) name)}"] := by
   classical
   have hMerged :=
     Partial.positionalValues_merge (earlier := earlier) (later := later) (name := name)
-  simp [runtimeLinesForSummary, hMerged, List.isEmpty]
-
-/-- Flag paragraphs in the manpage renderer prefer the right-hand payload when partials merge. -/
-@[simp] theorem runtimeParagraphs_merge_flag
-    (name : String) (lines : List String)
-    (earlier later : Spec.Partial) :
-    runtimeParagraphs
-        (some (Spec.Partial.merge earlier later).toSummary)
-        { heading := name, lines := lines, kind := EntryKind.flag } =
-      match Spec.Partial.Summary.flagValue? (Spec.Partial.toSummary later) name with
-      | some true => [".Pp current: enabled"]
-      | some false => [".Pp current: disabled"]
-      | none =>
-          match Spec.Partial.Summary.flagValue? (Spec.Partial.toSummary earlier) name with
-          | some true => [".Pp current: enabled"]
-          | some false => [".Pp current: disabled"]
-          | none => [] := by
-  classical
-  cases hLater :
-      Spec.Partial.Summary.flagValue? (Spec.Partial.toSummary later) name with
-  | none =>
-      cases hEarlier :
-          Spec.Partial.Summary.flagValue? (Spec.Partial.toSummary earlier) name with
-      | none =>
-          simp [runtimeParagraphs, hLater, hEarlier,
-            Partial.flagValue?_merge (earlier := earlier) (later := later) (name := name)]
-      | some prev =>
-          cases prev <;>
-            simp [runtimeParagraphs, hLater, hEarlier,
-              Partial.flagValue?_merge (earlier := earlier) (later := later) (name := name)]
-  | some value =>
-      cases value <;>
-        simp [runtimeParagraphs, hLater,
-          Partial.flagValue?_merge (earlier := earlier) (later := later) (name := name)]
-
-/-- Option paragraphs reflect appended values when partials merge. -/
-@[simp] theorem runtimeParagraphs_merge_option
-    (name : String) (lines : List String)
-    (earlier later : Spec.Partial) :
-    runtimeParagraphs
-        (some (Spec.Partial.merge earlier later).toSummary)
-        { heading := name, lines := lines, kind := EntryKind.option } =
-      if (Spec.Partial.Summary.optionValues (Spec.Partial.toSummary earlier) name ++
-          Spec.Partial.Summary.optionValues (Spec.Partial.toSummary later) name).isEmpty then []
-      else
-        [s!".Pp current: {String.intercalate ", " (
-            Spec.Partial.Summary.optionValues (Spec.Partial.toSummary earlier) name ++
-            Spec.Partial.Summary.optionValues (Spec.Partial.toSummary later) name)}"] := by
-  classical
-  have hMerged :=
-    Partial.optionValues_merge (earlier := earlier) (later := later) (name := name)
-  simp [runtimeParagraphs, hMerged, List.isEmpty]
-
-/-- Positional paragraphs reflect appended values when partials merge. -/
-@[simp] theorem runtimeParagraphs_merge_positional
-    (name : String) (lines : List String)
-    (earlier later : Spec.Partial) :
-    runtimeParagraphs
-        (some (Spec.Partial.merge earlier later).toSummary)
-        { heading := name, lines := lines, kind := EntryKind.positional } =
-      if (Spec.Partial.Summary.positionalValues (Spec.Partial.toSummary earlier) name ++
-          Spec.Partial.Summary.positionalValues (Spec.Partial.toSummary later) name).isEmpty then []
-      else
-        [s!".Pp current: {String.intercalate ", " (
-            Spec.Partial.Summary.positionalValues (Spec.Partial.toSummary earlier) name ++
-            Spec.Partial.Summary.positionalValues (Spec.Partial.toSummary later) name)}"] := by
-  classical
-  have hMerged :=
-    Partial.positionalValues_merge (earlier := earlier) (later := later) (name := name)
-  simp [runtimeParagraphs, hMerged, List.isEmpty]
+  simp [runtimeAnnotations, hMerged, List.isEmpty]
 
 /-- Completion suggestions retain the union of option/positional terms when partials merge. -/
 @[simp] theorem suggestionsWithSummary_merge_values
@@ -355,29 +287,12 @@ collector suggestions. -/
   classical
   simp [renderCompletionWithSummary, suggestionsWithSummary_merge_values]
 
-/-- The CLI wrapper inherits the merge-aware completion rendering behaviour. -/
-@[simp] theorem CLI.renderCompletionsWithSummary_merge_values
-    (spec : AppSpec)
-    (earlier later : Spec.Partial) :
-    ArgParse.CLI.renderCompletionsWithSummary spec
-        (some (Spec.Partial.merge earlier later).toSummary) =
-      String.intercalate "\n"
-        (((describeApp spec |>.map (·.heading)) ++
-          ((Spec.Partial.merge earlier later).toSummary.flags.map (·.fst) ++
-            (Spec.Partial.merge earlier later).toSummary.options.foldr
-              (fun entry acc =>
-                match entry with
-                | (name, values) =>
-                    values.foldr (fun value acc' => s!"{name}={value}" :: acc') acc)
-              [] ++
-            (Spec.Partial.merge earlier later).toSummary.positionals.foldr
-              (fun entry acc =>
-                match entry with
-                | (name, values) =>
-                    values.foldr (fun value acc' => s!"{name}:{value}" :: acc') acc)
-              [])).eraseDups) := by
-  classical
-  simp [ArgParse.CLI.renderCompletionsWithSummary, renderCompletionWithSummary_merge_values]
+/-- The CLI completion wrapper is definitionally the core renderer, so every
+merge-aware fact about `renderCompletionWithSummary` transfers directly. -/
+@[simp] theorem CLI.renderCompletionsWithSummary_eq
+    (spec : AppSpec) (summary? : Option Spec.Partial.Summary) :
+    ArgParse.CLI.renderCompletionsWithSummary spec summary? =
+      renderCompletionWithSummary spec summary? := rfl
 
 @[simp] private def helpRuntimeMerged
     (entry : DocEntry) (earlier later : Spec.Partial) : List String :=
@@ -441,17 +356,12 @@ collector suggestions. -/
   classical
   simp [renderHelpWithSummary, renderEntryWithSummary_merge]
 
-/-- CLI help rendering inherits the merge-aware annotations. -/
-@[simp] theorem CLI.renderHelpWithSummary_merge_values
-    (spec : AppSpec)
-    (earlier later : Spec.Partial) :
-    ArgParse.CLI.renderHelpWithSummary spec
-        (some (Spec.Partial.merge earlier later).toSummary) =
-      String.intercalate "\n\n"
-        ((describeApp spec).map
-          (fun entry => helpEntryMerged entry earlier later)) := by
-  classical
-  simp [ArgParse.CLI.renderHelpWithSummary]
+/-- The CLI help wrapper is definitionally the core renderer, so every
+merge-aware fact about `renderHelpWithSummary` transfers directly. -/
+@[simp] theorem CLI.renderHelpWithSummary_eq
+    (spec : AppSpec) (summary? : Option Spec.Partial.Summary) :
+    ArgParse.CLI.renderHelpWithSummary spec summary? =
+      renderHelpWithSummary spec summary? := rfl
 
 /-- Manpage rendering over a merged payload combines the per-section annotations produced by
 `manSectionMerged`. -/
@@ -468,19 +378,12 @@ collector suggestions. -/
   classical
   simp [renderManWithSummary, renderSectionWithSummary_merge, manSectionMerged]
 
-/-- CLI manpage rendering inherits the merge-aware annotations. -/
-@[simp] theorem CLI.renderManWithSummary_merge_values
-    (spec : AppSpec)
-    (earlier later : Spec.Partial) :
-    ArgParse.CLI.renderManWithSummary spec
-        (some (Spec.Partial.merge earlier later).toSummary) =
-      String.intercalate "\n"
-        (let header := s!".Dd Generated\n.Dt {spec.name}\n.Os"
-         let sections := (describeApp spec).map
-            (fun entry => manSectionMerged entry earlier later)
-         header :: sections) := by
-  classical
-  simp [ArgParse.CLI.renderManWithSummary]
+/-- The CLI manpage wrapper is definitionally the core renderer, so every
+merge-aware fact about `renderManWithSummary` transfers directly. -/
+@[simp] theorem CLI.renderManWithSummary_eq
+    (spec : AppSpec) (summary? : Option Spec.Partial.Summary) :
+    ArgParse.CLI.renderManWithSummary spec summary? =
+      renderManWithSummary spec summary? := rfl
 end PartialSummary
 
 end ArgParse.Proofs

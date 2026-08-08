@@ -1,5 +1,6 @@
 import ArgParse.Spec.Describe
 import ArgParse.Spec.Elab
+import ArgParse.Doc.Runtime
 
 /-!
 # ArgParse.Doc.Help
@@ -17,24 +18,7 @@ open ArgParse.Spec.EntryKind
 /-- Runtime annotations describing the current values associated with the entry. -/
 def runtimeLinesForSummary (summary? : Option Spec.Partial.Summary) (entry : DocEntry) :
     List String :=
-  match summary? with
-  | none => []
-  | some summary =>
-      match entry.kind with
-      | .flag =>
-          match summary.flagValue? entry.heading with
-          | some true => ["current: enabled"]
-          | some false => ["current: disabled"]
-          | none => []
-      | .option =>
-          let values := summary.optionValues entry.heading
-          if values.isEmpty then []
-          else [s!"current: {String.intercalate ", " values}"]
-      | .positional =>
-          let values := summary.positionalValues entry.heading
-          if values.isEmpty then []
-          else [s!"current: {String.intercalate ", " values}"]
-      | .command => []
+  runtimeAnnotations id summary? entry
 
 /-- Render a single documentation entry into a human-readable block. -/
 def renderEntryWithSummary (entry : DocEntry)

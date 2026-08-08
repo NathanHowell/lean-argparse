@@ -47,6 +47,10 @@
    - Prepare release notes summarizing parity with the old API plus new guarantees.
 
 ## Next Actions (focused, incremental)
+- ✅ Proof suite cleanup (2026-08-07)
+  - `Proofs/Determinism.lean` now records runner-outcome uniqueness (`runRaw_ok_unique`, `run_ok_unique`, `runSummary_ok_unique`) and normalization congruence (`runRaw_congr_normalize`) instead of the extensionality stub.
+  - Dropped the vacuous `*_result_cases`/`runNormalized_cases` lemmas from `Proofs/Totality.lean`; the file now carries only the substantive flag-totality and cursor-progress results.
+  - Factored the help/man runtime annotations through a shared `Doc.runtimeAnnotations` (new `ArgParse/Doc/Runtime.lean`); the six copy-pasted merge lemmas collapsed into three `fmt`-generic ones and the CLI wrapper merge lemmas became definitional bridge lemmas.
 - ✅ Subcommand recursion
   - `ArgParse/Spec/Elab.lean` now recurses on subcommands using a token-derived fuel measure, preserving left-to-right parsing and termination.
   - Added nested subcommand coverage in `Tests/Main.lean` (options before/after the subcommand token plus sentinel handling).
