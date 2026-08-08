@@ -24,7 +24,8 @@ next; the historical play-by-play lives in git history.
   cursor lemma (`collectStepsLoop_cursor`); determinism (outcome uniqueness,
   normalization congruence); sentinel factorization; accumulator/summary
   soundness; `Partial.merge` identity/associativity; merge-compatibility
-  threaded through elaborator → runner → renderers.
+  threaded through elaborator → runner → renderers; scan/front-of-stream
+  agreement on canonically ordered argv (`Proofs/Scan.lean`).
 - **Tooling**: demo CLI in `Main.lean` (greet/repeat), unit + golden tests,
   docstring/simp lint driver, doc-gen4 setup under `docbuild/`.
 
@@ -41,9 +42,10 @@ next; the historical play-by-play lives in git history.
    help/man output.
 5. **Bundle-splitting edge cases** — inline bundles like `-n5v` with
    non-`String` payloads.
-6. **Scan/front-of-stream agreement** — prove the scanning combinators agree
-   with the baseline combinators on canonically ordered argv (flags/options
-   before positionals).
+6. **Scan canonicality by construction** — `Proofs/Scan.lean` reduces scanning
+   to front-of-stream parsing under the `StepsAgreeAt` invariant; deriving that
+   invariant from a syntactic condition on argv (rather than assuming it) is
+   the remaining step.
 
 ## Design notes / decisions pending
 

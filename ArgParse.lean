@@ -19,11 +19,13 @@ import ArgParse.Proofs.Soundness
 import ArgParse.Proofs.Soundness.Summary
 import ArgParse.Proofs.Totality
 import ArgParse.Proofs.Determinism
+import ArgParse.Proofs.Scan
 
 /-!
 Aggregated ArgParse module. Importing every subsystem brings along the
 runtime, the documentation helpers, and the proof suite (lawful instances,
-totality/progress, determinism, sentinel handling, and merge soundness).
+totality/progress, determinism, sentinel handling, merge soundness, and
+scan/front-of-stream agreement).
 -/
 
 namespace ArgParse
