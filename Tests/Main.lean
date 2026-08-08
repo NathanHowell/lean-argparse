@@ -1,182 +1,109 @@
-import Argparse
+import ArgParse.Core.Runner
+import ArgParse.Tests.Unit
 
-open Argparse
-open Argparse.OptionSpec
-open Argparse.FlagSpec
-open Argparse.Completion
+open ArgParse
+open ArgParse.Spec
 
-namespace ArgparseTests
+private def rootModeSpec : ItemSpec :=
+  ItemSpec.opt
+    (α := String)
+    { long? := some "root-mode"
+      , «meta» := { name := "root-mode" }
+      , arity := .one }
 
-private def containsSubstring (haystack needle : String) : Bool :=
-  if needle.isEmpty then
-    true
+private def childSwitchSpec : ItemSpec :=
+  ItemSpec.flag
+    { long? := some "switch"
+      , «meta» := { name := "child-switch" } }
+
+private def childModeSpec : ItemSpec :=
+  ItemSpec.opt
+    (α := String)
+    { long? := some "child-mode"
+      , «meta» := { name := "child-mode" }
+      , arity := .many }
+
+private def grandModeSpec : ItemSpec :=
+  ItemSpec.opt
+    (α := String)
+    { long? := some "leaf-mode"
+      , «meta» := { name := "leaf-mode" }
+      , arity := .one }
+
+private def grandPayloadSpec : ItemSpec :=
+  ItemSpec.pos
+    (α := String)
+    { «meta» := { name := "payload" }
+      , arity := .one }
+
+private def grandCmd : CmdSpec :=
+  { name := "grand"
+    , «meta» := { name := "grand" }
+    , args := [grandModeSpec, grandPayloadSpec] }
+
+private def childCmd : CmdSpec :=
+  { name := "child"
+    , «meta» := { name := "child" }
+    , args := [childSwitchSpec, childModeSpec]
+    , subs := [grandCmd] }
+
+private def rootCmd : CmdSpec :=
+  { name := "sample"
+    , «meta» := { name := "sample" }
+    , args := [rootModeSpec]
+    , subs := [childCmd] }
+
+private def sampleApp : AppSpec :=
+  { name := "sample"
+    , root := rootCmd }
+
+private def tokens : List String :=
+  [ "--root-mode", "alpha"
+  , "child"
+  , "--switch"
+  , "--child-mode", "beta"
+  , "--child-mode", "gamma"
+  , "grand"
+  , "--leaf-mode", "delta"
+  , "--", "payload" ]
+
+private def verify (cond : Bool) (msg : String) : IO Bool :=
+  if cond then
+    pure true
   else
-    let target := needle.data
-    let rec loop : List Char → Bool
-      | [] => false
-      | chars@(_ :: rest) =>
-          if target.isPrefixOf chars then
-            true
-          else
-            loop rest
-    loop haystack.data
+    IO.eprintln msg *> pure false
 
-private structure ExampleCfg where
-  verbose : Bool
-  count : Nat
-  name : String
-  deriving Repr, DecidableEq
+private def testNestedSubcommand : IO Bool := do
+  let outcome := ArgParse.runSummary sampleApp tokens
+  match outcome.result with
+  | .ok summary =>
+      let rootVals := Partial.Summary.optionValues summary "root-mode"
+      let childVals := Partial.Summary.optionValues summary "child-mode"
+      let leafVals := Partial.Summary.optionValues summary "leaf-mode"
+      let payloadVals := Partial.Summary.positionalValues summary "payload"
+      let switchSeen := Partial.Summary.flagValue? summary "child-switch"
+      let checks ←
+        [ verify (rootVals = ["alpha"]) "expected root-mode=alpha"
+        , verify (childVals = ["beta", "gamma"]) "expected child-mode beta then gamma"
+        , verify (childVals.getLast? = some "gamma") "expected last child-mode to win"
+        , verify (leafVals = ["delta"]) "expected leaf-mode=delta"
+        , verify (payloadVals = ["payload"]) "expected positional payload"
+        , verify (switchSeen = some true) "expected child-switch flag to be set" ]
+          |>.mapM id
+      return checks.all id
+  | .err err =>
+      IO.eprintln s!"unexpected parse error: {repr err}" *> pure false
+  | other =>
+      IO.eprintln s!"unexpected runner result: {repr other}" *> pure false
 
-private def exampleParser : Parser ExampleCfg :=
-  pure ExampleCfg.mk
-    <*> switch "verbose" (short? := some 'v')
-    <*> Parser.withDefault
-          (option {
-            long? := some "count",
-            short? := some 'n',
-            metavar := "COUNT",
-            reader := Argparse.ValueReader.nat,
-            help? := some "Number of repetitions"
-          })
-          1
-    <*> rawArgument "NAME"
+private def runCheck (label : String) (check : Except String Unit) : IO Bool :=
+  match check with
+  | .ok _ => pure true
+  | .error msg =>
+      IO.eprintln s!"[FAIL] {label}: {msg}" *> pure false
 
-private def exampleInfo : ParserInfo ExampleCfg := {
-  progName := "example",
-  parser := exampleParser
-}
-
-#guard (match Argparse.ParserInfo.exec exampleInfo ["Alice"] with
-  | .success cfg => decide (cfg = { verbose := false, count := 1, name := "Alice" })
-  | _ => False)
-
-#guard (match Argparse.ParserInfo.exec exampleInfo ["--verbose", "--count", "3", "Bob"] with
-  | .success cfg => decide (cfg = { verbose := true, count := 3, name := "Bob" })
-  | _ => False)
-
-#guard (match Argparse.ParserInfo.exec exampleInfo ["--count", "5"] with
-  | .failure err => decide (err.error.kind = .missing)
-  | _ => False)
-
-private structure CommandResult where
-  tag : String
-  target? : Option String
-  deriving Repr, DecidableEq
-
-private def commandParser : Parser CommandResult :=
-  subcommand {
-    metavar := "CMD",
-    commands := [
-      {
-        name := "hello",
-        description? := some "Say hello",
-        parser := pure { tag := "hello", target? := none }
-      },
-      {
-        name := "run",
-        description? := some "Run against a target",
-        parser := pure (fun target => { tag := "run", target? := some target }) <*> rawArgument "TARGET"
-      }
-    ]
-  }
-
-#guard (match Argparse.ParserInfo.exec { progName := "cmd", parser := commandParser } ["hello"] with
-  | .success cfg => decide (cfg = { tag := "hello", target? := none })
-  | _ => False)
-
-#guard (match Argparse.ParserInfo.exec { progName := "cmd", parser := commandParser } ["run", "tests"] with
-  | .success cfg => decide (cfg = { tag := "run", target? := some "tests" })
-  | _ => False)
-
-#guard (match Argparse.ParserInfo.exec { progName := "cmd", parser := commandParser } ["unknown"] with
-  | .failure err => decide (err.error.kind = .invalid)
-  | _ => False)
-
-#guard (match Argparse.ParserInfo.exec exampleInfo ["--help"] with
-  | .showHelp => True
-  | _ => False)
-
-private def repeatedArgs : Parser (List String) :=
-  Parser.many (rawArgument "ITEM")
-
-#guard (match Argparse.ParserInfo.exec { progName := "items", parser := repeatedArgs } ["one", "two", "three"] with
-  | .success items => decide (items = ["one", "two", "three"])
-  | _ => False)
-
-#guard (match Argparse.ParserInfo.exec { progName := "items", parser := repeatedArgs } [] with
-  | .success items => decide (items = [])
-  | _ => False)
-
-#guard (match Argparse.ParserInfo.exec { progName := "items", parser := Parser.some (rawArgument "ITEM") } [] with
-  | .failure err => decide (err.error.kind = .missing)
-  | _ => False)
-
-private def requiredFlag : Parser Bool :=
-  flag' <|
-    FlagSpec.build false true [
-      FlagSpec.long "loud",
-      FlagSpec.short 'L',
-      FlagSpec.help "Enable loud mode"
-    ]
-
-#guard (match Argparse.ParserInfo.exec { progName := "flags", parser := requiredFlag } ["--loud"] with
-  | .success value => decide (value = true)
-  | _ => False)
-
-#guard (match Argparse.ParserInfo.exec { progName := "flags", parser := requiredFlag } [] with
-  | .failure err => decide (err.error.kind = .missing)
-  | _ => False)
-
-private def choiceParser : Parser String :=
-  Parser.choice [
-    strOption [OptionSpec.long "name", OptionSpec.help "Primary name"],
-    strOption [OptionSpec.long "alias", OptionSpec.help "Alias"]
-  ]
-
-#guard (match Argparse.ParserInfo.exec { progName := "choice", parser := choiceParser } ["--alias", "Bob"] with
-  | .success value => decide (value = "Bob")
-  | _ => False)
-
-#guard (match Argparse.ParserInfo.exec { progName := "choice", parser := choiceParser } [] with
-  | .failure err => decide (err.error.kind = .missing)
-  | _ => False)
-
-#guard (containsSubstring (Argparse.ParserInfo.renderBashCompletion exampleInfo) "--count")
-#guard (containsSubstring (Argparse.ParserInfo.renderZshCompletion exampleInfo) "_arguments")
-#guard (containsSubstring (Argparse.ParserInfo.renderFishCompletion exampleInfo) "complete -c")
-#guard (containsSubstring (Argparse.ParserInfo.renderManpage exampleInfo) ".SH OPTIONS")
-
-private def completionOnlyParser : Parser Shell :=
-  defaultShellOption
-
-private def completionOnlyInfo : ParserInfo Shell := {
-  progName := "complete-demo",
-  parser := completionOnlyParser
-}
-
-#guard (match Argparse.ParserInfo.exec completionOnlyInfo ["--completions", "bash"] with
-  | .success shell => decide (Shell.name shell = "bash")
-  | _ => False)
-
-#guard (match Argparse.ParserInfo.exec completionOnlyInfo ["--completions", "FISH"] with
-  | .success shell => decide (Shell.name shell = "fish")
-  | _ => False)
-
-#guard (match Argparse.ParserInfo.exec completionOnlyInfo ["--completions", "unknown"] with
-  | .failure err => decide (err.error.kind = .invalid)
-  | _ => False)
-
-private def optionalCompletionParser : Parser (Option Shell) :=
-  defaultOptionalShellOption
-
-#guard (match Argparse.ParserInfo.exec { progName := "opt-complete", parser := optionalCompletionParser } [] with
-  | .success none => True
-  | _ => False)
-
-#guard (containsSubstring (Argparse.ParserInfo.renderCompletionFor (Option.get! (Shell.ofString? "bash")) completionOnlyInfo) "--completions")
-
-end ArgparseTests
-
-/-- Trivial entry point for the test executable. -/
-def main : IO Unit :=
-  pure ()
+def main : IO UInt32 := do
+  let unitChecks ← ArgParse.Tests.runtimeChecks.mapM (fun (label, chk) => runCheck label chk)
+  let nestedOk ← testNestedSubcommand
+  let allOk := nestedOk && unitChecks.all id
+  pure <| if allOk then 0 else 1

@@ -6,7 +6,7 @@ open System Lean Std
 namespace LintDriver
 
 private def defaultEntries : List FilePath :=
-  ["Argparse.lean", "Argparse", "Main.lean", "Tests", "LintDriver.lean"].map FilePath.mk
+  ["ArgParse.lean", "ArgParse", "Main.lean", "Tests", "LintDriver.lean"].map FilePath.mk
 
 private def resolvePath (root entry : FilePath) : FilePath :=
   if entry.isAbsolute then entry else root / entry
@@ -57,6 +57,10 @@ def main (args : List String) : IO UInt32 := do
   let sysroot ← Lean.findSysroot
   Lean.initSearchPath sysroot
   let root ← IO.currentDir
+  -- Ensure the project root is on the module search path so imports like
+  -- `import ArgParse.Core.Value` resolve to source files during linting.
+  let current ← Lean.searchPathRef.get
+  Lean.searchPathRef.set (current ++ [root])
   let entries := if args.isEmpty then defaultEntries else args.map FilePath.mk
   let targets ← expandEntries root entries
   let mut exit : UInt32 := (0 : UInt32)
