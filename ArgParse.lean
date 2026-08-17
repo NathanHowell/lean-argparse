@@ -10,6 +10,7 @@ import ArgParse.P
 import ArgParse.Builder
 import ArgParse.Cmd
 import ArgParse.Exec
+import ArgParse.Correspondence
 import ArgParse.Doc.Usage
 import ArgParse.Doc.Help
 import ArgParse.Doc.Man
