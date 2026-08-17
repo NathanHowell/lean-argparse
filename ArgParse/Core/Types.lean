@@ -1,7 +1,8 @@
 /-!
 # ArgParse.Core.Types
 
-Core runtime types as prescribed by `SPEC.md`.
+Core runtime types: the parser state, the structured error vocabulary, and the
+result type. Nothing above Layer 1 changes these.
 -/
 
 namespace ArgParse

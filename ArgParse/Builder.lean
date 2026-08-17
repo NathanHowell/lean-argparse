@@ -212,7 +212,9 @@ def arg (α : Type) [FromArg α] (name : String) (metavar : Option String := non
       match Core.takePositionalValue? spec st with
       | .ok (Option.some (value, _), st') => .ok value st'
       | .ok (Option.none, _) =>
-          .err { kind := .missingValue, context := [], expect := [.positional name] }
+          -- The metavar, not the field name: it is what usage shows and what the
+          -- user has to type.
+          .err { kind := .missingValue, context := [], expect := [.positional item.metavar] }
       | .error err => .err err }
 
 /-- An optional positional argument. -/

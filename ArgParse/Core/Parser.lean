@@ -3,7 +3,9 @@ import ArgParse.Core.Types
 /-!
 # ArgParse.Core.Parser
 
-Core parser type and standard instances, following `SPEC.md`.
+The parser type and its instances. This is the whole runtime carrier: an opaque
+function from state to result, which every layer above pairs with a description
+rather than replacing.
 -/
 
 namespace ArgParse
