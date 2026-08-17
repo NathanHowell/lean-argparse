@@ -5,10 +5,21 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Supersede in-flight runs for the same ref. The lint step re-elaborates the
+# whole project and takes a couple of minutes on a 2-core runner, so without
+# this a quick follow-up push leaves two builds racing and invites cancelling
+# one by hand.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Lint is the long pole at ~2 minutes; this is headroom, not a target. Its
+    # job is to fail a genuine hang in minutes rather than burning the 6h default.
+    timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: leanprover/lean-action@v1

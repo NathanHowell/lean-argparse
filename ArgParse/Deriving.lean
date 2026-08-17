@@ -219,7 +219,7 @@ def mkParseableInstance (declName : Name) : CommandElabM Bool := do
   let ctor := getStructureCtor env declName
   let mut terms : Array Term := #[]
   for f in fields do
-    let doc := ((← liftCoreM (findDocString? env (declName ++ f))).getD "").trim
+    let doc := ((← liftCoreM (findDocString? env (declName ++ f))).getD "").trimAscii.toString
     let helpStx := Syntax.mkStrLit doc
     let longStx := Syntax.mkStrLit (kebabCase f.toString)
     let defaultStx ← match getDefaultFnForField? env declName f with
