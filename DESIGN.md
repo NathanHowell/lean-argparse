@@ -39,10 +39,15 @@ help degrades. Nothing in this library wants it.
 abbrev Parser (α : Type) := State → Result α
 ```
 
-The function parser, the order-insensitive scanning layer, and the entire
-proof suite (progress, scan/front-of-stream agreement, merge soundness) live
-here, stated over the function type. This layer is the foundation and is
-deliberately boring: nothing above it changes its statements.
+The function parser, the order-insensitive scanning layer, and the runtime proof
+suite (lawful instances, progress/totality, sentinel handling, scan/front-of-
+stream agreement) live here, stated over the function type. This layer is the
+foundation and is deliberately boring: nothing above it changes its statements.
+
+The merge-soundness suite that once sat alongside these was not part of this
+layer. It proved things about `Partial`, the carrier the excluded spec-
+elaboration design returned, and went out with it — replaced by Layer 6 rather
+than ported.
 
 `Core.Subcommand` and `Core.subcommand` remain the dispatch primitive that
 `Cmd.toParser` (Layer 4) is built from.
@@ -161,9 +166,13 @@ consume.
 The `execParser` equivalent, and the reason Layers 2 and 4 must be data:
 
 ```lean
-def exec (app : Cmd α) (argv : List String) : ExecResult α
--- ExecResult: parsed value | help text to print | error + usage
+def exec (app : Cmd α) (argv : List String) (cfg : Config := {}) : ExecResult α
+-- ExecResult: parsed value | text to print | error + usage
 ```
+
+`Config` carries the version string and lets an application move the builtin
+lexemes, for the case where it already uses `-h` or `--version` for something of
+its own.
 
 The runner — not the application — owns:
 
@@ -244,14 +253,14 @@ inductive AppCommand where
   | repeat (cfg : RepeatConfig)
 
 def app : Cmd AppCommand :=
-  .node "myapp" { descr := "Demo CLI" } (pure id)
-    [ .leaf "greet" { descr := "Greet someone" }
+  .node "myapp" { name := "myapp", help? := some "Demo CLI" } (pure id)
+    [ .leaf "greet" { name := "greet", help? := some "Greet someone" }
         (AppCommand.greet <$> greetP)
-    , .leaf "repeat" { descr := "Repeat a phrase" }
+    , .leaf "repeat" { name := "repeat", help? := some "Repeat a phrase" }
         (AppCommand.repeat <$> repeatP) ]
 
 def main (argv : List String) : IO UInt32 :=
-  ArgParse.run app argv fun
+  ArgParse.run app argv (cfg := { version? := some "0.2.0" }) fun
     | .greet cfg  => …
     | .repeat cfg => …
 ```
