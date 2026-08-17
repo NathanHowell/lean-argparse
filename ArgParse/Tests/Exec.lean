@@ -127,6 +127,31 @@ private def checkUnknownOption : Except String Unit :=
         s!"expected the unknown option to be named, got: {text}"
   | other => .error s!"expected an error, got {repr other}"
 
+/-- A misspelled verb is reported even when a later token is also illegal.
+
+Regression: options meant for the command the user *meant* are illegal at the
+node dispatch stopped at, so the unknown-option check used to fire first and
+name a token the user got right. -/
+private def checkUnknownVerbBeatsOption : Except String Unit := do
+  match Exec.exec sampleApp ["child", "grnd", "--leaf-mode", "delta"] with
+  | .error text =>
+      expectTrue ((text.splitOn "`grnd`").length == 2)
+        s!"expected the misspelled verb to be named, got: {text}"
+      expectTrue ((text.splitOn "did you mean `grand`?").length == 2)
+        s!"expected a suggestion for the verb, got: {text}"
+  | other => .error s!"expected an error, got {repr other}"
+
+/-- An option standing where a verb belongs is still reported as the option.
+
+The guard that makes the check above work keys on the token not looking like an
+option, so this is the case it must not swallow. -/
+private def checkOptionWhereVerbBelongs : Except String Unit :=
+  match Exec.exec sampleApp ["child", "--leaf-mode", "delta"] with
+  | .error text =>
+      expectTrue ((text.splitOn "`--leaf-mode`").length == 2)
+        s!"expected the option to be named, got: {text}"
+  | other => .error s!"expected an error, got {repr other}"
+
 /-- `--help` renders for the command named, not for the root. -/
 private def checkNestedHelp : Except String Unit :=
   match Exec.exec sampleApp ["child", "grand", "--help"] with
@@ -193,6 +218,8 @@ def execChecks : List (String × Except String Unit) :=
   , ("parent items stay out of child segments", checkScoping)
   , ("unknown verb suggestion", checkUnknownVerb)
   , ("unknown option named", checkUnknownOption)
+  , ("unknown verb beats unknown option", checkUnknownVerbBeatsOption)
+  , ("option where a verb belongs", checkOptionWhereVerbBelongs)
   , ("help for the named command", checkNestedHelp)
   , ("help found after other tokens", checkHelpAfterOptions)
   , ("version builtin", checkVersion)

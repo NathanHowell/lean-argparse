@@ -219,6 +219,24 @@ def unknownLong? (known : List String) (tokens : List String) : Option String :=
     else
       Option.none
 
+/-- Whether this error is dispatch complaining about a token that was meant to
+be a verb.
+
+A misspelled verb makes every token after it illegal, because they were meant
+for a command that was never reached. Diagnosing one of *those* instead names
+the wrong token: `ci scop --tier pr` is a misspelling of `scope`, not a problem
+with `--tier`. So a dispatch failure on a token that does not look like an
+option outranks any unknown-option finding.
+
+The token must not start with `-`: dispatch also fails when an option appears
+where a verb belongs (`ci --tier pr`), and there the option is genuinely the
+thing to report. -/
+def isUnknownVerb (err : Error) : Bool :=
+  err.expect.any (fun e => match e with | .subcommand _ => true | _ => false)
+    && (match err.context.head? with
+        | Option.some token => !token.startsWith "-"
+        | Option.none => false)
+
 /-- Everything the command at `path` accepts, for suggestion purposes. -/
 def candidatesAt (cmd : CmdSpec) (cfg : Config) : List String :=
   Doc.candidatesFor cmd ++ (runnerItems cfg).flatMap (·.lexemes)
@@ -259,11 +277,16 @@ where
         (Doc.pathItems spec.root st.pre).flatMap (·.lexemes)
           ++ (runnerItems cfg).flatMap (·.lexemes)
       let fail (err : Error) : ExecResult α :=
-        match unknownLong? legal st.pre with
-        | Option.some name =>
-            .error (renderError path hereSpec candidates
-              { kind := .unknownLong, context := [name], expect := [] })
-        | Option.none => .error (renderError path hereSpec candidates err)
+        if isUnknownVerb err then
+          -- The earliest wrong token wins: report the verb, not the options it
+          -- stranded.
+          .error (renderError path hereSpec candidates err)
+        else
+          match unknownLong? legal st.pre with
+          | Option.some name =>
+              .error (renderError path hereSpec candidates
+                { kind := .unknownLong, context := [name], expect := [] })
+          | Option.none => .error (renderError path hereSpec candidates err)
       match app.toParser st with
       | .err err => fail err
       | .ok value st' =>
