@@ -78,6 +78,12 @@ already pin the behaviour.
 
 - `.one` options use last-value-wins; `.many`/`.some` accumulate chronological
   lists.
+- `--name=` is an empty value, not a missing one. Whether the empty string *is*
+  a value is the decoder's call, so `parseConcatValue` asks it first: a `String`
+  option takes it, and a type that cannot decode it reports `missingValue`
+  rather than complaining about the contents of nothing. Before this the token
+  was rejected outright, which disagreed with `-m ""` -- the same input, since
+  the shell strips the quotes.
 - Scanning semantics: flags/options match anywhere within the current command's
   segment (bounded by the first subcommand name and the `--` sentinel);
   positionals stay front-of-stream over the residual tokens. Known ambiguity: a

@@ -179,6 +179,29 @@ private def checkMissingOptionValue : Except String Unit := do
         s!"expected missingValue, got {repr err.kind}"
   | other => .error s!"expected missingValue, got {repr other}"
 
+/-- `--name=` supplies an empty value, matching what `-n ""` supplies.
+
+The shell strips the quotes, so both spellings arrive as an empty string; the
+decoder decides whether that is a value. -/
+private def checkEmptyInlineValue : Except String Unit := do
+  match Core.optionScan nameOpt (normalize ["--name="]) with
+  | .ok value _ =>
+      expectTrue (value = some "") s!"expected an empty value, got {repr value}"
+  | other => .error s!"expected ok result, got {repr other}"
+  match Core.optionScan nameOpt (normalize ["--name", ""]) with
+  | .ok value _ =>
+      expectTrue (value = some "") s!"expected an empty value, got {repr value}"
+  | other => .error s!"expected ok result, got {repr other}"
+
+/-- A type that cannot decode the empty string still reports it as missing,
+rather than complaining about the contents of nothing. -/
+private def checkEmptyInlineValueUndecodable : Except String Unit := do
+  match Core.optionScan countOpt (normalize ["--count="]) with
+  | .err err =>
+      expectTrue (err.kind = ArgParse.ErrorKind.missingValue)
+        s!"expected missingValue, got {repr err.kind}"
+  | other => .error s!"expected an error, got {repr other}"
+
 /-- A value the `FromArg` instance rejects surfaces as a `custom` error. -/
 private def checkInvalidOptionPayload : Except String Unit := do
   match Core.optionScan countOpt (normalize ["--count=oops"]) with
@@ -321,6 +344,8 @@ def runtimeChecks : List (String × Except String Unit) :=
   , ("sentinel boundary", checkSentinelBoundary)
   , ("missing option value", checkMissingOptionValue)
   , ("invalid option payload", checkInvalidOptionPayload)
+  , ("empty inline value", checkEmptyInlineValue)
+  , ("empty inline value the type rejects", checkEmptyInlineValueUndecodable)
   , ("inline bundle splits", checkConcatBundleSplit)
   , ("inline bundle takes the longest value", checkConcatBundleGreedy)
   , ("inline value with no residue", checkConcatNoResidue)

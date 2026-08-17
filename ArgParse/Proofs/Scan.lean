@@ -646,11 +646,15 @@ forms are discharged here for a symbolic name, character, and value — so the
 agreement theorem covers `--name=value` and `-nvalue`, not just the detached
 form. -/
 
-/-- The front-of-stream step reads `--name=value` in one token. -/
+/-- The front-of-stream step reads `--name=value` in one token.
+
+No hypothesis that the value is non-empty: `--name=` is an empty value, and
+whether that is a value at all is the decoder's call, which `hrun` has already
+made. -/
 theorem takeOptionStep?_eq_form {α : Type} [FromArg α] (spec : OptSpec α)
     (name v : String) (value : α) (st : State) (rest : List String)
     (hlong : spec.long? = some name) (heq : spec.eqVal? = true)
-    (hne : v ≠ "") (hrun : FromArg.run v = .ok value)
+    (hrun : FromArg.run v = .ok value)
     (hpre : st.pre = ("--" ++ name ++ "=" ++ v) :: rest) :
     takeOptionStep? spec st
       = .ok (CollectStep.ofConcat (some (value, v)) (State.withPre st rest 1)) := by
@@ -658,7 +662,7 @@ theorem takeOptionStep?_eq_form {α : Type} [FromArg α] (spec : OptSpec α)
   rw [if_pos heq]
   split
   · rw [drop_append_length]
-    simp [takeOptionConcatPayload?, parseConcatValue, hne, hrun, CollectStep.ofConcat]
+    simp [takeOptionConcatPayload?, parseConcatValue, hrun, CollectStep.ofConcat]
   · rename_i hfalse
     exact absurd (startsWith_append_left ("--" ++ name ++ "=") v) hfalse
 
@@ -675,7 +679,7 @@ theorem takeOptionStep?_concat_short {α : Type} [FromArg α] (spec : OptSpec α
   rw [if_neg (append_ne_self _ _ hne)]
   split
   · rw [drop_append_length]
-    simp [takeOptionConcatPayload?, parseConcatValue, hne, hrun, CollectStep.ofConcat]
+    simp [takeOptionConcatPayload?, parseConcatValue, hrun, CollectStep.ofConcat]
   · rename_i hfalse
     exact absurd (startsWith_append_left (shortLexeme short) v) (by simp [hfalse])
 
@@ -683,12 +687,12 @@ theorem takeOptionStep?_concat_short {α : Type} [FromArg α] (spec : OptSpec α
 theorem canonical_of_eq_form {α : Type} [FromArg α] {spec : OptSpec α}
     {name v : String} {value : α} {st : State} {rest : List String}
     (hlong : spec.long? = some name) (heq : spec.eqVal? = true)
-    (hne : v ≠ "") (hrun : FromArg.run v = .ok value)
+    (hrun : FromArg.run v = .ok value)
     (hpre : st.pre = ("--" ++ name ++ "=" ++ v) :: rest)
     (hrest : ∀ tok ∈ rest, optionToken? spec tok = false) :
     Canonical spec st :=
   Canonical.consume
-    (takeOptionStep?_eq_form spec name v value st rest hlong heq hne hrun hpre)
+    (takeOptionStep?_eq_form spec name v value st rest hlong heq hrun hpre)
     (by simp [CollectStep.ofConcat])
     (Canonical.exhausted (by simpa [CollectStep.ofConcat, State.withPre] using hrest))
 
@@ -710,12 +714,12 @@ theorem canonical_of_concat_short {α : Type} [FromArg α] {spec : OptSpec α}
 theorem optionScan_eq_option_of_eq_form {α : Type} [FromArg α] {spec : OptSpec α}
     {name v : String} {value : α} {st : State} {rest : List String}
     (hlong : spec.long? = some name) (heq : spec.eqVal? = true)
-    (hne : v ≠ "") (hrun : FromArg.run v = .ok value)
+    (hrun : FromArg.run v = .ok value)
     (hpre : st.pre = ("--" ++ name ++ "=" ++ v) :: rest)
     (hrest : ∀ tok ∈ rest, optionToken? spec tok = false) :
     optionScan spec st = Core.option spec st :=
   optionScan_eq_option_of_canonical
-    (canonical_of_eq_form hlong heq hne hrun hpre hrest)
+    (canonical_of_eq_form hlong heq hrun hpre hrest)
 
 /-- **Agreement on `-nvalue`.** -/
 theorem optionScan_eq_option_of_concat_short {α : Type} [FromArg α] {spec : OptSpec α}

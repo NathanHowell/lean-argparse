@@ -308,13 +308,16 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
     {α : Type} [ArgParse.FromArg α] (_spec : OptSpec α) (token raw : String)
     (pending : List String) (st : State) (expect : Expect) :
     Except Error (Option (α × String) × State) :=
-  if raw = "" then
-    .error (missingValueError token expect)
-  else
-    let stAfter := State.withPre st pending 1
-    match FromArg.run raw with
-    | .ok value => .ok (some (value, raw), stAfter)
-    | .error msg =>
+  let stAfter := State.withPre st pending 1
+  match FromArg.run raw with
+  | .ok value => .ok (some (value, raw), stAfter)
+  | .error msg =>
+      -- `--name=` names an empty value. Whether that is one is the value type's
+      -- call, so it is asked first: `String` takes it, and a type that cannot
+      -- gets `missingValue` rather than a decoding complaint about nothing.
+      if raw = "" then
+        .error (missingValueError token expect)
+      else
         match findConcatSplit? (raw := raw) with
         | some (value, remainder) =>
             let newState :=
@@ -331,24 +334,19 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
     (h : parseConcatValue spec token raw pending st expect = .ok (payload, st')) :
     st'.cursor = st.cursor + 1 := by
   classical
-  by_cases hEmpty : raw = ""
-  · have := congrArg Except.isOk h
-    simp [parseConcatValue, hEmpty] at this
-    cases this
-  · have hRaw : raw ≠ "" := hEmpty
-    cases hRun : FromArg.run (α := α) raw with
-    | ok value =>
-        have hEval := h
-        simp [parseConcatValue, hRaw, hRun] at hEval
-        rcases hEval with ⟨hPayload, hState⟩
-        cases hPayload; cases hState
-        simp [State.withPre]
-    | error msg =>
-        cases hSplit : findConcatSplit? (α := α) (raw := raw) with
-        | none =>
-            have := congrArg Except.isOk h
-            simp [parseConcatValue, hRaw, hRun, hSplit] at this
-            cases this
+  cases hRun : FromArg.run (α := α) raw with
+  | ok value =>
+      have hEval := h
+      simp [parseConcatValue, hRun] at hEval
+      rcases hEval with ⟨hPayload, hState⟩
+      cases hPayload; cases hState
+      simp [State.withPre]
+  | error msg =>
+      by_cases hRaw : raw = ""
+      · rw [hRaw] at hRun
+        simp [parseConcatValue, hRaw, hRun] at h
+      · cases hSplit : findConcatSplit? (α := α) (raw := raw) with
+        | none => simp [parseConcatValue, hRaw, hRun, hSplit] at h
         | some result =>
             obtain ⟨value, remainder⟩ := result
             have hEval := h
