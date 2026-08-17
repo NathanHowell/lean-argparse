@@ -175,12 +175,18 @@ items exist or how they compose. -/
 /-! ### Repetition
 
 `many` needs a bound. A parser that succeeds without consuming would otherwise
-loop forever, and `Parser` carries no proof that it always progresses. The
-bound is the number of tokens left, which is the most iterations any progressing
-parser could manage; a step that succeeds without advancing the cursor ends the
-repetition and is discarded, so `many (pure x)` is `[]` rather than divergence. -/
+loop forever, and `Parser` carries no proof that it always progresses. The bound
+is `State.budget`, the most steps any progressing parser could manage; a step
+that succeeds without advancing the cursor ends the repetition and is discarded,
+so `many (pure x)` is `[]` rather than divergence.
 
-/-- Repeat `p` until it fails or stops consuming, bounded by the tokens left. -/
+The budget charges per character as well as per token. Token count alone is too
+small: matching a short flag out of a bundle advances the cursor without
+shortening the stream, so `many (flag …)` over `-vvv` used to stop one short and
+leave `-v` on the stream. `Proofs.Many` shows the budget is now slack — the loop
+always exits by failure or stall, never by exhaustion. -/
+
+/-- Repeat `p` until it fails or stops consuming, bounded by `State.budget`. -/
 def runMany (p : Parser α) : Parser (List α) := fun st =>
   let rec go : Nat → List α → State → Result (List α)
     | 0, acc, st => .ok acc.reverse st
@@ -192,7 +198,7 @@ def runMany (p : Parser α) : Parser (List α) := fun st =>
               go fuel (a :: acc) st'
             else
               .ok acc.reverse st
-  go (st.pre.length + st.post.length + 1) [] st
+  go (st.budget + 1) [] st
 
 /-- Collect zero or more occurrences. -/
 @[inline] def many (p : P α) : P (List α) :=

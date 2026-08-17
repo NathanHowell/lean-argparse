@@ -211,6 +211,20 @@ private def checkHelpMentionsItems : Except String Unit :=
         (Except.ok ())
   | other => .error s!"expected help output, got {repr other}"
 
+/-- `P.many` keeps going through a bundle.
+
+`-vvv` is three occurrences in one token. The repetition bound used to count
+tokens, so it stopped after two and left `-v` on the stream; `State.budget`
+charges per character as well, which is what makes the third reachable. -/
+private def checkManyThroughBundle : Except String Unit := do
+  let verbose := Builder.flag "verbose" (short := 'v')
+  match (P.many verbose).run (Core.normalize ["-vvv"]) with
+  | .ok values st =>
+      expectTrue (values.length == 3)
+        s!"expected three occurrences from -vvv, got {repr values}"
+      expectTrue (st.pre.isEmpty) s!"expected the bundle consumed, got {repr st.pre}"
+  | other => .error s!"expected ok result, got {repr other}"
+
 /-- Integration checks executed by `lake test`. -/
 def execChecks : List (String × Except String Unit) :=
   [ ("nested dispatch", checkNested)
@@ -225,6 +239,7 @@ def execChecks : List (String × Except String Unit) :=
   , ("version builtin", checkVersion)
   , ("completion follows the path", checkCompletion)
   , ("help mentions every item", checkHelpMentionsItems)
+  , ("many keeps going through a bundle", checkManyThroughBundle)
   ]
 
 end ArgParse.Tests

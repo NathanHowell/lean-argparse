@@ -20,6 +20,22 @@ structure State where
   cursor : Nat
 deriving Repr, DecidableEq
 
+/-- Progress budget for a token list: one unit for each token, plus one for
+each character in it. -/
+def tokensBudget (tokens : List String) : Nat :=
+  tokens.foldr (fun t n => t.length + 1 + n) 0
+
+/-- An upper bound on how many steps a parser that makes progress can take from
+this state.
+
+Counting tokens alone is not enough. Matching a short flag out of a bundle
+rewrites `-vxy` to `-xy`: the cursor advances but the stream is no shorter, so a
+token-count bound stops the repetition early and silently drops occurrences.
+Charging one unit per token *and* one per character makes both kinds of progress
+strictly decrease the budget. -/
+def State.budget (st : State) : Nat :=
+  tokensBudget st.pre + tokensBudget st.post
+
 /-- Error categories surfaced by the parser. -/
 inductive ErrorKind where
   /-- A short flag was not recognised. -/
