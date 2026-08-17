@@ -68,6 +68,7 @@ def flag (long : String) (short : Option Char := none) (help : String := "")
     , long? := some long
     , help? := if help.isEmpty then none else some help
     , arity := .zero
+    , required := false
     , hidden := hidden }
   { doc := .item item, run := Core.flagScan spec }
 
@@ -82,8 +83,8 @@ constraint is the price of the guarantee. -/
 /-- Build the runtime spec and erased item for an option from shared arguments. -/
 @[inline] private def optParts (α : Type) [FromArg α]
     (long : String) (short : Option Char) (metavar? : Option String)
-    (help : String) (defaultText? : Option String) (arity : Arity) (hidden : Bool) :
-    OptSpec α × ItemSpec :=
+    (help : String) (defaultText? : Option String) (arity : Arity) (required : Bool)
+    (hidden : Bool) : OptSpec α × ItemSpec :=
   let short? := mkShort? short
   let metavar := metavar?.getD (FromArg.metavar (α := α))
   let spec : OptSpec α :=
@@ -102,6 +103,7 @@ constraint is the price of the guarantee. -/
     , arity := arity
     , choices? := FromArg.choices (α := α)
     , default? := defaultText?
+    , required := required
     , hidden := hidden }
   (spec, item)
 
@@ -121,7 +123,7 @@ optionOpt (α := Nat) "count" (short := 'n') (help := "How many times.")
 def optionOpt (α : Type) [FromArg α] (long : String) (short : Option Char := none)
     (metavar : Option String := none) (help : String := "")
     (hidden : Bool := false) : P (Option α) :=
-  let (spec, item) := optParts α long short metavar help none .one hidden
+  let (spec, item) := optParts α long short metavar help none .one false hidden
   { doc := .alt [.item item, .none]
   , run := fun st =>
       match optionValues spec st with
@@ -134,7 +136,7 @@ The rendered default in help comes from the same value the parser falls back to.
 def optionD {α : Type} [FromArg α] [ToString α] (long : String) (default : α)
     (short : Option Char := none) (metavar : Option String := none)
     (help : String := "") (hidden : Bool := false) : P α :=
-  let (spec, item) := optParts α long short metavar help (some (toString default)) .one hidden
+  let (spec, item) := optParts α long short metavar help (some (toString default)) .one false hidden
   { doc := .alt [.item item, .none]
   , run := fun st =>
       match optionValues spec st with
@@ -145,7 +147,7 @@ def optionD {α : Type} [FromArg α] [ToString α] (long : String) (default : α
 def option (α : Type) [FromArg α] (long : String) (short : Option Char := none)
     (metavar : Option String := none) (help : String := "")
     (hidden : Bool := false) : P α :=
-  let (spec, item) := optParts α long short metavar help none .one hidden
+  let (spec, item) := optParts α long short metavar help none .one true hidden
   { doc := .item item
   , run := fun st =>
       match optionValues spec st with
@@ -160,7 +162,7 @@ def option (α : Type) [FromArg α] (long : String) (short : Option Char := none
 def options (α : Type) [FromArg α] (long : String) (short : Option Char := none)
     (metavar : Option String := none) (help : String := "")
     (hidden : Bool := false) : P (List α) :=
-  let (spec, item) := optParts α long short metavar help none .many hidden
+  let (spec, item) := optParts α long short metavar help none .many false hidden
   { doc := .many (.item item), run := optionValues spec }
 
 /-- A required `String` option. -/
@@ -174,7 +176,7 @@ def options (α : Type) [FromArg α] (long : String) (short : Option Char := non
 /-- Build the runtime spec and erased item for a positional. -/
 @[inline] private def posParts (α : Type) [FromArg α]
     (name : String) (metavar? : Option String) (help : String) (arity : Arity)
-    (hidden : Bool) : PosSpec α × ItemSpec :=
+    (required : Bool) (hidden : Bool) : PosSpec α × ItemSpec :=
   let metavar := metavar?.getD name
   let spec : PosSpec α :=
     { «meta» := mkMeta name help (some metavar) none
@@ -187,13 +189,14 @@ def options (α : Type) [FromArg α] (long : String) (short : Option Char := non
     , help? := if help.isEmpty then none else some help
     , arity := arity
     , choices? := FromArg.choices (α := α)
+    , required := required
     , hidden := hidden }
   (spec, item)
 
 /-- A required positional argument. -/
 def arg (α : Type) [FromArg α] (name : String) (metavar : Option String := none)
     (help : String := "") (hidden : Bool := false) : P α :=
-  let (spec, item) := posParts α name metavar help .one hidden
+  let (spec, item) := posParts α name metavar help .one true hidden
   { doc := .item item
   , run := fun st =>
       match Core.takePositionalValue? spec st with
@@ -205,7 +208,7 @@ def arg (α : Type) [FromArg α] (name : String) (metavar : Option String := non
 /-- An optional positional argument. -/
 def argOpt (α : Type) [FromArg α] (name : String) (metavar : Option String := none)
     (help : String := "") (hidden : Bool := false) : P (Option α) :=
-  let (spec, item) := posParts α name metavar help .one hidden
+  let (spec, item) := posParts α name metavar help .one false hidden
   { doc := .alt [.item item, .none]
   , run := fun st =>
       match Core.takePositionalValue? spec st with
@@ -215,7 +218,7 @@ def argOpt (α : Type) [FromArg α] (name : String) (metavar : Option String := 
 /-- Every remaining positional argument. -/
 def args (α : Type) [FromArg α] (name : String) (metavar : Option String := none)
     (help : String := "") (hidden : Bool := false) : P (List α) :=
-  let (spec, item) := posParts α name metavar help .many hidden
+  let (spec, item) := posParts α name metavar help .many false hidden
   { doc := .many (.item item)
   , run := fun st =>
       match Core.collectPositionalValues spec st with

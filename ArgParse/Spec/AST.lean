@@ -143,13 +143,21 @@ structure ItemSpec where
   choices?  : Option (List String) := none
   /-- Default rendered in help when the item is absent. -/
   default?  : Option String := none
+  /-- Whether omitting the item is an error.
+
+  Optionality is structural in `Doc` -- it is `alt [item, none]` -- but
+  `Doc.items` flattens that structure away, and usage synopses need to know
+  whether to bracket the item. The builders set this field in the same body
+  that chooses the `Doc` shape, so the two agree by construction. -/
+  required  : Bool := true
   /-- Whether the item is omitted from generated documentation. -/
   hidden    : Bool := false
 deriving Repr, DecidableEq, Inhabited
 
 namespace ItemSpec
 
-/-- Surface lexemes the item answers to, long form first. -/
+/-- Surface lexemes the item answers to. Order is irrelevant: this list is for
+matching, not display. -/
 def lexemes (item : ItemSpec) : List String :=
   match item.kind with
   | .positional => [item.name]
@@ -157,9 +165,26 @@ def lexemes (item : ItemSpec) : List String :=
       item.long?.toList.map (fun name => "--" ++ name) ++
         item.short?.toList.map (fun c => "-" ++ String.singleton c)
 
+/-- Lexemes in the order documentation shows them: short form first, the
+convention every other CLI follows. -/
+def displayLexemes (item : ItemSpec) : List String :=
+  match item.kind with
+  | .positional => [item.name]
+  | _ =>
+      item.short?.toList.map (fun c => "-" ++ String.singleton c) ++
+        item.long?.toList.map (fun name => "--" ++ name)
+
 /-- Placeholder text for the item's value, falling back to the upper-cased name. -/
 def metavar (item : ItemSpec) : String :=
   item.metavar?.getD item.name.toUpper
+
+/-- The single lexeme a usage synopsis shows, preferring the long form because
+it reads. -/
+def synopsisLexeme (item : ItemSpec) : String :=
+  match item.kind with
+  | .positional => item.metavar
+  | _ => (item.long?.map (fun n => "--" ++ n)).getD
+      ((item.short?.map (fun c => "-" ++ String.singleton c)).getD item.name)
 
 end ItemSpec
 

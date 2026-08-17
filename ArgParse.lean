@@ -9,10 +9,11 @@ import ArgParse.Spec.Describe
 import ArgParse.P
 import ArgParse.Builder
 import ArgParse.Cmd
+import ArgParse.Exec
+import ArgParse.Doc.Usage
 import ArgParse.Doc.Help
 import ArgParse.Doc.Man
 import ArgParse.Doc.Completion
-import ArgParse.CLI.Print
 import ArgParse.Proofs.Laws
 import ArgParse.Proofs.Sentinel
 import ArgParse.Proofs.Totality

@@ -1,12 +1,9 @@
 import ArgParse.Tests.Unit
+import ArgParse.Tests.Exec
 
 /-!
-Test driver.
-
-The nested-subcommand and order-insensitivity integration tests that lived here
-were written against the `Partial` runner. They are restored over `Cmd`/`P`
-once Layer 5 lands; `ArgParse.Tests.Unit` carries the combinator-level coverage
-in the meantime.
+Test driver: combinator-level checks from `Tests.Unit`, integration checks over
+`Cmd`/`P`/`Exec` from `Tests.Exec`.
 -/
 
 private def runCheck (label : String) (check : Except String Unit) : IO Bool :=
@@ -17,5 +14,6 @@ private def runCheck (label : String) (check : Except String Unit) : IO Bool :=
 
 /-- Run every unit check, reporting failures on stderr. -/
 def main : IO UInt32 := do
-  let results ← ArgParse.Tests.runtimeChecks.mapM (fun (label, chk) => runCheck label chk)
+  let checks := ArgParse.Tests.runtimeChecks ++ ArgParse.Tests.execChecks
+  let results ← checks.mapM (fun (label, chk) => runCheck label chk)
   pure <| if results.all id then 0 else 1

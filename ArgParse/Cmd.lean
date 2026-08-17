@@ -109,17 +109,30 @@ the root. -/
 
 mutual
 
-/-- Descend the tree along the leading non-option tokens, returning the deepest
-command reached and the tokens that were not verb names. -/
-def descend : Cmd α → List String → Cmd α × List String
-  | c, [] => (c, [])
-  | c, token :: rest =>
+/-- Descend the tree along whichever tokens name subcommands, accumulating the
+invocation path.
+
+Tokens that name no child are skipped rather than stopping the walk, so
+`app --verbose greet --help` routes to `greet`. The trade is that an option
+*value* equal to a verb name misroutes; this only ever chooses which help page
+to print, never how anything parses, and the exact answer is not available
+without knowing which options take values at the point the walk happens.
+
+Recursion is on fuel because neither argument decreases on every branch: naming
+a child shrinks the tree, skipping a token shrinks the input, and no single
+structural measure covers both. The token count bounds either. -/
+def descendFuel : Nat → Cmd α → List String → List String × Cmd α
+  | 0, c, _ => ([c.name], c)
+  | _, c, [] => ([c.name], c)
+  | fuel + 1, c, token :: rest =>
       match c with
-      | .leaf _ _ _ => (c, token :: rest)
-      | .node _ _ _ subs =>
+      | .leaf n m p => ([n], .leaf n m p)
+      | .node n m g subs =>
           match findSub subs token with
-          | Option.some child => descend child rest
-          | Option.none => (c, token :: rest)
+          | Option.some child =>
+              let (path, deepest) := descendFuel fuel child rest
+              (n :: path, deepest)
+          | Option.none => descendFuel fuel (.node n m g subs) rest
 
 /-- Find the sibling named `token`, if any. -/
 def findSub : List (Cmd α) → String → Option (Cmd α)
@@ -127,6 +140,10 @@ def findSub : List (Cmd α) → String → Option (Cmd α)
   | c :: rest, token => if c.name = token then Option.some c else findSub rest token
 
 end
+
+/-- The deepest command these tokens name, with the path taken to reach it. -/
+@[inline] def descend (c : Cmd α) (tokens : List String) : List String × Cmd α :=
+  descendFuel tokens.length c tokens
 
 /-- Names this command dispatches on. Empty for a leaf. -/
 def subNames : Cmd α → List String
