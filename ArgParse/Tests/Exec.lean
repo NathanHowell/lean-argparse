@@ -277,6 +277,30 @@ private def checkBundleUnknownShortUntouched : Except String Unit := do
   | .error _ => pure ()
   | other => .error s!"expected an error for an unknown short, got {repr other}"
 
+/-- An option's value is not in verb position, even when it spells a verb.
+
+`--root-mode child` sets the root's mode to the string "child"; the help walk
+used to read that value as a descent and document the child instead. -/
+private def checkOptionValueSpellingAVerb : Except String Unit := do
+  match Exec.exec sampleApp ["--root-mode", "child", "--help"] with
+  | .output text =>
+      expectTrue ((text.splitOn "\n").headD "" == "sample")
+        s!"expected the root's help, got: {text}"
+  | other => .error s!"expected help output, got {repr other}"
+  match Exec.exec sampleApp ["child", "--help"] with
+  | .output text =>
+      expectTrue (text.startsWith "sample child")
+        s!"a real verb should still route, got: {text}"
+  | other => .error s!"expected help output, got {repr other}"
+
+/-- Completion walks the same way, so it agrees about which command it is in. -/
+private def checkCompletionSkipsOptionValue : Except String Unit := do
+  match Exec.exec sampleApp ["--generate-completions", "--root-mode", "child"] with
+  | .output text =>
+      expectTrue ((text.splitOn "child").length ≥ 2)
+        s!"expected the root's verbs, got: {text}"
+  | other => .error s!"expected completion output, got {repr other}"
+
 /-- A builtin bundled with a command's own flag is still a builtin.
 
 Builtins match whole tokens, and `-vh` is not one; the runner expands bundles
@@ -395,6 +419,8 @@ def execChecks : List (String × Except String Unit) :=
   , ("bundled builtin is found", checkBundledBuiltin)
   , ("unknown short names itself", checkUnknownShortNamed)
   , ("negative numbers are values", checkNegativeNumberNotDiagnosed)
+  , ("option value spelling a verb", checkOptionValueSpellingAVerb)
+  , ("completion skips option values", checkCompletionSkipsOptionValue)
   ]
 
 end ArgParse.Tests

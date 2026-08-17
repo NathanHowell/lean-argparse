@@ -165,6 +165,13 @@ def lexemes (item : ItemSpec) : List String :=
       item.long?.toList.map (fun name => "--" ++ name) ++
         item.short?.toList.map (fun c => "-" ++ String.singleton c)
 
+/-- Whether this item consumes the token that follows it.
+
+A flag consumes nothing, and the packed `--name=value` and `-nvalue` forms are
+a single token, so only a value-taking option in its detached spelling does. -/
+def takesValue (item : ItemSpec) : Bool :=
+  item.kind == .option && item.arity != .zero
+
 /-- Lexemes in the order documentation shows them: short form first, the
 convention every other CLI follows. -/
 def displayLexemes (item : ItemSpec) : List String :=
@@ -187,6 +194,14 @@ def synopsisLexeme (item : ItemSpec) : String :=
       ((item.short?.map (fun c => "-" ++ String.singleton c)).getD item.name)
 
 end ItemSpec
+
+/-- Lexemes of the items that consume the token after them.
+
+Used by every walk that crosses a command's own arguments looking for the next
+verb: an option's *value* is not in verb position, however it happens to be
+spelled. -/
+def valueLexemes (items : List ItemSpec) : List String :=
+  (items.filter (·.takesValue)).flatMap (·.lexemes)
 
 /-- Command tree used by the renderers: a name, metadata, local items, and
 subcommands. Produced by `Cmd.toCmdSpec`, never written by hand.

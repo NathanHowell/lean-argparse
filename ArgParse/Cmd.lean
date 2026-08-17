@@ -120,10 +120,14 @@ mutual
 invocation path.
 
 Tokens that name no child are skipped rather than stopping the walk, so
-`app --verbose greet --help` routes to `greet`. The trade is that an option
-*value* equal to a verb name misroutes; this only ever chooses which help page
-to print, never how anything parses, and the exact answer is not available
-without knowing which options take values at the point the walk happens.
+`app --verbose greet --help` routes to `greet`. A token that is one of this
+node's value-taking option lexemes takes the token after it with it, so
+`app --mode child --help` documents the root rather than `child`: the value
+happened to spell a verb, but it was never in verb position.
+
+The globals are exactly the right item list to read here. They are the items
+scoped to the tokens before the first subcommand name, which is precisely the
+stretch this walk is crossing.
 
 Recursion is on fuel because neither argument decreases on every branch: naming
 a child shrinks the tree, skipping a token shrinks the input, and no single
@@ -139,7 +143,11 @@ def descendFuel : Nat → Cmd α → List String → List String × Cmd α
           | Option.some child =>
               let (path, deepest) := descendFuel fuel child rest
               (n :: path, deepest)
-          | Option.none => descendFuel fuel (.node n m g subs) rest
+          | Option.none =>
+              if (Spec.valueLexemes (Doc.items g.doc)).contains token then
+                descendFuel fuel (.node n m g subs) (rest.drop 1)
+              else
+                descendFuel fuel (.node n m g subs) rest
 
 /-- Find the sibling named `token`, if any. -/
 def findSub : List (Cmd α) → String → Option (Cmd α)

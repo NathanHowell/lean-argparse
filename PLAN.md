@@ -8,7 +8,10 @@ design of record.
 
 All ten roadmap items are closed. Three were bugs rather than missing theorems:
 `P.many` truncated bundled flags, `entryRow` let a wide label abut its
-description, and `-vn5` did not parse. One roadmap note was wrong --
+description, and `-vn5` did not parse. Fixing the last of those unblocked three
+more: `-vh` is now a help request, an unrecognised short names itself instead of
+letting a positional swallow it, and an option value that spells a verb no
+longer misroutes help. One roadmap note was wrong --
 `String.startsWith` does not block proofs -- and is corrected below.
 
 The paired-applicative migration is complete: all seven layers of `DESIGN.md`
@@ -80,9 +83,15 @@ already pin the behaviour.
   positionals stay front-of-stream over the residual tokens. Known ambiguity: a
   detached option value that lexes as a defined flag (`--message -v`) is claimed
   by the flag scan — `--name=value` forces the value reading.
-- Help routing (`Cmd.descend`) skips tokens that name no subcommand, so an
-  option *value* equal to a verb name can select the wrong help page. It only
-  ever chooses which page to print, never how anything parses.
+- Help routing (`Cmd.descend`) skips tokens that name no subcommand, but steps
+  *over* the token after one of the current command's value-taking option
+  lexemes, so `app --mode child --help` documents the root rather than `child`.
+  The globals are the right list to read: they are scoped to exactly the stretch
+  the walk crosses. `Doc.specAt` and `Doc.pathItemsFuel` apply the same rule, so
+  help routing, completion, and the legal-item list all agree about which
+  command the user is inside. `specAt` had to move to fuel to say it -- stepping
+  over a value shrinks the input by two, and no single structural measure covers
+  that alongside descending the tree.
 - Builtins are matched as whole tokens, but the tokens they are matched against
   are bundle-expanded first, so `-vh` is a help request. The probe expands with
   every item on the path plus the runner's own -- a wider list than any single

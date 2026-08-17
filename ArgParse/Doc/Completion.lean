@@ -6,31 +6,43 @@ import ArgParse.Doc.Usage
 Completion candidates derived by walking the render model to the command the
 user has typed so far, then offering that command's verbs and item lexemes.
 
-The walk mirrors dispatch: a token that names a child descends, anything else is
-skipped. Both read the same `CmdSpec`, so a verb that completes is a verb that
-parses.
+The walk mirrors dispatch: a token that names a child descends, a value-taking
+option lexeme takes the token after it with it, and anything else is skipped.
+Both read the same `CmdSpec`, so a verb that completes is a verb that parses --
+and the same rule in `Cmd.descendFuel` keeps the two walks agreeing about which
+command the user is inside.
 -/
 
 namespace ArgParse.Doc
 
 open ArgParse.Spec
 
-mutual
-
-/-- Descend the spec tree along whichever tokens name children. -/
-def specAt : CmdSpec → List String → CmdSpec
-  | cmd, [] => cmd
-  | .mk name info args subs, token :: rest =>
-      match findSpec subs token with
-      | Option.some child => specAt child rest
-      | Option.none => specAt (.mk name info args subs) rest
-
 /-- Find the child named `token`. -/
 def findSpec : List CmdSpec → String → Option CmdSpec
   | [], _ => Option.none
   | cmd :: rest, token => if cmd.name = token then Option.some cmd else findSpec rest token
 
-end
+/-- Descend the spec tree along whichever tokens name children, stepping over
+the value of any option that takes one.
+
+Fuel, for the same reason `Cmd.descendFuel` and `pathItemsFuel` use it: naming a
+child shrinks the tree while skipping a token shrinks the input, and stepping
+over a value shrinks it by two. No one structural measure covers all three. -/
+def specAtFuel : Nat → CmdSpec → List String → CmdSpec
+  | 0, cmd, _ => cmd
+  | _, cmd, [] => cmd
+  | fuel + 1, .mk name info args subs, token :: rest =>
+      match findSpec subs token with
+      | Option.some child => specAtFuel fuel child rest
+      | Option.none =>
+          if (valueLexemes args).contains token then
+            specAtFuel fuel (.mk name info args subs) (rest.drop 1)
+          else
+            specAtFuel fuel (.mk name info args subs) rest
+
+/-- The command these tokens name. -/
+@[inline] def specAt (cmd : CmdSpec) (tokens : List String) : CmdSpec :=
+  specAtFuel tokens.length cmd tokens
 
 /-- Items declared along the path these tokens name, innermost last.
 
@@ -44,7 +56,11 @@ def pathItemsFuel : Nat → CmdSpec → List String → List ItemSpec
   | fuel + 1, .mk name info args subs, token :: rest =>
       match findSpec subs token with
       | Option.some child => args ++ pathItemsFuel fuel child rest
-      | Option.none => pathItemsFuel fuel (.mk name info args subs) rest
+      | Option.none =>
+          if (valueLexemes args).contains token then
+            pathItemsFuel fuel (.mk name info args subs) (rest.drop 1)
+          else
+            pathItemsFuel fuel (.mk name info args subs) rest
 
 /-- Items legal at the command these tokens name, ancestors included. -/
 @[inline] def pathItems (cmd : CmdSpec) (tokens : List String) : List ItemSpec :=
