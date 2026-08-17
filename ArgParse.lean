@@ -6,6 +6,7 @@ import ArgParse.Core.Combinators
 import ArgParse.Core.Scan
 import ArgParse.Spec.AST
 import ArgParse.Spec.Describe
+import ArgParse.P
 import ArgParse.Doc.Help
 import ArgParse.Doc.Man
 import ArgParse.Doc.Completion
