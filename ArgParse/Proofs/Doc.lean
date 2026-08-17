@@ -330,6 +330,70 @@ end
 theorem normalize_idem (d : Doc) : d.normalize.normalize = d.normalize :=
   normalize_eq_self _ (normalize_normal d)
 
+/-- Flattening is stable: its output is already flat. -/
+theorem flattenSeq_flattenSeq (ds : List Doc) :
+    Doc.flattenSeq (Doc.flattenSeq ds) = Doc.flattenSeq ds :=
+  flattenSeq_eq_self _ (flattenSeq_normalSeq ds)
+
+/-! ### `seq` associativity
+
+`normalize (.seq ds)` reads `ds` only through `flattenSeq`, and `flattenSeq` is
+a monoid homomorphism from `List Doc` under `++`. Those two facts are what make
+`seq` associative up to normalization, which is what the applicative law needs.
+-/
+
+/-- `flattenSeq` distributes over append: each child is flattened on its own,
+independently of what surrounds it. -/
+theorem flattenSeq_append (a b : List Doc) :
+    Doc.flattenSeq (a ++ b) = Doc.flattenSeq a ++ Doc.flattenSeq b := by
+  induction a with
+  | nil => simp [Doc.flattenSeq]
+  | cons d rest ih =>
+      cases hd : Doc.normalize d <;>
+        simp [Doc.flattenSeq, hd, ih, List.append_assoc]
+
+/-- Normalizing a `seq` depends on its children only through `flattenSeq`. -/
+theorem normalize_seq_congr {a b : List Doc}
+    (h : Doc.flattenSeq a = Doc.flattenSeq b) :
+    (Doc.seq a).normalize = (Doc.seq b).normalize := by
+  simp only [Doc.normalize, h]
+
+/-- A `none` child contributes nothing to a `seq`. -/
+theorem flattenSeq_none : Doc.flattenSeq [Doc.none] = [] := by
+  simp [Doc.flattenSeq, Doc.normalize]
+
+/-- A nested `seq` child contributes exactly its own children. -/
+theorem flattenSeq_seq (ds : List Doc) :
+    Doc.flattenSeq [Doc.seq ds] = Doc.flattenSeq ds := by
+  have hns := flattenSeq_normalSeq ds
+  simp only [Doc.flattenSeq, Doc.normalize]
+  rcases hl : Doc.flattenSeq ds with _ | ⟨a, _ | ⟨b, t⟩⟩
+  · simp
+  · rw [hl] at hns
+    obtain ⟨ha, hnone, hseq, -⟩ := hns
+    cases a with
+    | item => rfl
+    | seq => exact absurd hseq (by simp [Doc.isSeq])
+    | alt => rfl
+    | many => rfl
+    | none => exact absurd hnone (by simp [Doc.isNone])
+  · simp
+
+/-- A one-child `seq` normalizes to what its child normalizes to. -/
+theorem normalize_seq_singleton (d : Doc) :
+    (Doc.seq [d]).normalize = d.normalize := by
+  have hn := normalize_normal d
+  simp only [Doc.normalize, Doc.flattenSeq]
+  cases hd : Doc.normalize d with
+  | seq inner =>
+      rw [hd] at hn
+      obtain ⟨hlen, -⟩ := hn
+      rcases inner with _ | ⟨a, _ | ⟨b, t⟩⟩
+      · simp at hlen
+      · simp at hlen
+      · simp
+  | _ => simp
+
 end Proofs
 
 end ArgParse

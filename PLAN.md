@@ -32,59 +32,45 @@ are built, with no `sorry` anywhere and no `partial def` outside `Core`.
 - **Layer 7 — deriving** (`Deriving.lean`): `deriving ArgParse.Parseable`
   generates a `P` from a structure. Short forms, positionals, and metavars
   travel in field types via `Arg α o`.
-- **Runtime proofs** (`Proofs/`): lawful Functor/Applicative; flag totality and
-  the collector cursor lemma; determinism; sentinel factorization;
+- **Runtime proofs** (`Proofs/`): lawful Functor/Applicative for `Parser`; flag
+  totality and the collector cursor lemma; determinism; sentinel factorization;
   scan/front-of-stream agreement on syntactically canonical argv; `Doc`
-  normalization preserving items and being idempotent.
+  normalization preserving items and being idempotent; the applicative laws for
+  `P` itself, up to normalization.
 - **Tooling**: demo CLI in `Main.lean` (greet/repeat, derived); derived example
   under `Examples/Derived.lean`; unit, integration, and deriving checks;
   docstring/simp lint driver; doc-gen4 setup under `docbuild/`.
 
 ## Roadmap
 
-Ordered by value rather than by the sequence they were noticed in. The first
-two came out of auditing which definitions have no theorem mentioning them at
-all, and they outrank most of what follows: one covers the headline abstraction,
-one closes a hole in a guarantee that is already advertised.
+Ordered by value rather than by the sequence they were noticed in. Item 1 came
+out of auditing which definitions have no theorem mentioning them at all, and
+leads because it closes a hole in a guarantee that is already advertised.
 
-1. **`P` is lawful** — `LawfulFunctor`/`LawfulApplicative` are proved for
-   `Parser` (`Proofs/Laws.lean`) and instantiated there, but not for `P`, which
-   is what applications actually compose. The laws cannot hold on the nose:
-   `seq [seq [a, b], c]` and `seq [a, seq [b, c]]` are different `Doc` trees, so
-   they hold only up to `Doc.normalize`, which is the real reason `normalize`
-   exists. Checked concretely: the two association trees the law relates are
-   `seq(seq(seq(-,u),v),w)` and `seq(u,seq(v,w))`, and `normalize` sends both to
-   `seq(u,v,w)`. State the laws with propositional equality -- `Doc` has no
-   `BEq`/`DecidableEq`, because no deriving handler covers an inductive nesting
-   through `List`. `Proofs/Doc.lean` is the groundwork: `Doc.Normal` names the
-   shape `normalize` produces, and the two directions (`normalize_normal`,
-   `normalize_eq_self`) are the handles the law proofs will need. Note that the
-   `Functor` laws already hold on the nose, since `P.map` leaves `doc` alone; it
-   is `pure_seq`, `seq_pure`, and `seq_assoc` that need normalization.
-2. **Verb agreement relates names to parsers, not just name lists** —
+1. **Verb agreement relates names to parsers, not just name lists** —
    `toSubcommands_names` proves the dispatch table's names equal the tree's
    names. Nothing proves the entry named `foo` runs `foo`'s parser; a
    `toSubcommands` that paired the first name with the second parser would
    satisfy every theorem currently stated. True by construction and cheap to
    prove, but the guarantee is advertised and not yet earned.
-3. **Correspondence for the option builders' behaviour** — the behavioural
+2. **Correspondence for the option builders' behaviour** — the behavioural
    acceptance lemmas cover `flag`. The seven option and positional builders have
    their data agreement proved but not their token-level acceptance.
-4. **`P.many` progress** — `many` is bounded by token count and discards a
+3. **`P.many` progress** — `many` is bounded by token count and discards a
    non-advancing step. A progress lemma for the builders would let the bound be
    stated rather than assumed.
-5. **Scan agreement for flags and bundles** — `Canonical` covers options; the
+4. **Scan agreement for flags and bundles** — `Canonical` covers options; the
    analogous syntactic canonicality story for flag scanning (and for `=`-form
    and concatenated option tokens, whose classification the kernel cannot
    evaluate because `String.startsWith` is opaque) is still open.
-6. **Completeness** — the missing half of the story: if argv conforms to a
+5. **Completeness** — the missing half of the story: if argv conforms to a
    well-formed command tree, parsing succeeds and yields the expected bindings.
-7. **`unknownLong?` soundness** — it should never flag a lexeme the command
+6. **`unknownLong?` soundness** — it should never flag a lexeme the command
    actually accepts, since a spurious "unrecognised `--foo`" is a user-facing
    bug. Provable against `Doc.pathItems`.
-8. **Bundle-splitting edge cases** — inline bundles like `-n5v` with
+7. **Bundle-splitting edge cases** — inline bundles like `-n5v` with
    non-`String` payloads.
-9. **Real completion scripts** — `--generate-completions` lists candidates.
+8. **Real completion scripts** — `--generate-completions` lists candidates.
    Emitting bash/zsh/fish scripts that call back into it is not done. The only
    feature on this list; everything above is a theorem.
 
@@ -123,9 +109,16 @@ already pin the behaviour.
 - `Doc.normalize` has no caller outside its own recursion: the renderers all
   read `Doc.items`, which is insensitive to nesting, so none of them needs it.
   It earns its place as the equivalence the applicative laws are stated up to
-  (roadmap item 1), not as a rendering pass. Worth remembering before anyone
-  deletes it as dead code -- and worth revisiting if item 1 ever concludes the
-  laws are better stated some other way.
+  (`Proofs/PLaws.lean`), not as a rendering pass. Worth remembering before
+  anyone deletes it as dead code.
+- `P` is lawful only up to `Doc.normalize`, and that is not a shortcoming to be
+  fixed later. `pure f <*> x` genuinely documents itself as `seq [none, x.doc]`
+  where `f <$> x` documents itself as `x.doc`; the two describe the same parse
+  without being the same term. `P.Equiv` -- equal `run`, descriptions that
+  normalize alike -- is the honest relation, and `equiv_items` is why it is the
+  right one: equivalent parsers print the same help. The `Functor` laws need
+  none of this and hold on the nose, so `LawfulFunctor P` is a real instance;
+  `LawfulApplicative P` is false and is deliberately not declared.
 
 ## Process guardrails
 
