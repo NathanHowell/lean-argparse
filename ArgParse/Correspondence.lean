@@ -186,12 +186,24 @@ step -- which is the design working, not the proof being weak. -/
 @[simp] theorem toCmdSpec_name (c : Cmd α) : (c.toCmdSpec).name = c.name := by
   cases c <;> rfl
 
-/-- Dispatch entries carry the names of the commands they were built from. -/
-theorem toSubcommands_names (subs : List (Cmd α)) :
-    (Cmd.toSubcommands subs).map Core.Subcommand.name = subs.map Cmd.name := by
+/-- The dispatch table is the pointwise image of the command list: entry `i`
+takes both its name and its parser from command `i`.
+
+This is the statement the name-only lemmas below do not make. A
+`toSubcommands` that paired the first name with the second parser would satisfy
+every theorem stated in terms of `List.map … name`, and dispatch would silently
+run the wrong command. -/
+theorem toSubcommands_eq_map (subs : List (Cmd α)) :
+    Cmd.toSubcommands subs
+      = subs.map (fun c => { name := c.name, parser := c.toParser }) := by
   induction subs with
   | nil => rfl
   | cons c rest ih => simp [Cmd.toSubcommands, ih]
+
+/-- Dispatch entries carry the names of the commands they were built from. -/
+theorem toSubcommands_names (subs : List (Cmd α)) :
+    (Cmd.toSubcommands subs).map Core.Subcommand.name = subs.map Cmd.name := by
+  simp [toSubcommands_eq_map]
 
 /-- The render model lists the names of the commands it was built from. -/
 theorem toCmdSpecs_names (subs : List (Cmd α)) :
@@ -216,6 +228,50 @@ theorem dispatch_agreement (c : Cmd α) :
   cases c with
   | leaf => rfl
   | node n m g subs => rw [toSubcommands_names]; exact toCmdSpecs_names subs
+
+/-- Walking the dispatch table for a token reaches the parser of the command
+that token names.
+
+`Core.subcommand`'s loop takes the first entry whose name matches, so the
+command it reaches is the one `List.find?` picks out of the tree. -/
+theorem loop_dispatch (subs : List (Cmd α)) (c : Cmd α)
+    (expects : List Expect) (st : State)
+    (token : String) (rest : List String)
+    (h : subs.find? (fun s => s.name == token) = some c) :
+    Core.subcommand.loop expects st token rest (Cmd.toSubcommands subs)
+      = c.toParser (Core.State.withPre st rest 1) := by
+  induction subs with
+  | nil => simp at h
+  | cons s tail ih =>
+      rw [List.find?_cons] at h
+      simp only [Cmd.toSubcommands, Core.subcommand.loop]
+      by_cases hn : s.name = token
+      · simp [hn] at h
+        subst h
+        simp [hn]
+      · have hb : (s.name == token) = false := by simpa using hn
+        rw [hb] at h
+        rw [if_neg (Ne.symm hn)]
+        exact ih h
+
+/-- **Dispatch agreement, pointwise.** The entry named `foo` runs `foo`'s
+parser.
+
+`dispatch_agreement` above compares two lists of names, which is silent about
+which parser sits behind each one. This says what the runner actually does: on
+a leading token naming a command in the tree, dispatch runs *that* command's
+parser, on the state with the verb consumed. -/
+theorem subcommand_toSubcommands (subs : List (Cmd α)) (c : Cmd α)
+    (st : State) (token : String) (rest : List String)
+    (hpre : st.pre = token :: rest)
+    (hfind : subs.find? (fun s => s.name == token) = some c) :
+    Core.subcommand (Cmd.toSubcommands subs) st
+      = c.toParser (Core.State.withPre st rest 1) := by
+  cases subs with
+  | nil => simp at hfind
+  | cons s tail =>
+      simp only [Core.subcommand, Cmd.toSubcommands, hpre]
+      exact loop_dispatch (s :: tail) c _ st token rest hfind
 
 /-- Verb agreement holds at every depth, not only at the root: it holds of
 whatever command the runner descends to. -/

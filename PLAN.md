@@ -27,8 +27,9 @@ are built, with no `sorry` anywhere and no `partial def` outside `Core`.
   `--man`, completion, usage synopses, and error rendering with nearest-match
   suggestions. Applications contain no help code.
 - **Layer 6 — correspondence** (`Correspondence.lean`): item agreement per
-  builder, behavioural acceptance, verb agreement lifted over the tree, help
-  coverage, completion agreement.
+  builder, behavioural acceptance, verb agreement lifted over the tree
+  (including pointwise dispatch: the entry named `foo` runs `foo`'s parser),
+  help coverage, completion agreement.
 - **Layer 7 — deriving** (`Deriving.lean`): `deriving ArgParse.Parseable`
   generates a `P` from a structure. Short forms, positionals, and metavars
   travel in field types via `Arg α o`.
@@ -43,34 +44,26 @@ are built, with no `sorry` anywhere and no `partial def` outside `Core`.
 
 ## Roadmap
 
-Ordered by value rather than by the sequence they were noticed in. Item 1 came
-out of auditing which definitions have no theorem mentioning them at all, and
-leads because it closes a hole in a guarantee that is already advertised.
+Ordered by value rather than by the sequence they were noticed in.
 
-1. **Verb agreement relates names to parsers, not just name lists** —
-   `toSubcommands_names` proves the dispatch table's names equal the tree's
-   names. Nothing proves the entry named `foo` runs `foo`'s parser; a
-   `toSubcommands` that paired the first name with the second parser would
-   satisfy every theorem currently stated. True by construction and cheap to
-   prove, but the guarantee is advertised and not yet earned.
-2. **Correspondence for the option builders' behaviour** — the behavioural
+1. **Correspondence for the option builders' behaviour** — the behavioural
    acceptance lemmas cover `flag`. The seven option and positional builders have
    their data agreement proved but not their token-level acceptance.
-3. **`P.many` progress** — `many` is bounded by token count and discards a
+2. **`P.many` progress** — `many` is bounded by token count and discards a
    non-advancing step. A progress lemma for the builders would let the bound be
    stated rather than assumed.
-4. **Scan agreement for flags and bundles** — `Canonical` covers options; the
+3. **Scan agreement for flags and bundles** — `Canonical` covers options; the
    analogous syntactic canonicality story for flag scanning (and for `=`-form
    and concatenated option tokens, whose classification the kernel cannot
    evaluate because `String.startsWith` is opaque) is still open.
-5. **Completeness** — the missing half of the story: if argv conforms to a
+4. **Completeness** — the missing half of the story: if argv conforms to a
    well-formed command tree, parsing succeeds and yields the expected bindings.
-6. **`unknownLong?` soundness** — it should never flag a lexeme the command
+5. **`unknownLong?` soundness** — it should never flag a lexeme the command
    actually accepts, since a spurious "unrecognised `--foo`" is a user-facing
    bug. Provable against `Doc.pathItems`.
-7. **Bundle-splitting edge cases** — inline bundles like `-n5v` with
+6. **Bundle-splitting edge cases** — inline bundles like `-n5v` with
    non-`String` payloads.
-8. **Real completion scripts** — `--generate-completions` lists candidates.
+7. **Real completion scripts** — `--generate-completions` lists candidates.
    Emitting bash/zsh/fish scripts that call back into it is not done. The only
    feature on this list; everything above is a theorem.
 
