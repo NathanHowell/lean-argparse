@@ -94,6 +94,7 @@ Options:
   --version               Show the version and exit.
   --man                   Print a man page and exit.
   --generate-completions  List completion candidates and exit.
+  --completion-script SHELL  Print a shell completion script and exit. [choices: bash|zsh|fish]
 
 Commands:
   greet                   Print a friendly greeting.
@@ -133,10 +134,35 @@ $ lake exe argparse gret Alice
 error: unrecognised `gret`; did you mean `greet`?
 ```
 
+Shell completion is two steps: the binary answers completion queries itself, and
+prints the hook that asks them.
+
+```
+$ lake exe argparse --generate-completions greet   # what the shell asks
+--verbose
+-v
+--count
+-n
+
+$ lake exe argparse --completion-script bash       # the hook that asks it
+# Add to ~/.bashrc:  eval "$(lean-argparse --completion-script bash)"
+_lean_argparse_complete() {
+  ...
+  candidates="$(lean-argparse --generate-completions "${prev_words[@]}" 2>/dev/null)"
+  ...
+}
+complete -F _lean_argparse_complete lean-argparse
+```
+
+Nothing about the command tree is baked into the script, so adding a subcommand
+changes what the binary answers, not what the user has installed. `zsh` and
+`fish` are generated the same way.
+
 ## Features
 
 - Applicative `P` with proved `LawfulFunctor`/`LawfulApplicative` instances on
-  the underlying `Parser`
+  the underlying `Parser`, and the same laws for `P` itself up to `Doc`
+  normalization
 - Flags with short-name bundling; options with `--name value`, `--name=value`,
   and `-n5` concatenation plus `.one`/`.many`/`.some` arities; positionals;
   recursive subcommands with per-node global options
@@ -147,8 +173,9 @@ error: unrecognised `gret`; did you mean `greet`?
   `greet --count 1 -- -v` greets `-v`
 - Structured errors carrying context tokens and expectations, rendered with
   usage and a nearest-match suggestion
-- `--help` at every level, `--version`, mdoc man pages, and position-aware
-  completion candidates — all owned by the runner
+- `--help` at every level, `--version`, mdoc man pages, position-aware
+  completion candidates, and installable bash/zsh/fish completion scripts —
+  all owned by the runner
 - Typed verbs: a `Cmd AppCommand` maps leaves straight into your own inductive,
   with no stringly recovery step
 - A proof suite with no `sorry`, no extra axioms, and a lint-clean build

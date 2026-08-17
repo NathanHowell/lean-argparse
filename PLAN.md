@@ -24,8 +24,9 @@ are built, with no `sorry` anywhere and no `partial def` outside `Core`.
 - **Layer 4 — `Cmd`** (`Cmd.lean`): the command tree, with `toParser` and
   `toCmdSpec` walking the same `subs` list, and per-node globals.
 - **Layer 5 — runner** (`Exec.lean`): `--help` at every level, `--version`,
-  `--man`, completion, usage synopses, and error rendering with nearest-match
-  suggestions. Applications contain no help code.
+  `--man`, completion candidates, installable bash/zsh/fish completion scripts,
+  usage synopses, and error rendering with nearest-match suggestions.
+  Applications contain no help code.
 - **Layer 6 — correspondence** (`Correspondence.lean`): item agreement per
   builder; behavioural acceptance for every builder -- flags, the four option
   builders through their shared `optionValues` core, and the three positionals
@@ -50,13 +51,10 @@ are built, with no `sorry` anywhere and no `partial def` outside `Core`.
 
 ## Roadmap
 
-Ordered by value rather than by the sequence they were noticed in.
+One item left.
 
 1. **Completeness** — the missing half of the story: if argv conforms to a
    well-formed command tree, parsing succeeds and yields the expected bindings.
-2. **Real completion scripts** — `--generate-completions` lists candidates.
-   Emitting bash/zsh/fish scripts that call back into it is not done. The only
-   feature on this list; everything above is a theorem.
 
 Deliberately not on the list: `usageLine`, `renderCommandHelp`, `renderMan`,
 `editDistance`, and `nearest?` have no theorems and should not get any. They are
@@ -103,6 +101,12 @@ already pin the behaviour.
   is the right thing to report. Reported downstream as nsnd-irq0.
 - `deriving Parseable` rejects, rather than mistranslates, a default that
   depends on an earlier field and a `Bool` defaulting to `true`.
+- Completion scripts are emitted for `eval`, not for autoloading. zsh's `_prog`
+  in `$fpath` and fish's `completions/prog.fish` would work, but each needs the
+  file in a particular place under a particular name, where
+  `eval "$(prog --completion-script zsh)"` is one instruction that reads the
+  same for all three shells. The script embeds only the binary name and the
+  query flag, so it never goes stale.
 - `rw` with a `String.startsWith` lemma usually fails where `simp` succeeds: the
   `ForwardPattern` instance is indexed by the pattern and stops matching once
   the surrounding definitions are unfolded. Prefer `split` over

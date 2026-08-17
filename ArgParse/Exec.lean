@@ -48,6 +48,10 @@ structure Config where
   manFlags : List String := ["--man"]
   /-- Lexemes that request completion candidates; empty disables them. -/
   completionFlags : List String := ["--generate-completions"]
+  /-- Lexemes that request an installable completion script for a named shell;
+  empty disables it. The script calls back into `completionFlags`, so disabling
+  those disables this in practice too. -/
+  completionScriptFlags : List String := ["--completion-script"]
 
 /-- Items the runner contributes to every options table. They are documented
 here and implemented here, so they cannot drift from each other either. -/
@@ -71,6 +75,18 @@ def runnerItems (cfg : Config) : List ItemSpec :=
         | some _ => ofFlags cfg.versionFlags "version" "Show the version and exit.")
     ++ ofFlags cfg.manFlags "man" "Print a man page and exit."
     ++ ofFlags cfg.completionFlags "generate-completions" "List completion candidates and exit."
+    ++ (match cfg.completionScriptFlags with
+        | [] => []
+        | _ =>
+            [{ kind := .option
+             , name := "completion-script"
+             , long? := cfg.completionScriptFlags.findSome? (fun f =>
+                 if f.startsWith "--" then some (f.drop 2).toString else none)
+             , metavar? := some "SHELL"
+             , help? := some "Print a shell completion script and exit."
+             , arity := .one
+             , choices? := some (Doc.Shell.all.map (·.name))
+             , required := false }])
 
 /-! ### Suggestions
 
@@ -264,11 +280,14 @@ def exec (app : Cmd α) (argv : List String) (cfg : Config := {}) : ExecResult �
           execParse app spec cfg st path hereSpec
     | none => execParse app spec cfg st path hereSpec
 where
-  /-- The non-help path: man and completions, then the application's own parse. -/
+  /-- The non-help path: man, completions, completion scripts, then the
+  application's own parse. -/
   execParse (app : Cmd α) (spec : AppSpec) (cfg : Config) (st : State)
       (path : List String) (hereSpec : CmdSpec) : ExecResult α :=
     if requested cfg.manFlags st.pre then
       .output (Doc.renderMan spec)
+    else if requested cfg.completionScriptFlags st.pre then
+      completionScript app cfg st
     else if requested cfg.completionFlags st.pre then
       .output (Doc.renderCompletion spec (wordsAfter cfg.completionFlags st.pre))
     else
@@ -295,6 +314,28 @@ where
             .ok value
           else
             fail { kind := .leftover, context := leftover, expect := [.endOfInput] }
+  /-- Emit a completion script for the shell named after the flag.
+
+  The script calls back into the completion flag, so the flag is read from the
+  same `Config` rather than hardcoded; with completions disabled there is
+  nothing for a script to call and the request is refused. -/
+  completionScript (app : Cmd α) (cfg : Config) (st : State) : ExecResult α :=
+    let named := match cfg.completionScriptFlags with
+      | [] => "--completion-script"
+      | f :: _ => f
+    let supported := String.intercalate ", " (Doc.Shell.all.map (·.name))
+    match cfg.completionFlags with
+    | [] =>
+        .error s!"{app.name}: {named} needs completion candidates, which are disabled."
+    | queryFlag :: _ =>
+        match (wordsAfter cfg.completionScriptFlags st.pre).head? with
+        | none => .error s!"{app.name}: {named} needs a shell name ({supported})."
+        | some word =>
+            match Doc.Shell.ofString? word with
+            | some shell =>
+                .output (Doc.renderCompletionScript app.name queryFlag shell)
+            | none =>
+                .error s!"{app.name}: unknown shell '{word}' ({supported})."
 
 end Exec
 

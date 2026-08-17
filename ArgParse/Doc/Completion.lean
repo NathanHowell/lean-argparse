@@ -80,4 +80,98 @@ def completeAt (cmd : CmdSpec) (words : List String) : List String :=
 def renderCompletion (spec : AppSpec) (words : List String := []) : String :=
   String.intercalate "\n" (completeAt spec.root words)
 
+/-! ### Installable completion scripts
+
+`renderCompletion` answers one query. A shell needs a hook that asks the
+question, which is what these emit.
+
+Every script is the same three lines of shell: take the words typed before the
+cursor, drop the program name, hand them back to the binary's own completion
+flag, and offer the newline-separated result. Nothing about the command tree is
+baked into the script, so it never goes stale — adding a subcommand changes what
+the binary answers, not what the user has installed. -/
+
+/-- Shells with a completion script generator. -/
+inductive Shell where
+  /-- GNU bash, via `complete -F`. -/
+  | bash
+  /-- Z shell, via `compdef`. -/
+  | zsh
+  /-- fish, via `complete -c`. -/
+  | fish
+deriving Repr, DecidableEq
+
+namespace Shell
+
+/-- Every shell that can be named on the command line. -/
+def all : List Shell := [.bash, .zsh, .fish]
+
+/-- The name the user types. -/
+def name : Shell → String
+  | .bash => "bash"
+  | .zsh => "zsh"
+  | .fish => "fish"
+
+/-- Parse a shell name, case-sensitively. -/
+def ofString? (s : String) : Option Shell :=
+  all.find? (fun sh => sh.name == s)
+
+end Shell
+
+/-- Make an identifier a shell will accept, by replacing anything that is not a
+letter, digit, or underscore. Program names routinely contain `-`. -/
+def shellIdent (prog : String) : String :=
+  String.ofList (prog.toList.map fun c =>
+    if c.isAlphanum || c == '_' then c else '_')
+
+/-- A completion script for `prog`, calling back into it via `flag`.
+
+Each script is meant to be evaluated, not installed as a file — one line in a
+shell config, printed at the top of the script itself. The autoload conventions
+(`_prog` in `$fpath` for zsh, `completions/prog.fish` for fish) would work too,
+but they need the file in the right place under the right name, and the eval
+form is the same instruction for all three shells.
+
+`prog` is both the command to complete and the command to invoke, so it must be
+on `PATH` — the same assumption every generated completion script makes. -/
+def renderCompletionScript (prog : String) (flag : String) : Shell → String
+  | .bash =>
+      let fn := "_" ++ shellIdent prog ++ "_complete"
+      String.intercalate "\n"
+        [ "# Add to ~/.bashrc:  eval \"$(" ++ prog ++ " --completion-script bash)\""
+        , fn ++ "() {"
+        , "  local cur prev_words candidates"
+        , "  cur=\"${COMP_WORDS[COMP_CWORD]}\""
+        , "  prev_words=(\"${COMP_WORDS[@]:1:COMP_CWORD-1}\")"
+        , "  candidates=\"$(" ++ prog ++ " " ++ flag ++ " \"${prev_words[@]}\" 2>/dev/null)\""
+        , "  local IFS=$'\\n'"
+        , "  COMPREPLY=($(compgen -W \"${candidates}\" -- \"${cur}\"))"
+        , "}"
+        , "complete -F " ++ fn ++ " " ++ prog
+        , "" ]
+  | .zsh =>
+      let fn := "_" ++ shellIdent prog
+      String.intercalate "\n"
+        [ "# Add to ~/.zshrc after compinit:"
+            ++ "  eval \"$(" ++ prog ++ " --completion-script zsh)\""
+        , fn ++ "() {"
+        , "  local -a candidates"
+        , "  candidates=(\"${(@f)$(" ++ prog ++ " " ++ flag
+            ++ " ${words[2,CURRENT-1]} 2>/dev/null)}\")"
+        , "  compadd -- ${candidates}"
+        , "}"
+        , "compdef " ++ fn ++ " " ++ prog
+        , "" ]
+  | .fish =>
+      let fn := "__" ++ shellIdent prog ++ "_complete"
+      String.intercalate "\n"
+        [ "# Add to ~/.config/fish/config.fish:  "
+            ++ prog ++ " --completion-script fish | source"
+        , "function " ++ fn
+        , "    set -l tokens (commandline -opc)"
+        , "    " ++ prog ++ " " ++ flag ++ " $tokens[2..-1]"
+        , "end"
+        , "complete -c " ++ prog ++ " -f -a '(" ++ fn ++ ")'"
+        , "" ]
+
 end ArgParse.Doc

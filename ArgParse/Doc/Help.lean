@@ -17,9 +17,15 @@ open ArgParse.Spec
 /-- Column at which descriptions start. -/
 private def descrColumn : Nat := 26
 
-/-- One `label  description` row. -/
+/-- One `label  description` row.
+
+A label that reaches the description column gets two spaces instead of running
+into the text. Padding alone is not enough: `padTo` is a minimum, so a long
+enough label -- `--completion-script SHELL` is one -- would otherwise abut its
+description with no separator at all. -/
 def entryRow (label : String) (descr : String) : String :=
-  let padded := padTo descrColumn ("  " ++ label)
+  let cell := "  " ++ label
+  let padded := if cell.length + 2 ≤ descrColumn then padTo descrColumn cell else cell ++ "  "
   if descr.isEmpty then padded.trimAsciiEnd.toString else padded ++ descr
 
 /-- Render a titled block, or nothing when it has no rows. -/

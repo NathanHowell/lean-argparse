@@ -211,6 +211,54 @@ private def checkHelpMentionsItems : Except String Unit :=
         (Except.ok ())
   | other => .error s!"expected help output, got {repr other}"
 
+/-- The completion script names the binary and calls back into the query flag.
+
+The point of generating a script rather than shipping one is that it stays
+correct as the command tree changes, so what it must contain is the callback,
+not any verb. -/
+private def checkCompletionScript : Except String Unit := do
+  for (shell, hook) in
+      [(Doc.Shell.bash, "complete -F"), (Doc.Shell.zsh, "compdef"),
+       (Doc.Shell.fish, "complete -c")] do
+    match Exec.exec sampleApp ["--completion-script", shell.name] with
+    | .output text =>
+        expectTrue ((text.splitOn "--generate-completions").length ≥ 2)
+          s!"{shell.name} script never calls back: {text}"
+        expectTrue ((text.splitOn hook).length ≥ 2)
+          s!"{shell.name} script never registers itself: {text}"
+        expectTrue ((text.splitOn sampleApp.name).length ≥ 2)
+          s!"{shell.name} script never names the binary: {text}"
+    | other => .error s!"expected a script for {shell.name}, got {repr other}"
+
+/-- An unusable shell name is refused, and the message lists the usable ones. -/
+private def checkCompletionScriptUnknownShell : Except String Unit := do
+  match Exec.exec sampleApp ["--completion-script", "tcsh"] with
+  | .error text =>
+      expectTrue ((text.splitOn "tcsh").length ≥ 2) s!"error omits the shell: {text}"
+      expectTrue ((text.splitOn "bash").length ≥ 2) s!"error omits the choices: {text}"
+  | other => .error s!"expected an error, got {repr other}"
+
+/-- Asking for a script without naming a shell is refused too. -/
+private def checkCompletionScriptNoShell : Except String Unit := do
+  match Exec.exec sampleApp ["--completion-script"] with
+  | .error text =>
+      expectTrue ((text.splitOn "shell name").length ≥ 2)
+        s!"error does not say what is missing: {text}"
+  | other => .error s!"expected an error, got {repr other}"
+
+/-- A label wide enough to reach the description column still gets a separator.
+
+`--completion-script SHELL` is the first builtin long enough to hit this, and
+without the guard in `entryRow` its description abutted the label. -/
+private def checkWideLabelSeparated : Except String Unit := do
+  match Exec.exec sampleApp ["--help"] with
+  | .output text =>
+      expectTrue ((text.splitOn "SHELLPrint").length == 1)
+        s!"a wide label ran into its description: {text}"
+      expectTrue ((text.splitOn "SHELL  Print").length ≥ 2)
+        s!"expected two spaces after the wide label: {text}"
+  | other => .error s!"expected help output, got {repr other}"
+
 /-- `P.many` keeps going through a bundle.
 
 `-vvv` is three occurrences in one token. The repetition bound used to count
@@ -240,6 +288,10 @@ def execChecks : List (String × Except String Unit) :=
   , ("completion follows the path", checkCompletion)
   , ("help mentions every item", checkHelpMentionsItems)
   , ("many keeps going through a bundle", checkManyThroughBundle)
+  , ("completion scripts call back", checkCompletionScript)
+  , ("unknown shell refused", checkCompletionScriptUnknownShell)
+  , ("missing shell refused", checkCompletionScriptNoShell)
+  , ("wide labels keep their separator", checkWideLabelSeparated)
   ]
 
 end ArgParse.Tests
