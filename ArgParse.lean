@@ -8,6 +8,7 @@ import ArgParse.Spec.AST
 import ArgParse.Spec.Describe
 import ArgParse.P
 import ArgParse.Builder
+import ArgParse.Cmd
 import ArgParse.Doc.Help
 import ArgParse.Doc.Man
 import ArgParse.Doc.Completion
