@@ -1,8 +1,7 @@
 import ArgParse.Core.Parser
 import ArgParse.Core.Combinators
-import ArgParse.Core.Runner
+import ArgParse.Core.Scan
 import ArgParse.Core.Value
-import ArgParse.Spec.Elab
 
 /-!
 # ArgParse.Proofs.Totality

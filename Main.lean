@@ -38,7 +38,7 @@ inductive AppCommand where
   | repeat (cfg : RepeatConfig)
   deriving Repr
 
-/-! ### Specification entries shared by docs and the applicative parser -/
+/-! ### Runtime specs consumed by the Layer-1 combinators -/
 
 /-- `--verbose` / `-v` flag for the greet command. -/
 def greetVerboseFlag : FlagSpec :=
@@ -73,37 +73,6 @@ def repeatTimesOpt : OptSpec Nat :=
 /-- Required MESSAGE positional for the repeat command. -/
 def repeatMessagePos : PosSpec String :=
   { «meta» := mkMeta "MESSAGE" (help? := some "Message to repeat."), arity := .one }
-
-/-- Specification for the `greet` subcommand. -/
-def greetCmdSpec : CmdSpec :=
-  { name := "greet"
-  , «meta» := mkMeta "greet" (help? := some "Print a friendly greeting.")
-  , args :=
-      [ ItemSpec.flag greetVerboseFlag
-      , ItemSpec.opt greetCountOpt
-      , ItemSpec.pos greetNamePos ] }
-
-/-- Specification for the `repeat` subcommand. -/
-def repeatCmdSpec : CmdSpec :=
-  { name := "repeat"
-  , «meta» := mkMeta "repeat" (help? := some "Repeat a message multiple times.")
-  , args :=
-      [ ItemSpec.opt repeatTimesOpt
-      , ItemSpec.pos repeatMessagePos ] }
-
-/-- Root command specification used for docs and built-ins. -/
-def rootCmdSpec : CmdSpec :=
-  { name := "lean-argparse"
-  , «meta» := mkMeta "lean-argparse"
-      (help? := some "Demonstrates subcommands with applicative parsing.")
-  , subs := [greetCmdSpec, repeatCmdSpec] }
-
-/-- Application specification exposed to the CLI helpers. -/
-def appSpec : AppSpec :=
-  { name := "lean-argparse"
-  , version? := some "0.2.0"
-  , about? := some "Applicative demo rebuilt on the SPEC-aligned core"
-  , root := rootCmdSpec }
 
 /-! ### Applicative parser helpers -/
 
@@ -211,26 +180,22 @@ def runCommand : AppCommand → IO UInt32
 
 end MainApp
 
-/-- Entry point mirroring the applicative example from the legacy repository. -/
+/-- Entry point for the demo CLI.
+
+Help, usage, and version handling are absent on purpose: they were driven by a
+hand-written `AppSpec` that duplicated every verb and item declared below, which
+is the drift this migration exists to remove. `ArgParse.Exec` (Layer 5) takes
+ownership of them, and this file shrinks to a `Cmd` tree and a dispatch. -/
 def main (argv : List String) : IO UInt32 := do
   let st₀ := ArgParse.Core.normalize argv
-  match ArgParse.builtinOutcome? (α := Unit) MainApp.appSpec st₀ with
-  | some outcome =>
-      match outcome.result with
-      | ArgParse.RunResult.help text => IO.println text; pure 0
-      | ArgParse.RunResult.man text => IO.println text; pure 0
-      | ArgParse.RunResult.completions text => IO.println text; pure 0
-      | ArgParse.RunResult.ok _ => pure 0
-      | ArgParse.RunResult.err err => IO.eprintln (MainApp.renderError err); pure 2
-  | none =>
-      match MainApp.appParser st₀ with
-      | .err err => IO.eprintln (MainApp.renderError err); pure 2
-      | .ok command st₁ =>
-          if st₁.pre ≠ [] ∨ st₁.post ≠ [] then
-            let leftovers := st₁.pre ++ st₁.post
-            let err : Error :=
-              { kind := .leftover, context := leftovers, expect := [Expect.endOfInput] }
-            IO.eprintln (MainApp.renderError err)
-            pure 2
-          else
-            MainApp.runCommand command
+  match MainApp.appParser st₀ with
+  | .err err => IO.eprintln (MainApp.renderError err); pure 2
+  | .ok command st₁ =>
+      if st₁.pre ≠ [] ∨ st₁.post ≠ [] then
+        let leftovers := st₁.pre ++ st₁.post
+        let err : Error :=
+          { kind := .leftover, context := leftovers, expect := [Expect.endOfInput] }
+        IO.eprintln (MainApp.renderError err)
+        pure 2
+      else
+        MainApp.runCommand command
