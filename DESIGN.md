@@ -209,9 +209,9 @@ over `Doc` and `Cmd`:
 
 These sit on top of, and do not disturb, the existing Layer-1 suite.
 
-### Layer 7 — the macro front end (optional, last)
+### Layer 7 — the macro front end (`ArgParse.Deriving`)
 
-A `deriving`-style handler or small DSL that takes an application's
+A `deriving` handler that takes an application's
 
 ```lean
 structure GreetConfig where
@@ -219,13 +219,34 @@ structure GreetConfig where
   name : String
   /-- Shout the greeting. -/
   loud : Bool := false
+  deriving ArgParse.Parseable
 ```
 
-and generates the `P GreetConfig` — field names to long options, doc-strings
-to help text, defaults carried over. It generates *calls to Layer 3*, never
-bypassing it, so everything it emits inherits the correspondence theorems.
-This is the single-declaration front end no Haskell design can offer; it is
-sugar over the design, not part of it.
+and generates the `P GreetConfig` — field names to long options (kebab-cased, so
+`dryRun` is `--dry-run`), doc-strings to help text, structure defaults carried
+over as parser defaults. It generates *calls to Layer 3*, never bypassing it, so
+everything it emits inherits the correspondence theorems. This is the
+single-declaration front end no Haskell design can offer; it is sugar over the
+design, not part of it.
+
+The handler does no type reflection. Which builder a field needs is decided by
+resolving `FieldParser` on the field's type — `Bool` is a flag, `Option α` an
+optional option, `List α` a repeatable one, anything else with `FromArg` a plain
+option — so supporting a new shape of field is an instance, not a change to the
+macro.
+
+What a structure field cannot say, the handler cannot generate: short forms,
+positionals, and per-item metavars have nowhere to live in a field declaration.
+Those stay available by writing Layer 3 directly, which is what the handler emits
+anyway, and the two mix freely inside one `Cmd`. `Main.lean` is written the
+explicit way for exactly this reason; `Examples/Derived.lean` shows the derived
+way.
+
+Two field shapes are rejected rather than mistranslated. A default that depends
+on an earlier field has no command-line meaning. A `Bool` defaulting to `true`
+has no flag spelling — an absent flag is `false`, so the default would be
+unreachable — and is a modelling error worth reporting rather than silently
+generating a parser that cannot produce its own default.
 
 ## What the design deliberately excludes
 

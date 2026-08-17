@@ -1,9 +1,11 @@
 import ArgParse.Tests.Unit
 import ArgParse.Tests.Exec
+import ArgParse.Tests.Deriving
 
 /-!
 Test driver: combinator-level checks from `Tests.Unit`, integration checks over
-`Cmd`/`P`/`Exec` from `Tests.Exec`.
+`Cmd`/`P`/`Exec` from `Tests.Exec`, and Layer 7 handler checks from
+`Tests.Deriving`.
 -/
 
 private def runCheck (label : String) (check : Except String Unit) : IO Bool :=
@@ -15,5 +17,6 @@ private def runCheck (label : String) (check : Except String Unit) : IO Bool :=
 /-- Run every unit check, reporting failures on stderr. -/
 def main : IO UInt32 := do
   let checks := ArgParse.Tests.runtimeChecks ++ ArgParse.Tests.execChecks
+      ++ ArgParse.Tests.derivingChecks
   let results ← checks.mapM (fun (label, chk) => runCheck label chk)
   pure <| if results.all id then 0 else 1

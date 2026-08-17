@@ -9,6 +9,8 @@ import ArgParse.Spec.Describe
 import ArgParse.P
 import ArgParse.Builder
 import ArgParse.Cmd
+import ArgParse.Deriving
+import ArgParse.Examples.Derived
 import ArgParse.Exec
 import ArgParse.Correspondence
 import ArgParse.Doc.Usage
