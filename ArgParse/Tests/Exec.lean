@@ -277,6 +277,36 @@ private def checkBundleUnknownShortUntouched : Except String Unit := do
   | .error _ => pure ()
   | other => .error s!"expected an error for an unknown short, got {repr other}"
 
+/-- A builtin bundled with a command's own flag is still a builtin.
+
+Builtins match whole tokens, and `-vh` is not one; the runner expands bundles
+against the path's items plus its own before looking. -/
+private def checkBundledBuiltin : Except String Unit := do
+  match Exec.exec flagFirstApp ["-vh"] with
+  | .output text =>
+      expectTrue ((text.splitOn "Usage").length ≥ 2)
+        s!"expected help for the bundled -h, got: {text}"
+  | other => .error s!"expected help output, got {repr other}"
+
+/-- An unrecognised short names itself, rather than letting a positional swallow
+it and blaming the next token. -/
+private def checkUnknownShortNamed : Except String Unit := do
+  match Exec.exec flagFirstApp ["-q", "5"] with
+  | .error text =>
+      expectTrue ((text.splitOn "-q").length ≥ 2)
+        s!"expected the unknown short named, got: {text}"
+  | other => .error s!"expected an error, got {repr other}"
+
+/-- A negative number is a value, not a lexeme, so it is never diagnosed as an
+unrecognised short. -/
+private def checkNegativeNumberNotDiagnosed : Except String Unit := do
+  expectTrue (Exec.unknownShort? ['n', 'v'] ["-5"] == none)
+    "a negative number was reported as an unknown short"
+  expectTrue (Exec.unknownShort? ['n', 'v'] ["-q"] == some "-q")
+    "an unknown short was not reported"
+  expectTrue (Exec.unknownShort? ['n', 'v'] ["-v", "-n"] == none)
+    "a known short was reported as unknown"
+
 /-- The completion script names the binary and calls back into the query flag.
 
 The point of generating a script rather than shipping one is that it stays
@@ -362,6 +392,9 @@ def execChecks : List (String × Except String Unit) :=
   , ("bundle leading with an option", checkBundleOptionThenFlag)
   , ("bundle residue needs a later flag", checkBundleOptionThenFlagLimitation)
   , ("unknown short leaves its token alone", checkBundleUnknownShortUntouched)
+  , ("bundled builtin is found", checkBundledBuiltin)
+  , ("unknown short names itself", checkUnknownShortNamed)
+  , ("negative numbers are values", checkNegativeNumberNotDiagnosed)
   ]
 
 end ArgParse.Tests

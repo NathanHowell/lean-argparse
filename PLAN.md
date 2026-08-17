@@ -83,9 +83,12 @@ already pin the behaviour.
 - Help routing (`Cmd.descend`) skips tokens that name no subcommand, so an
   option *value* equal to a verb name can select the wrong help page. It only
   ever chooses which page to print, never how anything parses.
-- Builtins are matched as whole tokens, so `-h` bundled into `-vh` is not
-  detected: resolving a bundle needs the flag specs of the command the tokens
-  belong to, which is not known until dispatch has happened.
+- Builtins are matched as whole tokens, but the tokens they are matched against
+  are bundle-expanded first, so `-vh` is a help request. The probe expands with
+  every item on the path plus the runner's own -- a wider list than any single
+  command's, which is safe because the probe only decides whether a builtin was
+  asked for, never how anything parses. The state handed to the parser is
+  untouched.
 - An inline bundle is split by the payload type: `findConcatSplit?` takes the
   longest prefix of the tail that decodes. `-n5v` is `5` plus a residual `-v`
   for a `Nat` option, and `-nfoo` is the whole tail for a `String` one, since
@@ -113,6 +116,14 @@ already pin the behaviour.
 - Suggestion threshold is 2 edits above three characters, which catches
   transpositions (`chidl` → `child`) at the cost of the occasional unhelpful
   but valid neighbour.
+- An unrecognised short lexeme is named. `unknownShort?` reports the first
+  single-dash token whose leading character is no short this command accepts,
+  which stops a positional from swallowing `-x` and the error from blaming the
+  next token. Two guards keep it honest: a digit is never reported, so a
+  negative number standing in as a value survives, and only the leading
+  character is named, since whatever follows may be its value. This became
+  possible only once bundles were expanded up front -- before that, a surviving
+  cluster might have been a legitimate bundle.
 - Error precedence: a dispatch failure on a token that does not start with `-`
   outranks any unknown-option finding. A misspelled verb strands every token
   after it -- they were meant for a command never reached -- so reporting one of

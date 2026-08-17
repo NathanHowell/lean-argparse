@@ -235,6 +235,29 @@ def unknownLong? (known : List String) (tokens : List String) : Option String :=
     else
       Option.none
 
+/-- The first single-dash token whose leading character names no short form the
+command accepts.
+
+The companion to `unknownLong?`, and it needs the same justification. A short
+token used to be undiagnosable because it might be a bundle (`-vf`) or a
+negative number standing in as a value (`-5`). The bundle case is gone --
+`Core.expandBundles` splits those against the command's own items before
+anything scans, so a surviving cluster starts with a character this command does
+not accept. The negative-number case is still real, so a digit is never
+reported.
+
+Only the leading character is named, since that is the one that went wrong;
+whatever follows it may be a value. -/
+def unknownShort? (shorts : List Char) (tokens : List String) : Option String :=
+  tokens.findSome? fun token =>
+    match token.toList with
+    | '-' :: c :: _ =>
+        if c = '-' then Option.none
+        else if shorts.contains c then Option.none
+        else if c.isDigit then Option.none
+        else Option.some (String.ofList ['-', c])
+    | _ => Option.none
+
 /-- Whether this error is dispatch complaining about a token that was meant to
 be a verb.
 
@@ -261,40 +284,56 @@ def candidatesAt (cmd : CmdSpec) (cfg : Config) : List String :=
 
 Builtins are checked against the pre-sentinel tokens before parsing, and help is
 rendered for the deepest command the tokens name, so `app sub --help` documents
-`sub` rather than the root. -/
+`sub` rather than the root.
+
+The check runs against a bundle-expanded copy of those tokens, so `-vh` counts
+as a help request. Only the probe is expanded; the state handed to the parser is
+untouched, and each command expands its own segment with its own items when
+`Cmd.toParser` reaches it. -/
 def exec (app : Cmd α) (argv : List String) (cfg : Config := {}) : ExecResult α :=
   let st := Core.normalize argv
   let spec := app.toAppSpec cfg.version? cfg.epilog?
   let (path, here) := app.descend st.pre
   let hereSpec := here.toCmdSpec
-  if requested cfg.helpFlags st.pre then
+  let probe := builtinProbe spec cfg st
+  if requested cfg.helpFlags probe then
     let inherited := (Doc.pathItems spec.root st.pre).filter (fun i => !hereSpec.args.contains i)
     .output (Doc.renderCommandHelp path hereSpec (runnerItems cfg)
       (if path.length == 1 then spec.about? else none) cfg.epilog? inherited)
   else
     match cfg.version? with
     | some version =>
-        if requested cfg.versionFlags st.pre then
+        if requested cfg.versionFlags probe then
           .output s!"{app.name} {version}"
         else
-          execParse app spec cfg st path hereSpec
-    | none => execParse app spec cfg st path hereSpec
+          execParse app spec cfg st probe path hereSpec
+    | none => execParse app spec cfg st probe path hereSpec
 where
+  /-- The token stream the builtin checks read: `pre`, with short bundles split
+  against every item on the path plus the runner's own.
+
+  A builtin is matched as a whole token, and `-vh` is not one. Expanding first
+  is what lets the `h` inside it be seen -- the merged item list is wider than
+  any single command's, but it only ever decides whether a builtin was asked
+  for, never how anything parses. -/
+  builtinProbe (spec : AppSpec) (cfg : Config) (st : State) : List String :=
+    let items := Doc.pathItems spec.root st.pre ++ runnerItems cfg
+    (Core.expandBundles items st).pre
   /-- The non-help path: man, completions, completion scripts, then the
   application's own parse. -/
   execParse (app : Cmd α) (spec : AppSpec) (cfg : Config) (st : State)
-      (path : List String) (hereSpec : CmdSpec) : ExecResult α :=
-    if requested cfg.manFlags st.pre then
+      (probe : List String) (path : List String) (hereSpec : CmdSpec) : ExecResult α :=
+    if requested cfg.manFlags probe then
       .output (Doc.renderMan spec)
-    else if requested cfg.completionScriptFlags st.pre then
+    else if requested cfg.completionScriptFlags probe then
       completionScript app cfg st
-    else if requested cfg.completionFlags st.pre then
-      .output (Doc.renderCompletion spec (wordsAfter cfg.completionFlags st.pre))
+    else if requested cfg.completionFlags probe then
+      .output (Doc.renderCompletion spec (wordsAfter cfg.completionFlags probe))
     else
       let candidates := candidatesAt hereSpec cfg
-      let legal :=
-        (Doc.pathItems spec.root st.pre).flatMap (·.lexemes)
-          ++ (runnerItems cfg).flatMap (·.lexemes)
+      let pathItems := Doc.pathItems spec.root st.pre ++ runnerItems cfg
+      let legal := pathItems.flatMap (·.lexemes)
+      let legalShorts := pathItems.filterMap (·.short?)
       let fail (err : Error) : ExecResult α :=
         if isUnknownVerb err then
           -- The earliest wrong token wins: report the verb, not the options it
@@ -305,7 +344,12 @@ where
           | Option.some name =>
               .error (renderError path hereSpec candidates
                 { kind := .unknownLong, context := [name], expect := [] })
-          | Option.none => .error (renderError path hereSpec candidates err)
+          | Option.none =>
+              match unknownShort? legalShorts st.pre with
+              | Option.some lexeme =>
+                  .error (renderError path hereSpec candidates
+                    { kind := .unknownShort, context := [lexeme], expect := [] })
+              | Option.none => .error (renderError path hereSpec candidates err)
       match app.toParser st with
       | .err err => fail err
       | .ok value st' =>

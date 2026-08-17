@@ -729,6 +729,25 @@ theorem unknownLong?_not_item_lexeme {items : List ItemSpec}
   exact unknownLong?_sound h
     (List.mem_append_left _ (List.mem_flatMap.mpr ⟨item, hitem, hname⟩))
 
+/-- **`unknownShort?` never names a short the command accepts**, and never a
+digit -- so a negative number standing in as a value is not mistaken for a
+lexeme. What it names is a single dash and one character. -/
+theorem unknownShort?_sound {shorts : List Char} {tokens : List String} {lexeme : String}
+    (h : Exec.unknownShort? shorts tokens = some lexeme) :
+    ∃ c, lexeme = String.ofList ['-', c] ∧ c ∉ shorts ∧ c.isDigit = false := by
+  obtain ⟨token, -, hf⟩ := List.exists_of_findSome?_eq_some h
+  split at hf
+  · split at hf
+    · exact absurd hf (by simp)
+    · split at hf
+      · exact absurd hf (by simp)
+      · split at hf
+        · exact absurd hf (by simp)
+        · rename_i c _ _ _ hnotShort hnotDigit
+          simp only [Option.some.injEq] at hf
+          exact ⟨c, hf.symm, by simpa using hnotShort, by simpa using hnotDigit⟩
+  · exact absurd hf (by simp)
+
 /-- The same for the runner's builtins: `--help` is never reported as
 unrecognised. -/
 theorem unknownLong?_not_runner_lexeme {items : List ItemSpec}

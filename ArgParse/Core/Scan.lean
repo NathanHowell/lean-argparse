@@ -180,10 +180,11 @@ where a bundle ends needs to know which characters are flags and which take
 values — and that is exactly what a command's item list says.
 
 So the split happens before either scan, driven by the items. It is deliberately
-conservative: a token is rewritten only when a non-empty run of this command's
-*flag* shorts is followed by one of its *option* shorts. Anything else is left
-byte-for-byte alone, so `-n5v` still reaches the concatenation path and `-vf`
-still reaches the flag scan's own bundle rewrite. -/
+conservative: every character has to name a short this command accepts, and the
+walk stops at the first one that takes a value, which keeps the rest of the
+token as that value. Anything else is left byte-for-byte alone, so `-n5v` still
+reaches the concatenation path and an unknown short can never be turned into
+tokens the user did not type. -/
 
 /-- Short forms of the items presenting a given surface syntax. -/
 def shortsOfKind (kind : ItemKind) (items : List ItemSpec) : List Char :=
@@ -192,11 +193,12 @@ def shortsOfKind (kind : ItemKind) (items : List ItemSpec) : List Char :=
 /-- Walk a bundle's characters, emitting one token per flag short until an
 option short is reached, which takes the rest of the token with it.
 
-`none` means "do not touch this token": either the characters ran out without
-reaching an option, or one of them names nothing this command accepts. -/
+`none` means "do not touch this token": one of the characters names nothing
+this command accepts, and guessing at it could invent a token the user never
+typed. Running out of characters is fine -- that is a bundle of pure flags. -/
 def splitBundle (flagShorts optShorts : List Char) :
     List String → List Char → Option (List String)
-  | _, [] => Option.none
+  | acc, [] => if acc.isEmpty then Option.none else Option.some acc.reverse
   | acc, ch :: tail =>
       if optShorts.contains ch then
         Option.some (acc.reverse ++ [String.ofList ('-' :: ch :: tail)])
@@ -207,8 +209,8 @@ def splitBundle (flagShorts optShorts : List Char) :
 
 /-- Split one token, or leave it exactly as it was.
 
-A single-token result means nothing was gained -- the option short was already
-leading -- so the original is returned rather than a re-spelled copy. -/
+A single-token result means nothing was gained -- the token was already one
+short -- so the original is returned rather than a re-spelled copy. -/
 def expandBundleToken (flagShorts optShorts : List Char) (token : String) : List String :=
   match token.toList with
   | '-' :: c :: rest =>
