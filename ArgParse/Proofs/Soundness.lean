@@ -130,6 +130,11 @@ open ArgParse.Spec.Partial
 @[simp] private def flagStep (name : String) : Option Bool → (String × Bool) → Option Bool :=
   fun latest entry => if entry.fst = name then some entry.snd else latest
 
+/-- `flagStep` as a rewrite for its partial applications, which is the form it
+takes as the operator of a `List.foldl`. -/
+private theorem flagStep_eq (name : String) :
+    flagStep name = fun latest entry => if entry.fst = name then some entry.snd else latest := rfl
+
 private theorem flagFold_from_some_ne_none
     (name : String) (entries : List (String × Bool)) (value : Bool) :
     entries.foldl (flagStep name) (some value) ≠ none := by
@@ -180,7 +185,7 @@ private theorem flagFold_override
   have := flagFold_override name later.flags
     (earlier.flags.foldl (flagStep name) none)
   simpa [Spec.Partial.merge, Spec.Partial.toSummary,
-    Spec.Partial.Summary.flagValue?, List.foldl_append]
+    Spec.Partial.Summary.flagValue?, List.foldl_append, flagStep_eq]
     using this
 
 /-- Option summary values concatenate when merging partial payloads. -/
@@ -558,7 +563,7 @@ theorem elaborateItem_opt_zero_mergesRight
   unfold Spec.elaborateItem at h
   simp [hArity] at h
   cases h
-  simpa using mergesRight_id
+  exact mergesRight_id
 
 theorem elaborateItem_opt_one_mergesRight
     {α : Type} [ArgParse.FromArg α]
@@ -643,7 +648,7 @@ theorem elaborateItem_pos_zero_mergesRight
   unfold Spec.elaborateItem at h
   simp [hArity] at h
   cases h
-  simpa using mergesRight_id
+  exact mergesRight_id
 
 theorem elaborateItem_pos_one_mergesRight
     {α : Type} [ArgParse.FromArg α]
@@ -792,10 +797,10 @@ theorem elaborateItems_nil_mergesRight
     (h : Spec.elaborateItems [] st = Result.ok f st') :
     mergesRight f := by
   classical
-  have hEval : Result.ok (fun p => p) st = Result.ok f st' := by
+  have hEval : Result.ok id st = Result.ok f st' := by
     simpa [elaborateItems_nil_eq, Parser.pure] using h
   cases hEval
-  simpa using mergesRight_id
+  exact mergesRight_id
 
 theorem elaborateItems_mergesRight
     : ∀ items (st : State)
@@ -905,8 +910,7 @@ theorem elaborateCommandCore_mergesRight
                   Spec.Partial.merge (f Spec.Partial.empty) child)
                 itemsP)
               (fun _ => subP) st = Result.ok p st' := by
-        simpa [Spec.elaborateCommandCore, itemsP, childParsers, subP]
-          using h
+        exact h
       cases hItems : itemsP st with
       | err err =>
           simp [Parser.seq, Parser.map, hItems] at hSeq
@@ -983,7 +987,7 @@ theorem elaborateCommand_mergesRight
   classical
   let fuel := st.pre.length + st.post.length + 1
   have hCore : Spec.elaborateCommandCore fuel cmd st = Result.ok p st' := by
-    simpa [Spec.elaborateCommand, fuel] using h
+    simpa [Spec.elaborateCommand, Spec.stateFuel, fuel] using h
   simpa [fuel] using
     elaborateCommandCore_mergesRight (fuel := fuel) (cmd := cmd) (st := st)
       (p := p) (st' := st') hCore

@@ -31,8 +31,11 @@ private def expandEntries (root : FilePath) (entries : List FilePath) : IO (List
     acc ← collectLeanFiles acc (resolvePath root entry)
   return acc.toList
 
-private def lintFile (root : FilePath) (path : FilePath) : IO UInt32 := do
+private unsafe def lintFile (root : FilePath) (path : FilePath) : IO UInt32 := do
   IO.println s!"Linting {path}"
+  -- Per file: the frontend clears the flag once it finishes importing, so every
+  -- `runFrontend` needs it set again.
+  Lean.enableInitializersExecution
   let contents ← IO.FS.readFile path
   let moduleName ←
     try
@@ -52,8 +55,9 @@ end LintDriver
 
 open LintDriver
 
-/-- Entry point for the lint driver executable used by `lake lint`. -/
-def main (args : List String) : IO UInt32 := do
+/-- Entry point for the lint driver executable used by `lake lint`. `unsafe`
+because enabling module initializers is. -/
+unsafe def main (args : List String) : IO UInt32 := do
   let sysroot ← Lean.findSysroot
   Lean.initSearchPath sysroot
   let root ← IO.currentDir

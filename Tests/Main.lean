@@ -115,6 +115,7 @@ private def runCheck (label : String) (check : Except String Unit) : IO Bool :=
   | .error msg =>
       IO.eprintln s!"[FAIL] {label}: {msg}" *> pure false
 
+/-- Run every unit and golden check, reporting failures on stderr. -/
 def main : IO UInt32 := do
   let unitChecks ← ArgParse.Tests.runtimeChecks.mapM (fun (label, chk) => runCheck label chk)
   let nestedOk ← testNestedSubcommand "nested" tokens

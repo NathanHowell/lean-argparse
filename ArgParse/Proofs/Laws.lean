@@ -93,35 +93,36 @@ theorem parser_seqRight_eq {α β : Type}
     x *> y = Function.const α id <$> x <*> y := by
   rfl
 
+-- Each law is the corresponding core lemma with `<$>`/`<*>`/`<*`/`*>` in place
+-- of `Parser.map`/`Parser.seq`. The instances make the two notations
+-- definitionally equal, so unification converts them and no rewriting is needed.
 instance : LawfulFunctor Parser where
   map_const := rfl
   id_map := by
     intro α x
-    simpa using parser_map_id (p := x)
+    exact parser_map_id (p := x)
   comp_map := by
     intro α β γ g h x
-    simpa using parser_map_comp (f := g) (g := h) (p := x)
+    exact parser_map_comp (f := g) (g := h) (p := x)
 
 instance : LawfulApplicative Parser where
   seqLeft_eq := by
     intro α β x y
-    simpa using parser_seqLeft_eq (x := x) (y := y)
+    exact parser_seqLeft_eq (x := x) (y := y)
   seqRight_eq := by
     intro α β x y
-    simpa using parser_seqRight_eq (x := x) (y := y)
+    exact parser_seqRight_eq (x := x) (y := y)
   pure_seq := by
     intro α β g x
-    simpa using parser_seq_pure (f := g) (pa := x)
+    exact parser_seq_pure (f := g) (pa := x)
   map_pure := by
     intro α β g x
-    simpa using parser_map_pure (f := g) (x := x)
+    exact parser_map_pure (f := g) (x := x)
   seq_pure := by
     intro α β g x
-    simpa using parser_pure_seq (pf := g) (x := x)
+    exact parser_pure_seq (pf := g) (x := x)
   seq_assoc := by
     intro α β γ x g h
-    -- Expand `<*>` in terms of `Parser.seq` and apply the core associativity lemma.
-    simpa [Seq.seq, SeqLeft.seqLeft, SeqRight.seqRight, Parser.seq, Parser.map] using
-      (parser_seq_assoc_core (pf := h) (pg := g) (pa := x)).symm
+    exact (parser_seq_assoc_core (pf := h) (pg := g) (pa := x)).symm
 
 end ArgParse.Proofs

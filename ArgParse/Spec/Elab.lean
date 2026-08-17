@@ -8,7 +8,7 @@ namespace ArgParse.Spec
 open ArgParse
 open Classical
 
-/- Parser runtime accumulator storing intermediate flag/option/positional values. -/
+/-- Parser runtime accumulator storing intermediate flag/option/positional values. -/
 structure Partial where
   /-- Recorded flag values in chronological order. -/
   flags : List (String × Bool) := []
@@ -84,10 +84,9 @@ private def missingOptionError {α : Type} [ArgParse.FromArg α]
   , expect := [ArgParse.Expect.optionVal spec.«meta».name] }
 
 
--- Subcommand recursion uses a simple token-derived measure to ensure
--- termination without relying on explicit proofs about the spec tree.
-
-private def stateFuel (st : ArgParse.State) : Nat :=
+/-- Token-derived fuel measure for subcommand recursion: enough steps for every
+token in the state, which keeps termination free of proofs about the spec tree. -/
+def stateFuel (st : ArgParse.State) : Nat :=
   st.pre.length + st.post.length + 1
 
 /-- Elaborate a single item specification into a transformer over `Partial`. -/
@@ -176,6 +175,7 @@ def elaborateItems (items : List ItemSpec) : Parser (Partial → Partial) :=
         Parser.seq (Parser.map (fun f => fun (g : Partial → Partial) => g ∘ f) head) (fun _ => tail)
   go items
 
+/-- Elaborate a command with an explicit recursion budget for its subcommands. -/
 def elaborateCommandCore : (fuel : Nat) → CmdSpec → Parser Partial
   | 0, _ => Parser.pure Partial.empty
   | fuel+1, cmd =>

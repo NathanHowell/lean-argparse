@@ -14,20 +14,27 @@ def mkMeta (name : String) (help? : Option String := none)
 
 /-- Runtime configuration for the `greet` subcommand. -/
 structure GreetConfig where
+  /-- Whether to print the greeting with a verbose marker. -/
   verbose : Bool
+  /-- How many times to print the greeting. -/
   count   : Nat
+  /-- Name to greet. -/
   name    : String
   deriving Repr
 
 /-- Runtime configuration for the `repeat` subcommand. -/
 structure RepeatConfig where
+  /-- How many times to print the message. -/
   times   : Nat
+  /-- Message to print. -/
   message : String
   deriving Repr
 
 /-- Enumerates the supported subcommands. -/
 inductive AppCommand where
+  /-- The `greet` subcommand with its parsed configuration. -/
   | greet (cfg : GreetConfig)
+  /-- The `repeat` subcommand with its parsed configuration. -/
   | repeat (cfg : RepeatConfig)
   deriving Repr
 
@@ -100,9 +107,11 @@ def appSpec : AppSpec :=
 
 /-! ### Applicative parser helpers -/
 
+/-- Parse `--count`, defaulting to one greeting. -/
 def greetCountParser : Parser Nat :=
   Parser.map (fun opt => opt.getD 1) (Core.optionScan greetCountOpt)
 
+/-- Parse the required NAME positional. -/
 def greetNameParser : Parser String := fun st =>
   match Core.positional greetNamePos st with
   | .err err => .err err
@@ -114,9 +123,11 @@ def greetNameParser : Parser String := fun st =>
         , expect := [Expect.positional greetNamePos.«meta».name] }
       .err err
 
+/-- Parse `--times`, defaulting to two repetitions. -/
 def repeatTimesParser : Parser Nat :=
   Parser.map (fun opt => opt.getD 2) (Core.optionScan repeatTimesOpt)
 
+/-- Parse the required MESSAGE positional. -/
 def repeatMessageParser : Parser String := fun st =>
   match Core.positional repeatMessagePos st with
   | .err err => .err err

@@ -141,9 +141,11 @@ structure CollectStep (α : Type) where
 
 namespace CollectStep
 
+/-- A step that consumes nothing and leaves the state as it was. -/
 @[inline] def stay {α : Type} (st : State) : CollectStep α :=
   { value? := none, raw? := none, state := st, consumed := 0 }
 
+/-- A step consuming `delta` tokens from `pre`, leaving `rest` behind. -/
 @[inline] def ofPre {α : Type}
     (st : State) (rest : List String) (delta : Nat)
     (value? : Option α) (raw? : Option String) : CollectStep α :=
@@ -152,6 +154,7 @@ namespace CollectStep
   , state := State.withPre st rest delta
   , consumed := delta }
 
+/-- A step consuming one token that carried its value concatenated. -/
 @[inline] def ofConcat {α : Type}
     (payload : Option (α × String)) (state : State) : CollectStep α :=
   { value? := payload.map Prod.fst
@@ -187,6 +190,7 @@ structure Subcommand (α : Type) where
   , context := token?.toList
   , expect := expect }
 
+/-- Match the next token against `entries` and run the parser it names. -/
 @[inline] def subcommand {α : Type} (entries : List (Subcommand α)) : Parser α :=
   let expects := entries.map (fun e => Expect.subcommand e.name)
   fun st =>
@@ -207,11 +211,11 @@ structure Subcommand (α : Type) where
 
 /--- Take the first `n` characters from a string. -/
 @[inline] def stringTake (s : String) (n : Nat) : String :=
-  String.mk (s.data.take n)
+  String.ofList (s.toList.take n)
 
 /--- Drop the first `n` characters from a string. -/
 @[inline] def stringDrop (s : String) (n : Nat) : String :=
-  String.mk (s.data.drop n)
+  String.ofList (s.toList.drop n)
 
 /--- Attempt to split a concatenated option token into a value and residual suffix. -/
 @[inline] def findConcatSplit? {α : Type} [ArgParse.FromArg α] (raw : String) : Option (α × String) :=
@@ -240,6 +244,7 @@ inductive FlagMatch
   /-- The token matches the long-form flag. -/
   | long
 
+/-- Classify `token` against the flag's short and long forms. -/
 @[inline] def matchFlagToken (spec : FlagSpec) (token : String) : FlagMatch :=
   match spec.long? with
   | some name =>
@@ -252,7 +257,7 @@ inductive FlagMatch
             if token = shortLex then
               FlagMatch.short
             else if token.startsWith shortLex then
-              let rest := token.drop shortLex.length
+              let rest := (token.drop shortLex.length).toString
               if rest.isEmpty then
                 FlagMatch.short
               else if token.startsWith "--" then
@@ -269,7 +274,7 @@ inductive FlagMatch
           if token = shortLex then
             FlagMatch.short
           else if token.startsWith shortLex then
-            let rest := token.drop shortLex.length
+            let rest := (token.drop shortLex.length).toString
             if rest.isEmpty then
               FlagMatch.short
             else if token.startsWith "--" then
@@ -388,7 +393,7 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
         | true =>
             match token.startsWith (shortLexeme short) with
             | true =>
-                let raw := token.drop (shortLexeme short).length
+                let raw := (token.drop (shortLexeme short).length).toString
                 takeOptionConcatPayload? spec token raw rest st expect
             | false => .ok (CollectStep.stay st)
         | false => .ok (CollectStep.stay st)
@@ -401,7 +406,7 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
     Except Error (CollectStep α) :=
   if spec.eqVal? then
     if token.startsWith (longLexeme name ++ "=") then
-      let raw := token.drop (longLexeme name ++ "=").length
+      let raw := (token.drop (longLexeme name ++ "=").length).toString
       takeOptionConcatPayload? spec token raw rest st expect
     else if token = longLexeme name then
       takeOptionDetachedValue? token rest st expect
@@ -502,10 +507,10 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
             | true =>
                 have hPayload :
                     takeOptionConcatPayload? spec token
-                        (token.drop (shortLexeme short).length) rest st expect = .ok step := by
+                        ((token.drop (shortLexeme short).length).toString) rest st expect = .ok step := by
                   simpa [hConcat, hStart] using hBranch
                 exact takeOptionConcatPayload?_cursor (spec := spec) (token := token)
-                  (raw := token.drop (shortLexeme short).length) (rest := rest) (st := st)
+                  (raw := (token.drop (shortLexeme short).length).toString) (rest := rest) (st := st)
                   (expect := expect) (step := step) hPayload
 
 /-- Cursor progression for long-option handling. -/
@@ -516,39 +521,23 @@ def flag (spec : FlagSpec) : Parser Bool := fun st =>
     step.state.cursor = st.cursor + step.consumed := by
   classical
   unfold takeOptionLongToken? at h
-  by_cases hEqVal : spec.eqVal?
-  · have hBranch := h
-    simp [hEqVal] at hBranch
-    by_cases hStart : token.startsWith (longLexeme name ++ "=")
-    · have hPayload :
-        takeOptionConcatPayload? spec token
-          (token.drop (longLexeme name ++ "=").length) rest st expect = .ok step := by
-        simpa [hStart] using hBranch
-      exact takeOptionConcatPayload?_cursor (spec := spec) (token := token)
-        (raw := token.drop (longLexeme name ++ "=").length) (rest := rest) (st := st)
-        (expect := expect) (step := step) hPayload
-    · have hBranch' := hBranch
-      simp [hStart] at hBranch'
-      by_cases hEq : token = longLexeme name
-      · have hDetached : takeOptionDetachedValue? token rest st expect = .ok step := by
-          simpa [hEq] using hBranch'
-        exact takeOptionDetachedValue?_cursor (token := token) (rest := rest)
-          (st := st) (expect := expect) (step := step) hDetached
-      · have hShort : takeOptionShortToken? spec token rest st expect = .ok step := by
-          simpa [hEq] using hBranch'
-        exact takeOptionShortToken?_cursor (spec := spec) (token := token)
-          (rest := rest) (st := st) (expect := expect) (step := step) hShort
-  · have hBranch := h
-    simp [hEqVal] at hBranch
-    by_cases hEq : token = longLexeme name
-    · have hDetached : takeOptionDetachedValue? token rest st expect = .ok step := by
-        simpa [hEq] using hBranch
-      exact takeOptionDetachedValue?_cursor (token := token) (rest := rest)
-        (st := st) (expect := expect) (step := step) hDetached
-    · have hShort : takeOptionShortToken? spec token rest st expect = .ok step := by
-        simpa [hEq] using hBranch
-      exact takeOptionShortToken?_cursor (spec := spec) (token := token)
-        (rest := rest) (st := st) (expect := expect) (step := step) hShort
+  -- Each branch body is handled by its own cursor lemma, so the conditions
+  -- never need to be reasoned about: `split` peels them off and leaves the
+  -- bodies untouched.
+  split at h
+  · split at h
+    · exact takeOptionConcatPayload?_cursor (spec := spec) (token := token)
+        (rest := rest) (st := st) (expect := expect) (step := step) h
+    · split at h
+      · exact takeOptionDetachedValue?_cursor (token := token) (rest := rest)
+          (st := st) (expect := expect) (step := step) h
+      · exact takeOptionShortToken?_cursor (spec := spec) (token := token)
+          (rest := rest) (st := st) (expect := expect) (step := step) h
+  · split at h
+    · exact takeOptionDetachedValue?_cursor (token := token) (rest := rest)
+        (st := st) (expect := expect) (step := step) h
+    · exact takeOptionShortToken?_cursor (spec := spec) (token := token)
+        (rest := rest) (st := st) (expect := expect) (step := step) h
 
 /-- Successful option steps advance the cursor by the recorded amount. -/
 @[simp] theorem takeOptionStep?_cursor

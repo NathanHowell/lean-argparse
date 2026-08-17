@@ -37,7 +37,7 @@ private def lowercase (s : String) : String := s.toLower
 
 Names are matched case-insensitively while documentation retains the original
 spelling from `xs`. Duplicate keys prefer the first occurrence. -/
-def enumFrom (xs : List (String × α)) : FromArg α where
+@[reducible] def enumFrom (xs : List (String × α)) : FromArg α where
   parse input :=
     let needle := lowercase input
     let table := xs.map (fun pair => (lowercase pair.fst, pair.snd))
@@ -57,8 +57,8 @@ instance instFromArgString : FromArg String where
   parse s := .ok s
   metavar := "STRING"
 
-instance instFromArgSubstring : FromArg Substring where
-  parse s := .ok s.toSubstring
+instance instFromArgSubstring : FromArg Substring.Raw where
+  parse s := .ok s.toRawSubstring
   metavar := "STRING"
 
 private def natError (input : String) : String := s!"expected a natural number, found '{input}'"

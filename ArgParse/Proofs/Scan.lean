@@ -182,6 +182,11 @@ theorem stepsAgreeAt_of_no_names
 classification to what the parsers actually do, so canonicality can be stated
 syntactically instead of assumed. -/
 
+/-- A token with no such prefix does not start with it, as a `Bool`. -/
+theorem startsWith_eq_false {token p : String}
+    (hp : ¬ (p.toList <+: token.toList)) : token.startsWith p = false := by
+  simpa [String.startsWith_string_iff] using hp
+
 /-- A token the option does not claim leaves the front-of-stream step in place. -/
 theorem takeOptionStep?_stay_of_not_optionToken
     {α : Type} [FromArg α] {spec : OptSpec α} {st : State}
@@ -193,7 +198,11 @@ theorem takeOptionStep?_stay_of_not_optionToken
   cases hL : spec.long? <;> cases hS : spec.short? <;>
     cases hE : spec.eqVal? <;> cases hC : spec.concatVal? <;>
     simp_all [takeOptionStep?, takeOptionLongToken?, takeOptionShortToken?,
-      optionToken?, optionTokenShort?, CollectStep.stay]
+      optionToken?, optionTokenShort?, CollectStep.stay] <;>
+    -- The concatenated-value branches scrutinize `token.startsWith` as a `Bool`,
+    -- where `hTok` is stated as a list-prefix predicate; `startsWith_eq_false`
+    -- crosses between the two forms.
+    (rw [startsWith_eq_false]; simp_all)
 
 /-- A stream containing no token the option claims leaves the scanning step in
 place: scanning walks the whole stream and finds nothing. -/
@@ -248,9 +257,9 @@ theorem stepsAgreeAt_of_head
   unfold StepsAgreeAt
   rw [takeOptionScanStep?_eq_of_head h hValue, h]
 
-/-! ### Canonically ordered input
+/-! ### Canonically ordered input -/
 
-`Canonical` says the option's occurrences already sit at the front of the
+/-- `Canonical` says the option's occurrences already sit at the front of the
 stream: consume matches while they are at the head, and end at a stream (or an
 error) where nothing further is claimed. Unlike a spec-level condition this is
 satisfiable by real named options — see `canonicalExample` below — and it is
