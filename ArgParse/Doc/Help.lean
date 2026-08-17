@@ -20,7 +20,7 @@ private def descrColumn : Nat := 26
 /-- One `label  description` row. -/
 def entryRow (label : String) (descr : String) : String :=
   let padded := padTo descrColumn ("  " ++ label)
-  if descr.isEmpty then padded.trimRight else padded ++ descr
+  if descr.isEmpty then padded.trimAsciiEnd.toString else padded ++ descr
 
 /-- Render a titled block, or nothing when it has no rows. -/
 def block (title : String) (rows : List String) : List String :=

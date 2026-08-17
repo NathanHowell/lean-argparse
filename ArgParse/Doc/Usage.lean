@@ -13,7 +13,7 @@ open ArgParse.Spec
 
 /-- Pad `s` on the right to at least `width` characters. -/
 def padTo (width : Nat) (s : String) : String :=
-  if s.length < width then s ++ String.mk (List.replicate (width - s.length) ' ') else s
+  if s.length < width then s ++ String.ofList (List.replicate (width - s.length) ' ') else s
 
 /-- Bracket `s` when the item it describes may be omitted. -/
 @[inline] def bracketIf (optional : Bool) (s : String) : String :=

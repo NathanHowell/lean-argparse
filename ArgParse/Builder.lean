@@ -47,14 +47,13 @@ def mkShort? (c? : Option Char) : Option Short :=
 
 /-! ### Flags -/
 
-/-- A boolean flag: `true` when present anywhere in the stream, `false` otherwise.
+/-- The runtime spec and the erased item a flag is built from.
 
-```
-flag "verbose" (short := 'v') (help := "Enable verbose output.")
-```
--/
-def flag (long : String) (short : Option Char := none) (help : String := "")
-    (hidden : Bool := false) : P Bool :=
+Exposed rather than inlined so Layer 6 can state agreement between the two
+halves, and so a proof about the scanner can be transported to a statement about
+the document. -/
+def flagParts (long : String) (short : Option Char) (help : String)
+    (hidden : Bool) : FlagSpec × ItemSpec :=
   let short? := mkShort? short
   let spec : FlagSpec :=
     { short? := short?
@@ -70,7 +69,18 @@ def flag (long : String) (short : Option Char := none) (help : String := "")
     , arity := .zero
     , required := false
     , hidden := hidden }
-  { doc := .item item, run := Core.flagScan spec }
+  (spec, item)
+
+/-- A boolean flag: `true` when present anywhere in the stream, `false` otherwise.
+
+```
+flag "verbose" (short := 'v') (help := "Enable verbose output.")
+```
+-/
+def flag (long : String) (short : Option Char := none) (help : String := "")
+    (hidden : Bool := false) : P Bool :=
+  let parts := flagParts long short help hidden
+  { doc := .item parts.snd, run := Core.flagScan parts.fst }
 
 /-! ### Options
 
@@ -81,7 +91,7 @@ sync -- precisely the drift this layer exists to remove -- so the `ToString`
 constraint is the price of the guarantee. -/
 
 /-- Build the runtime spec and erased item for an option from shared arguments. -/
-@[inline] private def optParts (α : Type) [FromArg α]
+def optParts (α : Type) [FromArg α]
     (long : String) (short : Option Char) (metavar? : Option String)
     (help : String) (defaultText? : Option String) (arity : Arity) (required : Bool)
     (hidden : Bool) : OptSpec α × ItemSpec :=
@@ -174,7 +184,7 @@ def options (α : Type) [FromArg α] (long : String) (short : Option Char := non
 /-! ### Positionals -/
 
 /-- Build the runtime spec and erased item for a positional. -/
-@[inline] private def posParts (α : Type) [FromArg α]
+def posParts (α : Type) [FromArg α]
     (name : String) (metavar? : Option String) (help : String) (arity : Arity)
     (required : Bool) (hidden : Bool) : PosSpec α × ItemSpec :=
   let metavar := metavar?.getD name
