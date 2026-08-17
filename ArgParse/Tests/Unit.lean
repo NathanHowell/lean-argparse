@@ -76,6 +76,8 @@ private abbrev countOpt : OptSpec Nat :=
   { long? := some "count", «meta» := mkMeta "count", arity := .one }
 private abbrev filePos : PosSpec String :=
   { «meta» := mkMeta "file", arity := .one }
+private abbrev countShortOpt : OptSpec Nat :=
+  { short? := some shortN, long? := some "count", «meta» := mkMeta "count", arity := .one }
 
 /-! ### Option token forms -/
 
@@ -185,6 +187,54 @@ private def checkInvalidOptionPayload : Except String Unit := do
         s!"expected custom error, got {repr err.kind}"
   | other => .error s!"expected custom error, got {repr other}"
 
+/-! ### Inline bundles with typed payloads
+
+`-n5v` is an option, its value, and a further short flag in one token. Splitting
+it needs the `FromArg` instance: the parser takes the longest prefix of the tail
+that decodes, and re-dashes what is left. These pin where that boundary falls,
+because it moves with the payload type. -/
+
+/-- `-n5v` splits into the value `5` and a residual `-v`. -/
+private def checkConcatBundleSplit : Except String Unit := do
+  match Core.optionScan countShortOpt (normalize ["-n5v"]) with
+  | .ok value st' =>
+      expectTrue (value = some 5) s!"expected 5, got {repr value}"
+      expectTrue (st'.pre = ["-v"]) s!"expected -v left behind, got {repr st'.pre}"
+  | other => .error s!"expected ok result, got {repr other}"
+
+/-- The value is taken greedily: `-n12v` is twelve, not one. -/
+private def checkConcatBundleGreedy : Except String Unit := do
+  match Core.optionScan countShortOpt (normalize ["-n12v"]) with
+  | .ok value st' =>
+      expectTrue (value = some 12) s!"expected 12, got {repr value}"
+      expectTrue (st'.pre = ["-v"]) s!"expected -v left behind, got {repr st'.pre}"
+  | other => .error s!"expected ok result, got {repr other}"
+
+/-- Nothing is left over when the whole tail is the value. -/
+private def checkConcatNoResidue : Except String Unit := do
+  match Core.optionScan countShortOpt (normalize ["-n5"]) with
+  | .ok value st' =>
+      expectTrue (value = some 5) s!"expected 5, got {repr value}"
+      expectTrue st'.pre.isEmpty s!"expected nothing left behind, got {repr st'.pre}"
+  | other => .error s!"expected ok result, got {repr other}"
+
+/-- A tail with no decodable prefix is a value error, not a silent bundle. -/
+private def checkConcatUndecodable : Except String Unit := do
+  match Core.optionScan countShortOpt (normalize ["-nv"]) with
+  | .err err =>
+      expectTrue (err.kind = ArgParse.ErrorKind.custom)
+        s!"expected custom error, got {repr err.kind}"
+  | other => .error s!"expected a value error, got {repr other}"
+
+/-- A `String` payload decodes anything, so it swallows the whole tail and no
+bundle survives. This is the boundary the typed cases above sit against. -/
+private def checkConcatStringSwallows : Except String Unit := do
+  match Core.optionScan shortOptOnly (normalize ["-nfoo"]) with
+  | .ok value st' =>
+      expectTrue (value = some "foo") s!"expected the whole tail, got {repr value}"
+      expectTrue st'.pre.isEmpty s!"expected nothing left behind, got {repr st'.pre}"
+  | other => .error s!"expected ok result, got {repr other}"
+
 /-- Positionals consume the tokens scanning left behind, sentinel included. -/
 private def checkPositionalAfterScan : Except String Unit := do
   let st := normalize ["--name=foo", "target.txt"]
@@ -271,6 +321,11 @@ def runtimeChecks : List (String × Except String Unit) :=
   , ("sentinel boundary", checkSentinelBoundary)
   , ("missing option value", checkMissingOptionValue)
   , ("invalid option payload", checkInvalidOptionPayload)
+  , ("inline bundle splits", checkConcatBundleSplit)
+  , ("inline bundle takes the longest value", checkConcatBundleGreedy)
+  , ("inline value with no residue", checkConcatNoResidue)
+  , ("undecodable inline tail errors", checkConcatUndecodable)
+  , ("string payload swallows the tail", checkConcatStringSwallows)
   , ("positional after scan", checkPositionalAfterScan)
   , ("scan order insensitivity", checkScanOrderInsensitive)
   , ("core subcommand combinator", checkCoreSubcommand)

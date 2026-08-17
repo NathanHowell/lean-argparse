@@ -59,9 +59,7 @@ Ordered by value rather than by the sequence they were noticed in.
    below.
 2. **Completeness** — the missing half of the story: if argv conforms to a
    well-formed command tree, parsing succeeds and yields the expected bindings.
-3. **Bundle-splitting edge cases** — inline bundles like `-n5v` with
-   non-`String` payloads.
-4. **Real completion scripts** — `--generate-completions` lists candidates.
+3. **Real completion scripts** — `--generate-completions` lists candidates.
    Emitting bash/zsh/fish scripts that call back into it is not done. The only
    feature on this list; everything above is a theorem.
 
@@ -85,6 +83,19 @@ already pin the behaviour.
 - Builtins are matched as whole tokens, so `-h` bundled into `-vh` is not
   detected: resolving a bundle needs the flag specs of the command the tokens
   belong to, which is not known until dispatch has happened.
+- An inline bundle is split by the payload type: `findConcatSplit?` takes the
+  longest prefix of the tail that decodes. `-n5v` is `5` plus a residual `-v`
+  for a `Nat` option, and `-nfoo` is the whole tail for a `String` one, since
+  `String` decodes anything. `findConcatSplit?_split` guarantees the residue is
+  a non-empty suffix that concatenates back to the tail, so the re-dashed token
+  is never something the user did not type. Tests pin where the boundary falls.
+- A short option only claims a bundle it *starts*: `-n5v` parses, `-vn5` does
+  not. The option scan runs before the flag scan, and at that point `-vn5` does
+  not begin with `-n`; had the flag scan run first it would have rewritten the
+  token, but then `-n5v` would break instead. Neither order works for both.
+  Fixing it needs a bundle-expanding pre-pass that knows every short form the
+  command accepts -- which `Cmd` does know, unlike `Core` -- so it is a Layer-4
+  change, not a scanner tweak. Not attempted.
 - Suggestion threshold is 2 edits above three characters, which catches
   transpositions (`chidl` → `child`) at the cost of the occasional unhelpful
   but valid neighbour.

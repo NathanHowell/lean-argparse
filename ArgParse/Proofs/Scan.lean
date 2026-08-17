@@ -449,6 +449,67 @@ theorem optionScan_eq_option_example :
     optionScan demoOpt demoState = Core.option demoOpt demoState :=
   optionScan_eq_option_of_canonical canonicalExample
 
+/-! ### Bundle splitting
+
+`-n5v` is an option, its value, and a further short flag in one token. Where the
+value ends depends on the payload type — `findConcatSplit?` takes the longest
+prefix of the tail that decodes — so what needs guaranteeing is not *where* the
+cut falls but that cutting neither loses nor invents characters. The residue is
+re-dashed and pushed back on the stream, and a residue that was wrong would
+become a token the user never typed. -/
+
+/-- Taking and dropping at the same index recovers the string. -/
+theorem stringTake_append_stringDrop (s : String) (n : Nat) :
+    stringTake s n ++ stringDrop s n = s := by
+  simp only [stringTake, stringDrop]
+  rw [← String.ofList_append, List.take_append_drop]
+  simp
+
+/-- Dropping shortens by the amount dropped. -/
+theorem stringDrop_length (s : String) (n : Nat) :
+    (stringDrop s n).length = s.length - n := by
+  simp only [stringDrop]
+  rw [← String.length_toList, ← String.length_toList]
+  simp
+
+/-- The search loop, over an arbitrary candidate list. -/
+theorem findConcatSplit?_loop_split {α : Type} [FromArg α] (raw : String) :
+    ∀ (cands : List Nat), (∀ i ∈ cands, i ≤ raw.length) →
+      ∀ {v : α} {rem : String},
+        findConcatSplit?.loop raw cands = some (v, rem) →
+        rem ≠ "" ∧ stringTake raw (raw.length - rem.length) ++ rem = raw := by
+  intro cands
+  induction cands with
+  | nil => intro _ v rem h; simp [findConcatSplit?.loop] at h
+  | cons idx rest ih =>
+      intro hle v rem h
+      simp only [findConcatSplit?.loop] at h
+      split at h
+      · exact ih (fun i hi => hle i (by simp [hi])) h
+      · rename_i hne
+        split at h
+        · simp only [Option.some.injEq, Prod.mk.injEq] at h
+          obtain ⟨-, rfl⟩ := h
+          refine ⟨by simpa using hne, ?_⟩
+          rw [stringDrop_length]
+          have : idx ≤ raw.length := hle idx (by simp)
+          rw [show raw.length - (raw.length - idx) = idx by omega]
+          exact stringTake_append_stringDrop raw idx
+        · exact ih (fun i hi => hle i (by simp [hi])) h
+
+/-- **Splitting an inline bundle loses nothing.** The residue is a non-empty
+suffix, and the consumed part concatenated with it is the original tail. So the
+token pushed back on the stream is made of characters the user actually typed,
+whatever the payload type decided to claim. -/
+theorem findConcatSplit?_split {α : Type} [FromArg α]
+    {raw : String} {v : α} {rem : String}
+    (h : findConcatSplit? (α := α) raw = some (v, rem)) :
+    rem ≠ "" ∧ stringTake raw (raw.length - rem.length) ++ rem = raw := by
+  refine findConcatSplit?_loop_split raw _ ?_ h
+  intro i hi
+  have := List.mem_range.mp (List.mem_of_mem_drop (List.mem_reverse.mp hi))
+  omega
+
 end Scan
 
 end ArgParse.Proofs
