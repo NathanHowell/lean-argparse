@@ -118,11 +118,16 @@ theorem arg_yields (α : Type) [FromArg α] (name : String) (metavar : Option St
 
 This is the completeness counterpart of `subcommand_toSubcommands`: that says
 dispatch reaches the right parser, this says the whole node succeeds when the
-globals and that parser do. -/
+globals and that parser do.
+
+The globals hypothesis is stated over the bundle-expanded segment, because that
+is what `toParser` actually runs them on. -/
 theorem node_yields {α : Type} (n : String) (m : Meta) (globals : P (α → α))
     (subs : List (Cmd α)) (c : Cmd α)
     {st stG stC : State} {f : α → α} {a : α} {token : String} {rest : List String}
-    (hglob : Core.scopedPre (subs.map Cmd.name) globals.run st = .ok f stG)
+    (hglob : Core.scopedPre (subs.map Cmd.name)
+      (fun st' => globals.run (Core.expandBundles (Doc.items globals.doc) st')) st
+        = .ok f stG)
     (hpre : stG.pre = token :: rest)
     (hfind : subs.find? (fun s => s.name == token) = some c)
     (hchild : Cmd.toParser c (Core.State.withPre stG rest 1) = .ok a stC) :
@@ -169,9 +174,17 @@ theorem argv_normalizes :
 /-- The node's globals are `pure id`, scoped to the empty segment before the
 verb, so they consume nothing and change nothing. -/
 theorem globals_pass :
-    Core.scopedPre ["greet"] (Pure.pure id : P (Greeting → Greeting)).run s0
-      = .ok id s0 := by
-  simp [Core.scopedPre, Core.splitAtFirst, s0, pure_run, Parser.pure]
+    Core.scopedPre ["greet"]
+      (fun st' => (Pure.pure id : P (Greeting → Greeting)).run
+        (Core.expandBundles (Doc.items (Pure.pure id : P (Greeting → Greeting)).doc) st'))
+      s0 = .ok id s0 := by
+  simp [Core.scopedPre, Core.splitAtFirst, s0, pure_run, Parser.pure,
+    Core.expandBundles, Core.shortsOfKind]
+
+/-- `greetP` declares no short forms, so expanding its bundles does nothing. -/
+theorem greet_expand_id (st : State) :
+    Core.expandBundles (Doc.items greetP.doc) st = st := by
+  refine Core.expandBundles_nil_shorts _ st ?_ ?_ <;> rfl
 
 /-- The trailing positional is not something the `--who` option would claim. -/
 theorem alice_unclaimed :
@@ -193,7 +206,9 @@ theorem demo_yields :
     (Cmd.leaf "greet" { name := "greet" } greetP)
     (token := "greet") (rest := ["--who", "world", "Alice"])
     (by simpa [Cmd.name] using globals_pass) rfl (by simp [Cmd.name]) ?_
-  show greetP.run { pre := ["--who", "world", "Alice"], post := [], cursor := 1 } = _
+  show greetP.run (Core.expandBundles (Doc.items greetP.doc)
+      { pre := ["--who", "world", "Alice"], post := [], cursor := 1 }) = _
+  rw [greet_expand_id]
   have hopt : Yields (Builder.option String "who")
       { pre := ["--who", "world", "Alice"], post := [], cursor := 1 } "world"
       { pre := ["Alice"], post := [], cursor := 3 } := by

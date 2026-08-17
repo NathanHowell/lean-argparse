@@ -171,6 +171,85 @@ def optionToken? {α : Type} [ArgParse.FromArg α]
         optionTokenShort? spec token
   | none => optionTokenShort? spec token
 
+/-! ### Bundle expansion
+
+`-n5v` parses and `-vn5` does not, because the option scan runs first and
+`-vn5` does not begin with `-n`. Swapping the two scans only moves the problem:
+then `-n5v` breaks instead. Neither pass can fix it alone, because deciding
+where a bundle ends needs to know which characters are flags and which take
+values — and that is exactly what a command's item list says.
+
+So the split happens before either scan, driven by the items. It is deliberately
+conservative: a token is rewritten only when a non-empty run of this command's
+*flag* shorts is followed by one of its *option* shorts. Anything else is left
+byte-for-byte alone, so `-n5v` still reaches the concatenation path and `-vf`
+still reaches the flag scan's own bundle rewrite. -/
+
+/-- Short forms of the items presenting a given surface syntax. -/
+def shortsOfKind (kind : ItemKind) (items : List ItemSpec) : List Char :=
+  items.filterMap (fun i => if i.kind = kind then i.short? else none)
+
+/-- Walk a bundle's characters, emitting one token per flag short until an
+option short is reached, which takes the rest of the token with it.
+
+`none` means "do not touch this token": either the characters ran out without
+reaching an option, or one of them names nothing this command accepts. -/
+def splitBundle (flagShorts optShorts : List Char) :
+    List String → List Char → Option (List String)
+  | _, [] => Option.none
+  | acc, ch :: tail =>
+      if optShorts.contains ch then
+        Option.some (acc.reverse ++ [String.ofList ('-' :: ch :: tail)])
+      else if flagShorts.contains ch then
+        splitBundle flagShorts optShorts (String.ofList ['-', ch] :: acc) tail
+      else
+        Option.none
+
+/-- Split one token, or leave it exactly as it was.
+
+A single-token result means nothing was gained -- the option short was already
+leading -- so the original is returned rather than a re-spelled copy. -/
+def expandBundleToken (flagShorts optShorts : List Char) (token : String) : List String :=
+  match token.toList with
+  | '-' :: c :: rest =>
+      if c = '-' then [token]
+      else
+        match splitBundle flagShorts optShorts [] (c :: rest) with
+        | Option.some out => if out.length ≥ 2 then out else [token]
+        | Option.none => [token]
+  | _ => [token]
+
+/-- Expand short bundles in the `pre` stream using the items legal here.
+
+`post` is untouched: past the `--` sentinel nothing is an option. -/
+def expandBundles (items : List ItemSpec) (st : State) : State :=
+  let flagShorts := shortsOfKind .flag items
+  let optShorts := shortsOfKind .option items
+  { st with pre := st.pre.flatMap (expandBundleToken flagShorts optShorts) }
+
+/-- A command with no short forms cannot bundle, so expansion is the identity. -/
+@[simp] theorem expandBundles_nil_shorts (items : List ItemSpec) (st : State)
+    (hflag : shortsOfKind .flag items = [])
+    (hopt : shortsOfKind .option items = []) :
+    expandBundles items st = st := by
+  simp only [expandBundles, hflag, hopt]
+  have hid : ∀ tokens : List String,
+      tokens.flatMap (expandBundleToken [] []) = tokens := by
+    intro tokens
+    induction tokens with
+    | nil => rfl
+    | cons t rest ih =>
+        simp only [List.flatMap_cons, ih]
+        have : expandBundleToken [] [] t = [t] := by
+          simp only [expandBundleToken]
+          split
+          · split
+            · rfl
+            · simp [splitBundle]
+          · rfl
+        simp [this]
+  rw [hid]
+
 /-- Split a token list at the first occurrence of any of the given names. -/
 def splitAtFirst (names : List String) : List String → List String × List String
   | [] => ([], [])

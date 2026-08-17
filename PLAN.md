@@ -6,10 +6,10 @@ design of record.
 
 ## Current state (2026-08-17)
 
-All ten roadmap items are closed. Two were bugs rather than missing theorems:
-`P.many` truncated bundled flags, and `entryRow` let a wide label abut its
-description. One roadmap note was wrong -- `String.startsWith` does not block
-proofs -- and is corrected below.
+All ten roadmap items are closed. Three were bugs rather than missing theorems:
+`P.many` truncated bundled flags, `entryRow` let a wide label abut its
+description, and `-vn5` did not parse. One roadmap note was wrong --
+`String.startsWith` does not block proofs -- and is corrected below.
 
 The paired-applicative migration is complete: all seven layers of `DESIGN.md`
 are built, with no `sorry` anywhere and no `partial def` outside `Core`.
@@ -27,7 +27,9 @@ are built, with no `sorry` anywhere and no `partial def` outside `Core`.
 - **Layer 3 — builders** (`Builder.lean`): the only place `doc` and `run` are
   zipped. Named arguments replace the `Mod` monoid.
 - **Layer 4 — `Cmd`** (`Cmd.lean`): the command tree, with `toParser` and
-  `toCmdSpec` walking the same `subs` list, and per-node globals.
+  `toCmdSpec` walking the same `subs` list, per-node globals, and a
+  bundle-expanding pre-pass that splits `-vn5` using the items legal at that
+  command.
 - **Layer 5 — runner** (`Exec.lean`): `--help` at every level, `--version`,
   `--man`, completion candidates, installable bash/zsh/fish completion scripts,
   usage synopses, and error rendering with nearest-match suggestions.
@@ -59,15 +61,10 @@ are built, with no `sorry` anywhere and no `partial def` outside `Core`.
 
 ## Roadmap
 
-The ten-item roadmap is closed. What follows is what that work turned up, not
-what it left undone.
-
-1. **Bundles are order-dependent** — `-n5v` parses, `-vn5` does not. Found while
-   pinning the bundle-splitting edge cases; described in the design notes below,
-   with why swapping the scan order does not fix it. The fix is a
-   bundle-expanding pre-pass at Layer 4, where the command's short forms are
-   known. Worth doing only if someone actually types `-vn5`; `getopt` accepts it,
-   so someone will.
+Empty. The ten items are closed, and the bug that closing them turned up --
+`-vn5` failing to parse -- is fixed as far as the layering allows; the residue
+is recorded as a design note rather than a to-do, with the price of removing it
+written down.
 
 Deliberately not on the list: `usageLine`, `renderCommandHelp`, `renderMan`,
 `editDistance`, and `nearest?` have no theorems and should not get any. They are
@@ -95,13 +92,24 @@ already pin the behaviour.
   `String` decodes anything. `findConcatSplit?_split` guarantees the residue is
   a non-empty suffix that concatenates back to the tail, so the re-dashed token
   is never something the user did not type. Tests pin where the boundary falls.
-- A short option only claims a bundle it *starts*: `-n5v` parses, `-vn5` does
-  not. The option scan runs before the flag scan, and at that point `-vn5` does
-  not begin with `-n`; had the flag scan run first it would have rewritten the
-  token, but then `-n5v` would break instead. Neither order works for both.
-  Fixing it needs a bundle-expanding pre-pass that knows every short form the
-  command accepts -- which `Cmd` does know, unlike `Core` -- so it is a Layer-4
-  change, not a scanner tweak. Not attempted.
+- Bundles that *lead with flags* are split before anything scans, by
+  `Core.expandBundles` running in `Cmd.toParser` over the segment each command
+  owns. `-vn5` becomes `-v -n5` whichever order the parser sequences its items
+  in. The pass is conservative -- it rewrites only a non-empty run of this
+  command's flag shorts followed by one of its option shorts -- so `-n5v` still
+  reaches the concatenation path, `-vf` still reaches the flag scan's own bundle
+  rewrite, and a token with an unknown short is left byte-for-byte alone.
+- Bundles that *lead with an option* still depend on sequencing: `-n5v` parses
+  only if the flag is sequenced after the option. The split there happens during
+  the option's own scan, which pushes the residue `-v` back onto the stream, and
+  a flag that already ran cannot see it. Doing that split up front instead would
+  need the value's decoder -- `5v` is `5` then `v` for a `Nat` and the whole
+  string for a `String` -- and the item list the expansion pass reads is
+  type-erased. Carrying a splitter through it means a function field on
+  `ItemSpec` or `Doc`, which costs the derived `Repr` and `DecidableEq` that
+  `Exec.exec` (`args.contains`) and the renderers depend on. Not worth it while
+  `-n5 -v` and `--count=5 -v` work in either order, and the failure is a
+  leftover error rather than a wrong parse. Pinned by tests in both directions.
 - Suggestion threshold is 2 edits above three characters, which catches
   transpositions (`chidl` → `child`) at the cost of the occasional unhelpful
   but valid neighbour.

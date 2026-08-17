@@ -211,6 +211,72 @@ private def checkHelpMentionsItems : Except String Unit :=
         (Except.ok ())
   | other => .error s!"expected help output, got {repr other}"
 
+/-! ### Bundles packing an option
+
+`-vn5` is a flag, then an option, then its value, in one token. Which of these
+parse depends on where the split has to happen, so all four combinations are
+pinned -- including the one that does not work, so it cannot change silently. -/
+
+/-- Payload for the bundle fixtures. -/
+private structure Bundled where
+  count : Nat
+  verbose : Bool
+  deriving Repr, DecidableEq
+
+/-- The option is sequenced before the flag. -/
+private def optFirstApp : Cmd Bundled :=
+  .leaf "run" { name := "run" }
+    ((fun c v => Bundled.mk c v)
+      <$> option Nat "count" (short := 'n') <*> flag "verbose" (short := 'v'))
+
+/-- The flag is sequenced before the option. -/
+private def flagFirstApp : Cmd Bundled :=
+  .leaf "run" { name := "run" }
+    ((fun v c => Bundled.mk c v)
+      <$> flag "verbose" (short := 'v') <*> option Nat "count" (short := 'n'))
+
+private def expectBundled (label : String) (app : Cmd Bundled) (argv : List String)
+    (want : Bundled) : Except String Unit :=
+  match Exec.exec app argv with
+  | .ok value => expectTrue (value == want) s!"{label}: got {repr value}, want {repr want}"
+  | other => .error s!"{label}: expected a parse, got {repr other}"
+
+/-- A bundle that *leads* with flags splits before anything scans, so it parses
+whichever order the parser was written in. This is what the expansion pass in
+`Cmd.toParser` buys. -/
+private def checkBundleFlagsThenOption : Except String Unit := do
+  expectBundled "option first" optFirstApp ["-vn5"] { count := 5, verbose := true }
+  expectBundled "flag first" flagFirstApp ["-vn5"] { count := 5, verbose := true }
+
+/-- A bundle that *leads* with the option splits during the option's own scan,
+which pushes the residue back onto the stream. Only parsers that reach the flag
+afterwards can see it. -/
+private def checkBundleOptionThenFlag : Except String Unit := do
+  expectBundled "option first" optFirstApp ["-n5v"] { count := 5, verbose := true }
+
+/-- The unfixed half, pinned. With the flag sequenced first, the residue `-v`
+appears after that flag has already run, and is reported as leftover.
+
+This is a consequence of scanning each item once in applicative order, not an
+oversight: splitting `-n5v` up front would need the value's decoder, and the
+item list the expansion pass reads is type-erased. `-n5 -v` and `--count=5 -v`
+work in either order. -/
+private def checkBundleOptionThenFlagLimitation : Except String Unit := do
+  match Exec.exec flagFirstApp ["-n5v"] with
+  | .error text =>
+      expectTrue ((text.splitOn "-v").length ≥ 2)
+        s!"expected the residue reported as leftover, got: {text}"
+  | other => .error s!"expected the documented failure, got {repr other}"
+  expectBundled "detached still works" flagFirstApp ["-n5", "-v"]
+    { count := 5, verbose := true }
+
+/-- A short the command does not accept leaves its token untouched, so the
+expansion pass cannot invent tokens the user never typed. -/
+private def checkBundleUnknownShortUntouched : Except String Unit := do
+  match Exec.exec flagFirstApp ["-xn5"] with
+  | .error _ => pure ()
+  | other => .error s!"expected an error for an unknown short, got {repr other}"
+
 /-- The completion script names the binary and calls back into the query flag.
 
 The point of generating a script rather than shipping one is that it stays
@@ -292,6 +358,10 @@ def execChecks : List (String × Except String Unit) :=
   , ("unknown shell refused", checkCompletionScriptUnknownShell)
   , ("missing shell refused", checkCompletionScriptNoShell)
   , ("wide labels keep their separator", checkWideLabelSeparated)
+  , ("bundle leading with flags", checkBundleFlagsThenOption)
+  , ("bundle leading with an option", checkBundleOptionThenFlag)
+  , ("bundle residue needs a later flag", checkBundleOptionThenFlagLimitation)
+  , ("unknown short leaves its token alone", checkBundleUnknownShortUntouched)
   ]
 
 end ArgParse.Tests

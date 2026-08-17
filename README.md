@@ -164,7 +164,8 @@ changes what the binary answers, not what the user has installed. `zsh` and
   the underlying `Parser`, and the same laws for `P` itself up to `Doc`
   normalization
 - Flags with short-name bundling; options with `--name value`, `--name=value`,
-  and `-n5` concatenation plus `.one`/`.many`/`.some` arities; positionals;
+  and `-n5` concatenation plus `.one`/`.many`/`.some` arities; mixed bundles
+  like `-vn5`, split against the items legal at that command; positionals;
   recursive subcommands with per-node global options
 - Order-insensitive parsing: flags and options are *scanned* out of the current
   command's segment rather than consumed front-of-stream, so
@@ -180,9 +181,11 @@ changes what the binary answers, not what the user has installed. `zsh` and
   with no stringly recovery step
 - A proof suite with no `sorry`, no extra axioms, and a lint-clean build
 
-One documented ambiguity: a detached option value that lexes as a defined flag
+Two documented ambiguities. A detached option value that lexes as a defined flag
 (`--message -v`) is claimed by the flag scan first; write `--message=-v` to force
-the value reading.
+the value reading. And a bundle that *leads* with an option, like `-n5v`, is
+split during that option's own scan, so the trailing `-v` is only picked up by
+flags sequenced after it — `-n5 -v` works either way.
 
 ## Comparison with lean4-cli
 
