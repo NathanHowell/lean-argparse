@@ -38,7 +38,9 @@ are built, with no `sorry` anywhere and no `partial def` outside `Core`.
   travel in field types via `Arg α o`.
 - **Runtime proofs** (`Proofs/`): lawful Functor/Applicative for `Parser`; flag
   totality and the collector cursor lemma; determinism; sentinel factorization;
-  scan/front-of-stream agreement on syntactically canonical argv; `Doc`
+  scan/front-of-stream agreement on syntactically canonical argv, for flags
+  (bundles included) as well as options, and across the detached, `=`-form, and
+  concatenated token forms; `Doc`
   normalization preserving items and being idempotent; the applicative laws for
   `P` itself, up to normalization; `P.many`'s repetition bound proved slack for
   parsers that progress, with the flag builder shown to be one.
@@ -50,16 +52,9 @@ are built, with no `sorry` anywhere and no `partial def` outside `Core`.
 
 Ordered by value rather than by the sequence they were noticed in.
 
-1. **Scan agreement for flags and bundles** — `Canonical` covers options; the
-   analogous syntactic canonicality story for flag scanning, and for `=`-form
-   and concatenated option tokens, is still open. The note that used to sit
-   here -- that `String.startsWith` blocks it -- turned out to be wrong, and the
-   option-builder work disproved it in passing: `simp` rewrites `startsWith` to
-   a list-prefix claim and ordinary list reasoning finishes. See the design note
-   below.
-2. **Completeness** — the missing half of the story: if argv conforms to a
+1. **Completeness** — the missing half of the story: if argv conforms to a
    well-formed command tree, parsing succeeds and yields the expected bindings.
-3. **Real completion scripts** — `--generate-completions` lists candidates.
+2. **Real completion scripts** — `--generate-completions` lists candidates.
    Emitting bash/zsh/fish scripts that call back into it is not done. The only
    feature on this list; everything above is a theorem.
 
@@ -108,6 +103,11 @@ already pin the behaviour.
   is the right thing to report. Reported downstream as nsnd-irq0.
 - `deriving Parseable` rejects, rather than mistranslates, a default that
   depends on an earlier field and a `Bool` defaulting to `true`.
+- `rw` with a `String.startsWith` lemma usually fails where `simp` succeeds: the
+  `ForwardPattern` instance is indexed by the pattern and stops matching once
+  the surrounding definitions are unfolded. Prefer `split` over
+  `rw [if_pos …]` on a `startsWith` guard, and close the impossible branch with
+  `absurd`.
 - `String.startsWith` is not the proof obstacle it looked like. It routes
   through `String.Slice.Pattern`, so it does not reduce, but `simp` rewrites it
   to a `List.IsPrefix` claim about `toList`, and list reasoning finishes the

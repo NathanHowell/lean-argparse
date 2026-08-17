@@ -19,7 +19,11 @@ below isolate exactly that condition:
   each state the collector visits;
 * `Canonical` derives that invariant from the *syntax* of argv rather than
   assuming it — `optionToken?` classifies tokens by inspection, and
-  `optionScan_eq_option_of_canonical` needs no further hypothesis.
+  `optionScan_eq_option_of_canonical` needs no further hypothesis;
+* `FlagCanonical` is the flag counterpart, and covers bundles: a token like
+  `-vf` is classified symbolically by `matchFlagToken_bundle`;
+* the `--name=value` and `-nvalue` forms are covered too, by
+  `optionScan_eq_option_of_eq_form` and `optionScan_eq_option_of_concat_short`.
 
 Both conditions are properties of the *state*, not of the spec: for any option
 that can match at all there are streams where scanning legitimately sees more,
@@ -423,8 +427,12 @@ possibility that `Canonical` is satisfiable only by degenerate specs. -/
 
 /-- A `--name` option collecting many detached values, used to witness
 `Canonical`. `eqVal?`/`concatVal?` are off so that token classification reduces
-to string equality: `String.startsWith` is opaque to the kernel, so the `=`-form
-branch could not otherwise be discharged by computation. -/
+to string equality and the whole witness is settled by computation.
+
+That is a convenience for *this* literal example, not a limitation:
+`canonical_of_eq_form` and `canonical_of_concat_short` below cover both other
+forms for a symbolic name and value. `String.startsWith` does not reduce, but it
+does rewrite. -/
 def demoOpt : OptSpec String :=
   { long? := some "name", «meta» := { name := "name" }, arity := .many
     , eqVal? := false, concatVal? := false }
@@ -509,6 +517,217 @@ theorem findConcatSplit?_split {α : Type} [FromArg α]
   intro i hi
   have := List.mem_range.mp (List.mem_of_mem_drop (List.mem_reverse.mp hi))
   omega
+
+/-! ### Reading a token symbolically
+
+`String.startsWith` does not reduce — it goes through `String.Slice.Pattern` —
+but `simp` rewrites it into a `List.IsPrefix` claim about `toList`, and list
+reasoning finishes. That is what lets the `=`-form and concatenated branches be
+discharged for a *symbolic* name and value rather than only for literals.
+
+One wrinkle worth knowing: `rw` with these lemmas usually fails where `simp`
+succeeds, because the `ForwardPattern` instance is indexed by the pattern and
+does not match syntactically after unfolding. Prefer `split` over `rw [if_pos …]`
+on a `startsWith` guard. -/
+
+/-- A string starts with any prefix of itself. -/
+theorem startsWith_append_left (s t : String) : (s ++ t).startsWith s = true := by simp
+
+/-- Dropping a prefix leaves exactly the suffix. -/
+theorem drop_append_length (s t : String) : ((s ++ t).drop s.length).toString = t := by
+  apply String.toList_inj.mp
+  simp [← String.length_toList]
+
+/-- Appending something non-empty changes the string. -/
+theorem append_ne_self (s v : String) (h : v ≠ "") : s ++ v ≠ s := by
+  intro heq
+  apply h
+  have hl := congrArg (fun x : String => x.toList.length) heq
+  simp at hl
+  exact hl
+
+/-- A short-form token never looks like a long one: `Short.ok` rules out `-` as
+the flag character, so the second position is never a dash. -/
+theorem short_token_not_double_dash (short : Spec.Short) (tail : String) :
+    (shortLexeme short ++ tail).startsWith "--" = false := by
+  simp only [shortLexeme]
+  simp
+  intro h
+  exact absurd h.symm short.ok.1
+
+/-! ### Canonically ordered input for flags
+
+The option story has `Canonical`; this is its counterpart. `flagScan` is a
+single step rather than a collector, so the condition is correspondingly
+simpler: the flag's occurrence, if it has one, is already the head token.
+`matchFlagToken` classifies a token by inspection, so — as with `optionToken?` —
+the condition is syntactic. -/
+
+/-- A stream in which no token matches is a stream the scan misses. -/
+theorem scanFlagPre_none_of_no_match {spec : FlagSpec} :
+    ∀ {pre : List String}, (∀ tok ∈ pre, matchFlagToken spec tok = .none) →
+      scanFlagPre spec pre = none := by
+  intro pre
+  induction pre with
+  | nil => intro _; rfl
+  | cons token rest ih =>
+      intro h
+      simp only [scanFlagPre, h token (by simp)]
+      rw [ih (fun tok hm => h tok (by simp [hm]))]
+      rfl
+
+/-- `FlagCanonical` says the flag's occurrence, if it has one, already sits at
+the front of the stream — the flag analogue of `Canonical`. -/
+inductive FlagCanonical (spec : FlagSpec) : State → Prop where
+  /-- No token in the stream matches the flag. -/
+  | absent {st : State}
+      (h : ∀ tok ∈ st.pre, matchFlagToken spec tok = .none) : FlagCanonical spec st
+  /-- The flag matches the head token. -/
+  | head {st : State} {token : String} {rest : List String}
+      (hPre : st.pre = token :: rest)
+      (hMatch : matchFlagToken spec token ≠ .none) : FlagCanonical spec st
+
+/-- **Agreement for flags on canonically ordered argv.** -/
+theorem flagScan_eq_flag_of_canonical {spec : FlagSpec} {st : State}
+    (h : FlagCanonical spec st) : flagScan spec st = Core.flag spec st := by
+  cases h with
+  | absent hno => exact flagScan_eq_flag_of_scan_none (scanFlagPre_none_of_no_match hno)
+  | head hPre hMatch => exact flagScan_eq_flag_of_head hPre hMatch
+
+/-- A long lexeme is classified as the long form. -/
+theorem matchFlagToken_long {spec : FlagSpec} {name : String}
+    (hlong : spec.long? = some name) :
+    matchFlagToken spec (longLexeme name) = .long := by
+  simp [matchFlagToken, hlong]
+
+/-- **A bundle is classified as a bundle**, for a symbolic flag character and
+tail. This is the case that makes flag scanning more than string equality, and
+the one the budget work in `Proofs.Many` depends on. -/
+theorem matchFlagToken_bundle {spec : FlagSpec} {short : Spec.Short} {tail : String}
+    (hshort : spec.short? = some short) (hlong : spec.long? = none)
+    (htail : tail ≠ "") :
+    matchFlagToken spec (shortLexeme short ++ tail) = .shortBundled tail := by
+  have hdd := short_token_not_double_dash short tail
+  simp only [matchFlagToken, hlong, hshort]
+  rw [if_neg (append_ne_self _ _ htail)]
+  split
+  · rw [drop_append_length]
+    split
+    · rename_i hemp
+      exact absurd hemp (by simp [htail])
+    · split
+      · rename_i h2
+        exact absurd h2 (by simp [hdd])
+      · rfl
+  · rename_i hf
+    exact absurd (startsWith_append_left (shortLexeme short) tail) (by simp [hf])
+
+/-- A stream headed by a bundle is canonical for the flag it starts with, so the
+two flag parsers agree there. -/
+theorem flagCanonical_of_bundle {spec : FlagSpec} {short : Spec.Short}
+    {tail : String} {st : State} {rest : List String}
+    (hshort : spec.short? = some short) (hlong : spec.long? = none)
+    (htail : tail ≠ "") (hpre : st.pre = (shortLexeme short ++ tail) :: rest) :
+    FlagCanonical spec st :=
+  FlagCanonical.head hpre (by rw [matchFlagToken_bundle hshort hlong htail]; simp)
+
+/-- A stream headed by the long lexeme is canonical for that flag. -/
+theorem flagCanonical_of_long {spec : FlagSpec} {name : String}
+    {st : State} {rest : List String}
+    (hlong : spec.long? = some name) (hpre : st.pre = longLexeme name :: rest) :
+    FlagCanonical spec st :=
+  FlagCanonical.head hpre (by rw [matchFlagToken_long hlong]; simp)
+
+/-! ### `=`-form and concatenated option tokens
+
+`Canonical`'s witness above uses an option with `eqVal?`/`concatVal?` switched
+off, because those branches were believed to be out of reach. They are not. Both
+forms are discharged here for a symbolic name, character, and value — so the
+agreement theorem covers `--name=value` and `-nvalue`, not just the detached
+form. -/
+
+/-- The front-of-stream step reads `--name=value` in one token. -/
+theorem takeOptionStep?_eq_form {α : Type} [FromArg α] (spec : OptSpec α)
+    (name v : String) (value : α) (st : State) (rest : List String)
+    (hlong : spec.long? = some name) (heq : spec.eqVal? = true)
+    (hne : v ≠ "") (hrun : FromArg.run v = .ok value)
+    (hpre : st.pre = ("--" ++ name ++ "=" ++ v) :: rest) :
+    takeOptionStep? spec st
+      = .ok (CollectStep.ofConcat (some (value, v)) (State.withPre st rest 1)) := by
+  simp only [takeOptionStep?, hpre, hlong, takeOptionLongToken?, longLexeme]
+  rw [if_pos heq]
+  split
+  · rw [drop_append_length]
+    simp [takeOptionConcatPayload?, parseConcatValue, hne, hrun, CollectStep.ofConcat]
+  · rename_i hfalse
+    exact absurd (startsWith_append_left ("--" ++ name ++ "=") v) hfalse
+
+/-- The front-of-stream step reads `-nvalue` in one token. -/
+theorem takeOptionStep?_concat_short {α : Type} [FromArg α] (spec : OptSpec α)
+    (short : Spec.Short) (v : String) (value : α) (st : State) (rest : List String)
+    (hshort : spec.short? = some short) (hlong : spec.long? = none)
+    (hconcat : spec.concatVal? = true)
+    (hne : v ≠ "") (hrun : FromArg.run v = .ok value)
+    (hpre : st.pre = (shortLexeme short ++ v) :: rest) :
+    takeOptionStep? spec st
+      = .ok (CollectStep.ofConcat (some (value, v)) (State.withPre st rest 1)) := by
+  simp only [takeOptionStep?, hpre, hlong, takeOptionShortToken?, hshort, hconcat]
+  rw [if_neg (append_ne_self _ _ hne)]
+  split
+  · rw [drop_append_length]
+    simp [takeOptionConcatPayload?, parseConcatValue, hne, hrun, CollectStep.ofConcat]
+  · rename_i hfalse
+    exact absurd (startsWith_append_left (shortLexeme short) v) (by simp [hfalse])
+
+/-- A stream headed by `--name=value` whose tail claims nothing is canonical. -/
+theorem canonical_of_eq_form {α : Type} [FromArg α] {spec : OptSpec α}
+    {name v : String} {value : α} {st : State} {rest : List String}
+    (hlong : spec.long? = some name) (heq : spec.eqVal? = true)
+    (hne : v ≠ "") (hrun : FromArg.run v = .ok value)
+    (hpre : st.pre = ("--" ++ name ++ "=" ++ v) :: rest)
+    (hrest : ∀ tok ∈ rest, optionToken? spec tok = false) :
+    Canonical spec st :=
+  Canonical.consume
+    (takeOptionStep?_eq_form spec name v value st rest hlong heq hne hrun hpre)
+    (by simp [CollectStep.ofConcat])
+    (Canonical.exhausted (by simpa [CollectStep.ofConcat, State.withPre] using hrest))
+
+/-- A stream headed by `-nvalue` whose tail claims nothing is canonical. -/
+theorem canonical_of_concat_short {α : Type} [FromArg α] {spec : OptSpec α}
+    {short : Spec.Short} {v : String} {value : α} {st : State} {rest : List String}
+    (hshort : spec.short? = some short) (hlong : spec.long? = none)
+    (hconcat : spec.concatVal? = true)
+    (hne : v ≠ "") (hrun : FromArg.run v = .ok value)
+    (hpre : st.pre = (shortLexeme short ++ v) :: rest)
+    (hrest : ∀ tok ∈ rest, optionToken? spec tok = false) :
+    Canonical spec st :=
+  Canonical.consume
+    (takeOptionStep?_concat_short spec short v value st rest hshort hlong hconcat hne hrun hpre)
+    (by simp [CollectStep.ofConcat])
+    (Canonical.exhausted (by simpa [CollectStep.ofConcat, State.withPre] using hrest))
+
+/-- **Agreement on `--name=value`.** -/
+theorem optionScan_eq_option_of_eq_form {α : Type} [FromArg α] {spec : OptSpec α}
+    {name v : String} {value : α} {st : State} {rest : List String}
+    (hlong : spec.long? = some name) (heq : spec.eqVal? = true)
+    (hne : v ≠ "") (hrun : FromArg.run v = .ok value)
+    (hpre : st.pre = ("--" ++ name ++ "=" ++ v) :: rest)
+    (hrest : ∀ tok ∈ rest, optionToken? spec tok = false) :
+    optionScan spec st = Core.option spec st :=
+  optionScan_eq_option_of_canonical
+    (canonical_of_eq_form hlong heq hne hrun hpre hrest)
+
+/-- **Agreement on `-nvalue`.** -/
+theorem optionScan_eq_option_of_concat_short {α : Type} [FromArg α] {spec : OptSpec α}
+    {short : Spec.Short} {v : String} {value : α} {st : State} {rest : List String}
+    (hshort : spec.short? = some short) (hlong : spec.long? = none)
+    (hconcat : spec.concatVal? = true)
+    (hne : v ≠ "") (hrun : FromArg.run v = .ok value)
+    (hpre : st.pre = (shortLexeme short ++ v) :: rest)
+    (hrest : ∀ tok ∈ rest, optionToken? spec tok = false) :
+    optionScan spec st = Core.option spec st :=
+  optionScan_eq_option_of_canonical
+    (canonical_of_concat_short hshort hlong hconcat hne hrun hpre hrest)
 
 end Scan
 
