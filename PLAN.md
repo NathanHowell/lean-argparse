@@ -31,7 +31,8 @@ are built, with no `sorry` anywhere and no `partial def` outside `Core`.
   builders through their shared `optionValues` core, and the three positionals
   -- in both directions, accepting what they claim and declining what they do
   not; verb agreement lifted over the tree (including pointwise dispatch: the
-  entry named `foo` runs `foo`'s parser); help coverage; completion agreement.
+  entry named `foo` runs `foo`'s parser); help coverage; completion agreement;
+  soundness of the `unknownLong?` diagnostic.
 - **Layer 7 — deriving** (`Deriving.lean`): `deriving ArgParse.Parseable`
   generates a `P` from a structure. Short forms, positionals, and metavars
   travel in field types via `Arg α o`.
@@ -58,12 +59,9 @@ Ordered by value rather than by the sequence they were noticed in.
    below.
 2. **Completeness** — the missing half of the story: if argv conforms to a
    well-formed command tree, parsing succeeds and yields the expected bindings.
-3. **`unknownLong?` soundness** — it should never flag a lexeme the command
-   actually accepts, since a spurious "unrecognised `--foo`" is a user-facing
-   bug. Provable against `Doc.pathItems`.
-4. **Bundle-splitting edge cases** — inline bundles like `-n5v` with
+3. **Bundle-splitting edge cases** — inline bundles like `-n5v` with
    non-`String` payloads.
-5. **Real completion scripts** — `--generate-completions` lists candidates.
+4. **Real completion scripts** — `--generate-completions` lists candidates.
    Emitting bash/zsh/fish scripts that call back into it is not done. The only
    feature on this list; everything above is a theorem.
 

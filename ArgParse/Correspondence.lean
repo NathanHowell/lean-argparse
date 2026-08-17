@@ -675,4 +675,60 @@ theorem candidates_contain_cmd_verbs {c : Cmd α} {name : String}
   rw [verb_agreement]
   exact h
 
+/-! ### Diagnostics are sound
+
+`Exec.unknownLong?` rewrites a parse failure into "unrecognised `--foo`". That
+is a better message when it is right and a confusing one when it is wrong, so
+what needs proving is that it never fires on something the command accepts. -/
+
+/-- **`unknownLong?` never names something it was told about.** -/
+theorem unknownLong?_sound {known tokens : List String} {name : String}
+    (h : Exec.unknownLong? known tokens = some name) : name ∉ known := by
+  obtain ⟨token, -, hf⟩ := List.exists_of_findSome?_eq_some h
+  dsimp only at hf
+  split at hf
+  · split at hf
+    · exact absurd hf (by simp)
+    · rename_i hk
+      simp only [Option.some.injEq] at hf
+      subst hf
+      simpa using hk
+  · exact absurd hf (by simp)
+
+/-- What it names is a long lexeme actually present in the stream, with any
+`=value` suffix removed — not something invented. -/
+theorem unknownLong?_provenance {known tokens : List String} {name : String}
+    (h : Exec.unknownLong? known tokens = some name) :
+    ∃ token ∈ tokens, token.startsWith "--" = true ∧ token ≠ "--"
+      ∧ name = (token.splitOn "=").headD token := by
+  obtain ⟨token, hmem, hf⟩ := List.exists_of_findSome?_eq_some h
+  dsimp only at hf
+  split at hf
+  · rename_i hstart
+    split at hf
+    · exact absurd hf (by simp)
+    · simp only [Option.some.injEq] at hf
+      simp only [Bool.and_eq_true, bne_iff_ne, ne_eq] at hstart
+      exact ⟨token, hmem, hstart.1, hstart.2, hf.symm⟩
+  · exact absurd hf (by simp)
+
+/-- Soundness in the shape `Exec.exec` uses it: the `legal` list it passes is the
+lexemes of the items on the path plus the runner's own, so no lexeme of an item
+the command accepts can be reported as unrecognised. -/
+theorem unknownLong?_not_item_lexeme {items : List ItemSpec}
+    {extra tokens : List String} {name : String} {item : ItemSpec}
+    (h : Exec.unknownLong? (items.flatMap (·.lexemes) ++ extra) tokens = some name)
+    (hitem : item ∈ items) : name ∉ item.lexemes := by
+  intro hname
+  exact unknownLong?_sound h
+    (List.mem_append_left _ (List.mem_flatMap.mpr ⟨item, hitem, hname⟩))
+
+/-- The same for the runner's builtins: `--help` is never reported as
+unrecognised. -/
+theorem unknownLong?_not_runner_lexeme {items : List ItemSpec}
+    {extra tokens : List String} {name : String}
+    (h : Exec.unknownLong? (items.flatMap (·.lexemes) ++ extra) tokens = some name) :
+    name ∉ extra :=
+  fun hname => unknownLong?_sound h (List.mem_append_right _ hname)
+
 end ArgParse.Correspondence
