@@ -27,9 +27,11 @@ are built, with no `sorry` anywhere and no `partial def` outside `Core`.
   `--man`, completion, usage synopses, and error rendering with nearest-match
   suggestions. Applications contain no help code.
 - **Layer 6 — correspondence** (`Correspondence.lean`): item agreement per
-  builder, behavioural acceptance, verb agreement lifted over the tree
-  (including pointwise dispatch: the entry named `foo` runs `foo`'s parser),
-  help coverage, completion agreement.
+  builder; behavioural acceptance for every builder -- flags, the four option
+  builders through their shared `optionValues` core, and the three positionals
+  -- in both directions, accepting what they claim and declining what they do
+  not; verb agreement lifted over the tree (including pointwise dispatch: the
+  entry named `foo` runs `foo`'s parser); help coverage; completion agreement.
 - **Layer 7 — deriving** (`Deriving.lean`): `deriving ArgParse.Parseable`
   generates a `P` from a structure. Short forms, positionals, and metavars
   travel in field types via `Arg α o`.
@@ -46,24 +48,23 @@ are built, with no `sorry` anywhere and no `partial def` outside `Core`.
 
 Ordered by value rather than by the sequence they were noticed in.
 
-1. **Correspondence for the option builders' behaviour** — the behavioural
-   acceptance lemmas cover `flag`. The seven option and positional builders have
-   their data agreement proved but not their token-level acceptance.
-2. **`P.many` progress** — `many` is bounded by token count and discards a
+1. **`P.many` progress** — `many` is bounded by token count and discards a
    non-advancing step. A progress lemma for the builders would let the bound be
    stated rather than assumed.
-3. **Scan agreement for flags and bundles** — `Canonical` covers options; the
-   analogous syntactic canonicality story for flag scanning (and for `=`-form
-   and concatenated option tokens, whose classification the kernel cannot
-   evaluate because `String.startsWith` is opaque) is still open.
-4. **Completeness** — the missing half of the story: if argv conforms to a
+2. **Scan agreement for flags and bundles** — `Canonical` covers options; the
+   analogous syntactic canonicality story for flag scanning, and for `=`-form
+   and concatenated option tokens, is still open. The note that used to sit
+   here -- that `String.startsWith` blocks it -- turned out to be wrong, and
+   item 1 disproved it in passing: `simp` rewrites `startsWith` to a list-prefix
+   claim and ordinary list reasoning finishes. See the design note below.
+3. **Completeness** — the missing half of the story: if argv conforms to a
    well-formed command tree, parsing succeeds and yields the expected bindings.
-5. **`unknownLong?` soundness** — it should never flag a lexeme the command
+4. **`unknownLong?` soundness** — it should never flag a lexeme the command
    actually accepts, since a spurious "unrecognised `--foo`" is a user-facing
    bug. Provable against `Doc.pathItems`.
-6. **Bundle-splitting edge cases** — inline bundles like `-n5v` with
+5. **Bundle-splitting edge cases** — inline bundles like `-n5v` with
    non-`String` payloads.
-7. **Real completion scripts** — `--generate-completions` lists candidates.
+6. **Real completion scripts** — `--generate-completions` lists candidates.
    Emitting bash/zsh/fish scripts that call back into it is not done. The only
    feature on this list; everything above is a theorem.
 
@@ -99,6 +100,15 @@ already pin the behaviour.
   is the right thing to report. Reported downstream as nsnd-irq0.
 - `deriving Parseable` rejects, rather than mistranslates, a default that
   depends on an earlier field and a `Bool` defaulting to `true`.
+- `String.startsWith` is not the proof obstacle it looked like. It routes
+  through `String.Slice.Pattern`, so it does not reduce, but `simp` rewrites it
+  to a `List.IsPrefix` claim about `toList`, and list reasoning finishes the
+  job. `startsWith_append_eq_false` is the instance that mattered: reaching the
+  detached `--name value` branch means first ruling out `--name=`, and the
+  ruling-out is a length argument. Note that `rw` with that lemma fails where
+  `simp` succeeds -- the `ForwardPattern` instance argument does not match
+  syntactically -- so unfold the surrounding `if` first and rewrite into a goal
+  that still mentions `Core.longLexeme` unexpanded.
 - `Doc.normalize` has no caller outside its own recursion: the renderers all
   read `Doc.items`, which is insensitive to nesting, so none of them needs it.
   It earns its place as the equivalence the applicative laws are stated up to

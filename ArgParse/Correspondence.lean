@@ -1,5 +1,6 @@
 import ArgParse.Exec
 import ArgParse.Core.Scan
+import ArgParse.Proofs.Scan
 
 /-!
 # ArgParse.Correspondence
@@ -174,6 +175,334 @@ theorem flag_ignores_unmatched (long : String) (short : Option Char) (help : Str
     simp
   simp only [Builder.flag, Core.flagScan, Core.normalize, hsplit,
              Core.scanFlagPre, hmiss]
+  rfl
+
+/-! ### Behavioural acceptance: options
+
+The four option builders share one runtime core, `Builder.optionValues`, and
+differ only in how they read the list it returns. So acceptance is proved once
+against that core and the builders follow as corollaries — which is also the
+statement that they cannot drift apart.
+
+Two directions are covered, matching the flag lemmas above: a stream carrying
+the option's own detached long form yields its value, and a stream carrying
+nothing the option claims leaves it empty. -/
+
+/-- A string never starts with a strict extension of itself.
+
+`takeOptionLongToken?` tests the `--name=value` form *before* the detached
+`--name value` form, so reaching the detached branch means discharging this.
+The proof crosses out of `String`: `simp` rewrites `startsWith` to a list-prefix
+claim, and a prefix cannot be longer than what it prefixes. -/
+theorem startsWith_append_eq_false (s t : String) (ht : t ≠ "") :
+    (s.startsWith (s ++ t)) = false := by
+  simp
+  intro h
+  have hl := h.length_le
+  simp at hl
+  apply ht
+  have h0 : t.toList = [] := by
+    have : t.toList.length = 0 := by omega
+    exact List.eq_nil_of_length_eq_zero this
+  simpa using congrArg String.ofList h0
+
+/-- A non-empty long name gives a lexeme distinct from the sentinel. -/
+theorem long_lexeme_ne_sentinel {long : String} (h : long ≠ "") :
+    ("--" ++ long) ≠ "--" := by
+  intro hEq
+  apply h
+  have hlen := congrArg String.length hEq
+  simp at hlen
+  exact hlen
+
+/-- Two non-sentinel tokens normalize to a two-token `pre` stream. -/
+theorem normalize_pre_pair {a b : String} (ha : a ≠ "--") (hb : b ≠ "--") :
+    (Core.normalize [a, b]).pre = a :: b :: [] := by
+  simp [Core.normalize, Core.split_cons_token ha, Core.split_cons_token hb]
+
+/-- The collector loop over one matching step followed by an exhausted stream. -/
+theorem collectStepsLoop_single {α : Type}
+    (takeStep : State → Except Error (Core.CollectStep α))
+    (fuel : Nat) (hfuel : 2 ≤ fuel)
+    (st : State) (step : Core.CollectStep α) (value : α) (raw : String)
+    (h1 : takeStep st = .ok step)
+    (hv : step.value? = some value) (hr : step.raw? = some raw)
+    (h2 : takeStep step.state = .ok (Core.CollectStep.stay step.state)) :
+    Core.collectStepsLoop takeStep fuel [] [] 0 st
+      = .ok { values := [value], raws := [raw]
+            , state := step.state, consumed := step.consumed } := by
+  obtain ⟨f, rfl⟩ : ∃ f, fuel = f + 2 := ⟨fuel - 2, by omega⟩
+  simp only [Core.collectStepsLoop, h1, hv, hr]
+  simp only [h2, Core.CollectStep.stay]
+  simp
+
+/-- The collector loop over a stream that matches nothing. -/
+theorem collectStepsLoop_stay {α : Type}
+    (takeStep : State → Except Error (Core.CollectStep α))
+    (fuel : Nat) (hfuel : 1 ≤ fuel) (st : State)
+    (h : takeStep st = .ok (Core.CollectStep.stay st)) :
+    Core.collectStepsLoop takeStep fuel [] [] 0 st
+      = .ok { values := [], raws := [], state := st, consumed := 0 } := by
+  obtain ⟨f, rfl⟩ : ∃ f, fuel = f + 1 := ⟨fuel - 1, by omega⟩
+  simp [Core.collectStepsLoop, h, Core.CollectStep.stay]
+
+/-- An exhausted stream offers the option scanner nothing. -/
+theorem takeOptionScanStep?_stay_nil {α : Type} [FromArg α] (spec : OptSpec α)
+    (st : State) (h : st.pre = []) :
+    Core.takeOptionScanStep? spec st = .ok (Core.CollectStep.stay st) := by
+  simp [Core.takeOptionScanStep?, h, Core.takeOptionScanStepGo]
+
+/-- Every option builder's spec carries the long name it was given. -/
+theorem optParts_long? (α : Type) [FromArg α] (long : String) (short : Option Char)
+    (metavar : Option String) (help : String) (defaultText : Option String)
+    (arity : Arity) (required hidden : Bool) :
+    (optParts α long short metavar help defaultText arity required hidden).fst.long?
+      = some long := rfl
+
+/-- The front-of-stream step claims its own long lexeme and the token after it. -/
+theorem takeOptionStep?_detached_long {α : Type} [FromArg α] (spec : OptSpec α)
+    (long v : String) (value : α) (st : State)
+    (hlong : spec.long? = some long)
+    (hpre : st.pre = ("--" ++ long) :: v :: [])
+    (hrun : FromArg.run v = .ok value) :
+    Core.takeOptionStep? spec st
+      = .ok (Core.CollectStep.ofPre st [] 2 (some value) (some v)) := by
+  simp only [Core.takeOptionStep?, hpre, hlong, Core.takeOptionLongToken?]
+  by_cases heq : spec.eqVal? = true
+  · rw [if_pos heq, Core.longLexeme,
+      startsWith_append_eq_false ("--" ++ long) "=" (by simp)]
+    simp [Core.takeOptionDetachedValue?, hrun]
+  · rw [if_neg heq, Core.longLexeme]
+    simp [Core.takeOptionDetachedValue?, hrun]
+
+/-- The scanning collector reads exactly one value off `--name value`. -/
+theorem collectOptionScanValues_detached_long {α : Type} [FromArg α]
+    (spec : OptSpec α) (long v : String) (value : α) (st : State)
+    (hlong : spec.long? = some long)
+    (hpre : st.pre = ("--" ++ long) :: v :: [])
+    (hrun : FromArg.run v = .ok value) :
+    Core.collectOptionScanValues spec st
+      = .ok ([value], [v], Core.State.withPre st [] 2) := by
+  have hstep := takeOptionStep?_detached_long spec long v value st hlong hpre hrun
+  have hscan := Proofs.Scan.takeOptionScanStep?_eq_of_head hstep
+    (by simp [Core.CollectStep.ofPre])
+  have hnil : (Core.CollectStep.ofPre st [] 2 (some value) (some v)
+      : Core.CollectStep α).state.pre = [] := by
+    simp [Core.CollectStep.ofPre, Core.State.withPre]
+  have hstay := takeOptionScanStep?_stay_nil spec _ hnil
+  simp only [Core.collectOptionScanValues, Core.collectOptionScanSteps]
+  rw [collectStepsLoop_single _ _ (by simp [hpre]; omega) st _ value v hscan
+    (by simp [Core.CollectStep.ofPre]) (by simp [Core.CollectStep.ofPre]) hstay]
+  rfl
+
+/-- **The shared option core accepts its detached long form.** Every option
+builder is a reading of this list. -/
+theorem optionValues_accepts_detached_long {α : Type} [FromArg α]
+    (spec : OptSpec α) (long v : String) (value : α) (st : State)
+    (hlong : spec.long? = some long)
+    (hpre : st.pre = ("--" ++ long) :: v :: [])
+    (hrun : FromArg.run v = .ok value) :
+    optionValues spec st = .ok [value] (Core.State.withPre st [] 2) := by
+  simp [optionValues,
+    collectOptionScanValues_detached_long spec long v value st hlong hpre hrun]
+
+/-- A stream with no token the option claims collects nothing and moves nothing.
+
+The hypothesis is stated over `Core.optionToken?`, the classifier the scanner
+itself consults, which is what makes this the option-side counterpart of
+`flag_ignores_unmatched`. -/
+theorem collectOptionScanValues_no_match {α : Type} [FromArg α]
+    (spec : OptSpec α) (st : State)
+    (h : ∀ tok ∈ st.pre, Core.optionToken? spec tok = false) :
+    Core.collectOptionScanValues spec st = .ok ([], [], st) := by
+  simp only [Core.collectOptionScanValues, Core.collectOptionScanSteps]
+  rw [collectStepsLoop_stay _ _ (by omega) st
+    (Proofs.Scan.takeOptionScanStep?_stay_of_no_match h)]
+  rfl
+
+/-- **The shared option core declines what it does not claim.** -/
+theorem optionValues_no_match {α : Type} [FromArg α]
+    (spec : OptSpec α) (st : State)
+    (h : ∀ tok ∈ st.pre, Core.optionToken? spec tok = false) :
+    optionValues spec st = .ok [] st := by
+  simp [optionValues, collectOptionScanValues_no_match spec st h]
+
+/-- A required option accepts `--name value`. -/
+theorem option_accepts_detached_long (α : Type) [FromArg α]
+    (long v : String) (value : α) (short : Option Char) (metavar : Option String)
+    (help : String) (hidden : Bool)
+    (hlong : long ≠ "") (hv : v ≠ "--") (hrun : FromArg.run v = .ok value) :
+    (Builder.option α long short metavar help hidden).run
+        (Core.normalize ["--" ++ long, v])
+      = .ok value (Core.State.withPre (Core.normalize ["--" ++ long, v]) [] 2) := by
+  have hpre := normalize_pre_pair (long_lexeme_ne_sentinel hlong) hv
+  have h := optionValues_accepts_detached_long _ long v value _
+    (optParts_long? α long short metavar help none .one true hidden) hpre hrun
+  simp [Builder.option, h]
+
+/-- An optional option accepts `--name value`. -/
+theorem optionOpt_accepts_detached_long (α : Type) [FromArg α]
+    (long v : String) (value : α) (short : Option Char) (metavar : Option String)
+    (help : String) (hidden : Bool)
+    (hlong : long ≠ "") (hv : v ≠ "--") (hrun : FromArg.run v = .ok value) :
+    (Builder.optionOpt α long short metavar help hidden).run
+        (Core.normalize ["--" ++ long, v])
+      = .ok (some value)
+          (Core.State.withPre (Core.normalize ["--" ++ long, v]) [] 2) := by
+  have hpre := normalize_pre_pair (long_lexeme_ne_sentinel hlong) hv
+  have h := optionValues_accepts_detached_long _ long v value _
+    (optParts_long? α long short metavar help none .one false hidden) hpre hrun
+  simp [Builder.optionOpt, h]
+
+/-- A defaulted option accepts `--name value`, and the supplied value wins. -/
+theorem optionD_accepts_detached_long {α : Type} [FromArg α] [ToString α]
+    (long v : String) (value default : α) (short : Option Char)
+    (metavar : Option String) (help : String) (hidden : Bool)
+    (hlong : long ≠ "") (hv : v ≠ "--") (hrun : FromArg.run v = .ok value) :
+    (Builder.optionD long default short metavar help hidden).run
+        (Core.normalize ["--" ++ long, v])
+      = .ok value (Core.State.withPre (Core.normalize ["--" ++ long, v]) [] 2) := by
+  have hpre := normalize_pre_pair (long_lexeme_ne_sentinel hlong) hv
+  have h := optionValues_accepts_detached_long _ long v value _
+    (optParts_long? α long short metavar help (some (toString default)) .one false hidden)
+    hpre hrun
+  simp [Builder.optionD, h]
+
+/-- A repeatable option accepts `--name value`, collecting a one-element list. -/
+theorem options_accepts_detached_long (α : Type) [FromArg α]
+    (long v : String) (value : α) (short : Option Char) (metavar : Option String)
+    (help : String) (hidden : Bool)
+    (hlong : long ≠ "") (hv : v ≠ "--") (hrun : FromArg.run v = .ok value) :
+    (Builder.options α long short metavar help hidden).run
+        (Core.normalize ["--" ++ long, v])
+      = .ok [value] (Core.State.withPre (Core.normalize ["--" ++ long, v]) [] 2) := by
+  have hpre := normalize_pre_pair (long_lexeme_ne_sentinel hlong) hv
+  have h := optionValues_accepts_detached_long _ long v value _
+    (optParts_long? α long short metavar help none .many false hidden) hpre hrun
+  simp [Builder.options, h]
+
+/-- An optional option is `none` when the stream claims nothing for it. -/
+theorem optionOpt_ignores_unclaimed (α : Type) [FromArg α]
+    (long : String) (short : Option Char) (metavar : Option String)
+    (help : String) (hidden : Bool) (st : State)
+    (h : ∀ tok ∈ st.pre,
+      Core.optionToken? (optParts α long short metavar help none .one false hidden).fst
+        tok = false) :
+    (Builder.optionOpt α long short metavar help hidden).run st = .ok none st := by
+  simp [Builder.optionOpt, optionValues_no_match _ st h]
+
+/-- A defaulted option falls back exactly when the stream claims nothing for it. -/
+theorem optionD_falls_back {α : Type} [FromArg α] [ToString α]
+    (long : String) (default : α) (short : Option Char) (metavar : Option String)
+    (help : String) (hidden : Bool) (st : State)
+    (h : ∀ tok ∈ st.pre,
+      Core.optionToken?
+        (optParts α long short metavar help (some (toString default)) .one false hidden).fst
+        tok = false) :
+    (Builder.optionD long default short metavar help hidden).run st
+      = .ok default st := by
+  simp [Builder.optionD, optionValues_no_match _ st h]
+
+/-- A repeatable option collects the empty list when nothing is claimed. -/
+theorem options_ignores_unclaimed (α : Type) [FromArg α]
+    (long : String) (short : Option Char) (metavar : Option String)
+    (help : String) (hidden : Bool) (st : State)
+    (h : ∀ tok ∈ st.pre,
+      Core.optionToken? (optParts α long short metavar help none .many false hidden).fst
+        tok = false) :
+    (Builder.options α long short metavar help hidden).run st = .ok [] st := by
+  simp [Builder.options, optionValues_no_match _ st h]
+
+/-- A required option reports `missingValue` exactly when nothing is claimed. -/
+theorem option_missing_when_unclaimed (α : Type) [FromArg α]
+    (long : String) (short : Option Char) (metavar : Option String)
+    (help : String) (hidden : Bool) (st : State)
+    (h : ∀ tok ∈ st.pre,
+      Core.optionToken? (optParts α long short metavar help none .one true hidden).fst
+        tok = false) :
+    (Builder.option α long short metavar help hidden).run st
+      = .err { kind := .missingValue, context := [], expect := [.optionVal long] } := by
+  simp [Builder.option, optionValues_no_match _ st h]
+
+/-! ### Behavioural acceptance: positionals
+
+Positionals read the front of the stream rather than scanning it, so these are
+shorter: one lemma for a readable head token, one for an exhausted stream, and
+the three builders read off them. -/
+
+/-- A positional claims the head token when it parses. -/
+theorem takePositionalStep?_head {α : Type} [FromArg α] (spec : PosSpec α)
+    (st : State) (tok : String) (rest : List String) (value : α)
+    (hpre : st.pre = tok :: rest) (hrun : FromArg.run tok = .ok value) :
+    Core.takePositionalStep? spec st
+      = .ok { value? := some value, raw? := some tok
+            , state := Core.State.withPre st rest 1, consumed := 1 } := by
+  simp [Core.takePositionalStep?, Core.State.consumePre?, hpre, hrun]
+
+/-- A positional claims nothing once both streams are exhausted. -/
+theorem takePositionalStep?_stay {α : Type} [FromArg α] (spec : PosSpec α)
+    (st : State) (hpre : st.pre = []) (hpost : st.post = []) :
+    Core.takePositionalStep? spec st = .ok (Core.CollectStep.stay st) := by
+  simp [Core.takePositionalStep?, Core.State.consumePre?, Core.State.consumePost?,
+    hpre, hpost, Core.CollectStep.stay]
+
+/-- A required positional takes the head token. -/
+theorem arg_accepts_head (α : Type) [FromArg α]
+    (name : String) (metavar : Option String) (help : String) (hidden : Bool)
+    (st : State) (tok : String) (rest : List String) (value : α)
+    (hpre : st.pre = tok :: rest) (hrun : FromArg.run tok = .ok value) :
+    (Builder.arg α name metavar help hidden).run st
+      = .ok value (Core.State.withPre st rest 1) := by
+  simp [Builder.arg, Core.takePositionalValue?,
+    takePositionalStep?_head _ st tok rest value hpre hrun]
+
+/-- An optional positional takes the head token. -/
+theorem argOpt_accepts_head (α : Type) [FromArg α]
+    (name : String) (metavar : Option String) (help : String) (hidden : Bool)
+    (st : State) (tok : String) (rest : List String) (value : α)
+    (hpre : st.pre = tok :: rest) (hrun : FromArg.run tok = .ok value) :
+    (Builder.argOpt α name metavar help hidden).run st
+      = .ok (some value) (Core.State.withPre st rest 1) := by
+  simp [Builder.argOpt, Core.takePositionalValue?,
+    takePositionalStep?_head _ st tok rest value hpre hrun]
+
+/-- An optional positional is `none` on an exhausted stream. -/
+theorem argOpt_none_when_exhausted (α : Type) [FromArg α]
+    (name : String) (metavar : Option String) (help : String) (hidden : Bool)
+    (st : State) (hpre : st.pre = []) (hpost : st.post = []) :
+    (Builder.argOpt α name metavar help hidden).run st = .ok none st := by
+  simp [Builder.argOpt, Core.takePositionalValue?,
+    takePositionalStep?_stay _ st hpre hpost, Core.CollectStep.stay]
+
+/-- A required positional reports `missingValue`, naming the metavar the user
+had to type rather than the field name. -/
+theorem arg_missing_when_exhausted (α : Type) [FromArg α]
+    (name : String) (metavar : Option String) (help : String) (hidden : Bool)
+    (st : State) (hpre : st.pre = []) (hpost : st.post = []) :
+    (Builder.arg α name metavar help hidden).run st
+      = .err { kind := .missingValue, context := []
+             , expect := [.positional (metavar.getD name)] } := by
+  simp [Builder.arg, Core.takePositionalValue?,
+    takePositionalStep?_stay _ st hpre hpost, Core.CollectStep.stay,
+    posParts, ItemSpec.metavar]
+
+/-- A repeatable positional collects the head token. -/
+theorem args_collects_head (α : Type) [FromArg α]
+    (name : String) (metavar : Option String) (help : String) (hidden : Bool)
+    (st : State) (tok : String) (value : α)
+    (hpre : st.pre = [tok]) (hpost : st.post = [])
+    (hrun : FromArg.run tok = .ok value) :
+    (Builder.args α name metavar help hidden).run st
+      = .ok [value] (Core.State.withPre st [] 1) := by
+  have hhead := takePositionalStep?_head
+    (posParts α name metavar help .many false hidden).fst st tok [] value hpre hrun
+  have hnilPre : (Core.State.withPre st [] 1).pre = [] := by simp [Core.State.withPre]
+  have hnilPost : (Core.State.withPre st [] 1).post = [] := by
+    simp [Core.State.withPre, hpost]
+  have hstay := takePositionalStep?_stay
+    (posParts α name metavar help .many false hidden).fst _ hnilPre hnilPost
+  simp only [Builder.args, Core.collectPositionalValues, Core.collectPositionalSteps]
+  rw [collectStepsLoop_single _ _ (by simp [hpre]) st _ value tok hhead rfl rfl hstay]
   rfl
 
 /-! ### Verb agreement

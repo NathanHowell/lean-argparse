@@ -117,8 +117,14 @@ def optParts (α : Type) [FromArg α]
     , hidden := hidden }
   (spec, item)
 
-/-- Read every value supplied for an option, in order. -/
-@[inline] private def optionValues {α : Type} [FromArg α] (spec : OptSpec α) :
+/-- Read every value supplied for an option, in order.
+
+Shared by all four option builders, which differ only in how they read this
+list: `optionOpt` takes the last as an `Option`, `optionD` falls back to a
+default, `option` errors when it is empty, `options` returns it whole. That is
+why the behavioural correspondence proofs establish acceptance once here and
+derive the four builders as corollaries. -/
+@[inline] def optionValues {α : Type} [FromArg α] (spec : OptSpec α) :
     Parser (List α) := fun st =>
   match Core.collectOptionScanValues spec st with
   | .ok (values, _, st') => .ok values st'
