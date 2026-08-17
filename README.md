@@ -157,6 +157,61 @@ One documented ambiguity: a detached option value that lexes as a defined flag
 (`--message -v`) is claimed by the flag scan first; write `--message=-v` to force
 the value reading.
 
+## Comparison with lean4-cli
+
+[`lean4-cli`](https://github.com/leanprover/lean4-cli) is the established
+option, lives under the `leanprover` organisation, and is maintained by
+[@mhuisi](https://github.com/mhuisi). **If you want a CLI library for real work
+today, use it.** It is mature, widely used, and covers the ground.
+
+Both libraries generate `-h`/`--help` and `--version` from a single declaration,
+so neither has a help-drift problem at the surface. The difference is what
+happens to the parsed values.
+
+`lean4-cli` hands your handler a `Parsed` and you recover values by name:
+
+```lean
+def runExampleCmd (p : Parsed) : IO UInt32 := do
+  let input : String := p.positionalArg! "input" |>.as! String
+  let priority : Nat := p.flag! "priority" |>.as! Nat
+```
+
+Both the name and the type are restated at the use site — `"priority"` and
+`Nat` appear once in the declaration and again here. A misspelled name or a type
+that disagrees with the declaration is a runtime failure: `!` panics, and the
+`?` forms hand back an `Option` you have to deal with at every read.
+
+`lean-argparse` composes into your own type, so there is no recovery step and no
+second spelling of anything:
+
+```lean
+structure Config where
+  /-- Priority to run at. -/
+  priority : Nat := 1
+  /-- Input file. -/
+  input : Positional String
+  deriving ArgParse.Parseable
+
+ArgParse.run app argv fun cfg => do
+  IO.println s!"{cfg.input.val} at {cfg.priority}"   -- typed; the compiler checks it
+```
+
+That is the whole pitch. Everything else follows from it: because the parser and
+its description are one value, the library can prove they agree
+(`ArgParse.Correspondence`) rather than relying on a DSL to keep them together,
+and a `Cmd AppCommand` can map subcommands straight into your own inductive
+instead of dispatching on strings.
+
+The costs are real and worth stating. `lean4-cli` is more mature and more widely
+used. Its `` `[Cli| ...] `` DSL is more compact than building a `Cmd` tree by
+hand. And where this library's derived front end needs a short form or a
+positional, the field's *type* carries it (`Short Bool 'v'`), which means a
+wrapper and a `.val` at the use site — `lean4-cli` just writes `i, invert;`.
+
+So: leaner? Not in size — with the proof suite this is the larger of the two.
+"Lean" is the language, not the diet. It is leaner in one specific sense: there
+is no stringly layer between what you declared and what you get back.
+
 ## Layers
 
 | | |
