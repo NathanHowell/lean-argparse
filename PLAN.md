@@ -41,22 +41,61 @@ are built, with no `sorry` anywhere and no `partial def` outside `Core`.
 
 ## Roadmap
 
-1. **Completeness** — the missing half of the story: if argv conforms to a
-   well-formed command tree, parsing succeeds and yields the expected bindings.
-2. **Scan agreement for flags and bundles** — `Canonical` covers options; the
+Ordered by value rather than by the sequence they were noticed in. The first
+three came out of auditing which definitions have no theorem mentioning them at
+all, and they outrank most of what follows: one guards against a silent failure,
+one covers the headline abstraction, and one closes a hole in a guarantee that
+is already advertised.
+
+1. **`Doc.normalize` preserves items** — `items (normalize d) = items d`.
+   `P.lean` claims normalization is a rendering-quality concern that "never
+   touches parsing". Half of that is free, since `run` is not in scope there.
+   The other half -- that it does not change what is *documented* -- is exactly
+   what is unproved, and it is the one place a help-loss bug could hide in
+   silence: if `flattenSeq` dropped an item, help would quietly stop mentioning
+   it and no theorem would fire. Idempotence (`normalize (normalize d) =
+   normalize d`) is worth having alongside it.
+2. **`P` is lawful** — `LawfulFunctor`/`LawfulApplicative` are proved for
+   `Parser` (`Proofs/Laws.lean`) and instantiated there, but not for `P`, which
+   is what applications actually compose. The laws cannot hold on the nose:
+   `seq [seq [a, b], c]` and `seq [a, seq [b, c]]` are different `Doc` trees, so
+   they hold only up to `Doc.normalize`. That makes this depend on item 1, and
+   it is the real reason `normalize` exists. Checked concretely: the two
+   association trees the law relates are `seq(seq(seq(-,u),v),w)` and
+   `seq(u,seq(v,w))`, and `normalize` sends both to `seq(u,v,w)`. State the laws
+   with propositional equality -- `Doc` has no `BEq`/`DecidableEq`, because no
+   deriving handler covers an inductive nesting through `List`.
+3. **Verb agreement relates names to parsers, not just name lists** —
+   `toSubcommands_names` proves the dispatch table's names equal the tree's
+   names. Nothing proves the entry named `foo` runs `foo`'s parser; a
+   `toSubcommands` that paired the first name with the second parser would
+   satisfy every theorem currently stated. True by construction and cheap to
+   prove, but the guarantee is advertised and not yet earned.
+4. **Correspondence for the option builders' behaviour** — the behavioural
+   acceptance lemmas cover `flag`. The seven option and positional builders have
+   their data agreement proved but not their token-level acceptance.
+5. **`P.many` progress** — `many` is bounded by token count and discards a
+   non-advancing step. A progress lemma for the builders would let the bound be
+   stated rather than assumed.
+6. **Scan agreement for flags and bundles** — `Canonical` covers options; the
    analogous syntactic canonicality story for flag scanning (and for `=`-form
    and concatenated option tokens, whose classification the kernel cannot
    evaluate because `String.startsWith` is opaque) is still open.
-3. **Correspondence for the option builders' behaviour** — the behavioural
-   acceptance lemmas cover flags. The option and positional builders have their
-   data agreement proved but not their token-level acceptance.
-4. **Real completion scripts** — `--generate-completions` lists candidates.
-   Emitting bash/zsh/fish scripts that call back into it is not done.
-5. **Bundle-splitting edge cases** — inline bundles like `-n5v` with
+7. **Completeness** — the missing half of the story: if argv conforms to a
+   well-formed command tree, parsing succeeds and yields the expected bindings.
+8. **`unknownLong?` soundness** — it should never flag a lexeme the command
+   actually accepts, since a spurious "unrecognised `--foo`" is a user-facing
+   bug. Provable against `Doc.pathItems`.
+9. **Bundle-splitting edge cases** — inline bundles like `-n5v` with
    non-`String` payloads.
-6. **`P.many` progress** — `many` is bounded by token count and discards a
-   non-advancing step. A progress lemma for the builders would let the bound be
-   stated rather than assumed.
+10. **Real completion scripts** — `--generate-completions` lists candidates.
+    Emitting bash/zsh/fish scripts that call back into it is not done. The only
+    feature on this list; everything above is a theorem.
+
+Deliberately not on the list: `usageLine`, `renderCommandHelp`, `renderMan`,
+`editDistance`, and `nearest?` have no theorems and should not get any. They are
+string formatting, where proofs cost a great deal and buy little, and the tests
+already pin the behaviour.
 
 ## Design notes / decisions pending
 
@@ -76,6 +115,13 @@ are built, with no `sorry` anywhere and no `partial def` outside `Core`.
 - Suggestion threshold is 2 edits above three characters, which catches
   transpositions (`chidl` → `child`) at the cost of the occasional unhelpful
   but valid neighbour.
+- Error precedence: a dispatch failure on a token that does not start with `-`
+  outranks any unknown-option finding. A misspelled verb strands every token
+  after it -- they were meant for a command never reached -- so reporting one of
+  *those* names the wrong token. `ci scop --tier pr` is a misspelling of `scope`,
+  not a problem with `--tier`. The guard on `-` matters: dispatch also fails when
+  an option appears where a verb belongs (`ci --tier pr`), and there the option
+  is the right thing to report. Reported downstream as nsnd-irq0.
 - `deriving Parseable` rejects, rather than mistranslates, a default that
   depends on an earlier field and a `Bool` defaulting to `true`.
 
