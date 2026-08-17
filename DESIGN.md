@@ -235,12 +235,32 @@ optional option, `List α` a repeatable one, anything else with `FromArg` a plai
 option — so supporting a new shape of field is an instance, not a change to the
 macro.
 
-What a structure field cannot say, the handler cannot generate: short forms,
-positionals, and per-item metavars have nowhere to live in a field declaration.
-Those stay available by writing Layer 3 directly, which is what the handler emits
-anyway, and the two mix freely inside one `Cmd`. `Main.lean` is written the
-explicit way for exactly this reason; `Examples/Derived.lean` shows the derived
-way.
+What a field *name* cannot say, its *type* can. A field declaration has nowhere
+to put "this one is `-v`" or "this one is positional", so `Arg α o` carries it in
+a phantom parameter:
+
+```lean
+structure GreetConfig where
+  /-- Enable verbose output. -/
+  verbose : Short Bool 'v' := ⟨false⟩
+  /-- Number of times to greet. -/
+  count   : Arg Nat { short? := some 'n', metavar? := some "COUNT" } := ⟨1⟩
+  /-- Name to greet. -/
+  name    : Positional String
+  deriving ArgParse.Parseable
+```
+
+`Arg α o` is a structure rather than an abbreviation, which is what keeps it
+opaque to instance resolution: `FieldParser` dispatches on it and reads `o`,
+while the payload `α` still selects which builder to reach for. So the wrappers
+cost the handler nothing — they are four more instances, and `Short`,
+`Positional`, and `Named` are one-line abbreviations over the general form.
+
+The price is a wrapper at use sites: the field holds `Arg Bool _`, so reading it
+is `cfg.verbose.val`. `Repr`, `DecidableEq`, `ToString`, `Inhabited`, and a
+coercion pass through, which covers most of what a config record does with its
+own fields. Plain and wrapped fields mix freely, as do derived and hand-written
+commands inside one `Cmd`.
 
 Two field shapes are rejected rather than mistranslated. A default that depends
 on an earlier field has no command-line meaning. A `Bool` defaulting to `true`

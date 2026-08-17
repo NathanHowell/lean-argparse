@@ -6,12 +6,13 @@ import ArgParse.Deriving
 
 The Layer 7 front end, end to end.
 
-Compare with `Main.lean`, which writes the same shape of CLI through Layer 3 by
-hand. The derived form is one declaration instead of two, and the doc-strings do
-double duty as help text. What it gives up is anything a structure field has
-nowhere to say: short forms, positionals, and per-item metavars. Those remain
-available by writing the builders directly, which is what the handler emits
-anyway.
+One declaration per configuration, with the doc-strings doing double duty as help
+text. What a field name cannot say -- the short form, that a field is positional,
+a metavar the `FromArg` instance would not guess -- travels in the field's type
+instead, so it stays one declaration.
+
+Plain and wrapped fields mix freely, as do derived and hand-written commands
+inside one `Cmd`.
 -/
 
 namespace ArgParse.Examples
@@ -21,23 +22,23 @@ open ArgParse
 /-- Options for a `build` verb. -/
 structure BuildConfig where
   /-- Directory to build into. -/
-  outDir : String := "build"
+  outDir : Arg String { short? := some 'o', metavar? := some "DIR" } := ⟨"build"⟩
   /-- Compile without optimisations. -/
-  debug : Bool := false
+  debug : Short Bool 'd' := ⟨false⟩
   /-- Number of parallel jobs. -/
   jobs : Nat := 1
   /-- Targets to build; repeatable. -/
-  target : List String := []
+  target : Short (List String) 't' := ⟨[]⟩
   /-- Override the toolchain to use. -/
   toolchain : Option String := none
   deriving Repr, DecidableEq, ArgParse.Parseable
 
-/-- Options for a `clean` verb. -/
+/-- Options for a `clean` verb, taking the directory positionally. -/
 structure CleanConfig where
   /-- Directory to clean. -/
-  outDir : String := "build"
+  outDir : Positional String := ⟨"build"⟩
   /-- Remove the directory itself as well. -/
-  purge : Bool := false
+  purge : Short Bool 'p' := ⟨false⟩
   deriving Repr, DecidableEq, ArgParse.Parseable
 
 /-- What the example CLI can be asked to do. -/

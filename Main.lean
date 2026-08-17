@@ -5,23 +5,28 @@ open ArgParse.Builder
 
 namespace MainApp
 
-/-- Runtime configuration for the `greet` subcommand. -/
+/-- Runtime configuration for the `greet` subcommand.
+
+Deriving `Parseable` is the whole parser. Field names become long options, these
+doc-strings become the help text, and the defaults become the parser's defaults;
+the type wrappers carry what a field name cannot say -- the short form, the
+positional, the metavar. -/
 structure GreetConfig where
-  /-- Whether to print the greeting with a verbose marker. -/
-  verbose : Bool
-  /-- How many times to print the greeting. -/
-  count   : Nat
+  /-- Enable verbose output. -/
+  verbose : Short Bool 'v' := ⟨false⟩
+  /-- Number of times to greet. -/
+  count   : Arg Nat { short? := some 'n', metavar? := some "COUNT" } := ⟨1⟩
   /-- Name to greet. -/
-  name    : String
-  deriving Repr
+  name    : Positional String
+  deriving Repr, ArgParse.Parseable
 
 /-- Runtime configuration for the `repeat` subcommand. -/
 structure RepeatConfig where
-  /-- How many times to print the message. -/
-  times   : Nat
-  /-- Message to print. -/
-  message : String
-  deriving Repr
+  /-- How many times to repeat the message. -/
+  times   : Arg Nat { short? := some 't', metavar? := some "TIMES" } := ⟨2⟩
+  /-- Message to repeat. -/
+  message : Positional String
+  deriving Repr, ArgParse.Parseable
 
 /-- Enumerates the supported subcommands. -/
 inductive AppCommand where
@@ -31,43 +36,27 @@ inductive AppCommand where
   | repeat (cfg : RepeatConfig)
   deriving Repr
 
-/-- Parser for the `greet` payload. Each item is declared once; its help text
-travels with it. -/
-def greetP : P GreetConfig :=
-  GreetConfig.mk
-    <$> flag "verbose" (short := 'v') (help := "Enable verbose output.")
-    <*> optionD "count" (default := 1) (short := 'n') (metavar := "COUNT")
-          (help := "Number of times to greet.")
-    <*> positional "NAME" (help := "Name to greet.")
-
-/-- Parser for the `repeat` payload. -/
-def repeatP : P RepeatConfig :=
-  RepeatConfig.mk
-    <$> optionD "times" (default := 2) (short := 't') (metavar := "TIMES")
-          (help := "How many times to repeat the message.")
-    <*> positional "MESSAGE" (help := "Message to repeat.")
-
 /-- The whole command-line interface. Every verb appears exactly once. -/
 def app : Cmd AppCommand :=
   .node "lean-argparse" { name := "lean-argparse"
                         , help? := some "Demonstrates subcommands with applicative parsing." }
     (pure id)
     [ .leaf "greet" { name := "greet", help? := some "Print a friendly greeting." }
-        (AppCommand.greet <$> greetP)
+        (AppCommand.greet <$> parserFor GreetConfig)
     , .leaf "repeat" { name := "repeat", help? := some "Repeat a message multiple times." }
-        (AppCommand.repeat <$> repeatP) ]
+        (AppCommand.repeat <$> parserFor RepeatConfig) ]
 
 /-- Execute the `greet` command payload. -/
 def runGreet (cfg : GreetConfig) : IO UInt32 := do
-  let suffix := if cfg.verbose then " (verbose)" else ""
-  for _ in [0:cfg.count] do
-    IO.println s!"Hello, {cfg.name}!{suffix}"
+  let suffix := if cfg.verbose.val then " (verbose)" else ""
+  for _ in [0:cfg.count.val] do
+    IO.println s!"Hello, {cfg.name.val}!{suffix}"
   pure 0
 
 /-- Execute the `repeat` command payload. -/
 def runRepeat (cfg : RepeatConfig) : IO UInt32 := do
-  for _ in [0:cfg.times] do
-    IO.println cfg.message
+  for _ in [0:cfg.times.val] do
+    IO.println cfg.message.val
   pure 0
 
 end MainApp
