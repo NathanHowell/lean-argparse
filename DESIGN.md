@@ -64,13 +64,24 @@ structure P (α : Type) where
   run : Parser α
 ```
 
+`ItemSpec` here is *payload-free*: a flat record of name, short/long forms,
+arity, metavar, choices, help, and default, with the value type erased. That
+erasure is what keeps `Doc` — and therefore `P α` — in `Type`, with no universe
+bump. The typed `FlagSpec`/`OptSpec α`/`PosSpec α` records stay where they are,
+as the inputs Layer 1's combinators already consume; Layer 3 builds both from
+the same arguments. `ItemSpec` is also the leaf of the render model
+(`CmdSpec.args`), so help and correspondence read one item type.
+
 Instances are one line each and total:
 
 - `Functor`: maps `run`, leaves `doc` untouched.
 - `Applicative`: composes `run`; `Doc.seq`s the docs.
 - `Alternative`: alternates `run`; `Doc.alt`s the docs.
-- `P.many` / `P.optional`: wrap `run` with the corresponding scanner
-  combinator; wrap `doc` in `Doc.many` / mark the item optional.
+- `P.many`: wraps `run` in a fuel-bounded repetition of the scanner and `doc`
+  in `Doc.many`.
+- `P.optional`: `(some <$> p) <|> pure none`, whose doc is `Doc.alt [d, .none]`
+  — the alternative-with-nothing that renderers already print as `[…]`. No
+  sixth constructor is needed.
 
 `Doc` is the static skeleton of a free applicative with the payloads deleted —
 which is everything the renderers ever read. `P` is introspectable to exactly
@@ -90,7 +101,7 @@ def strOption (long : String) (short : Option Char := none)
     (metavar : String := "ARG") (help : String := "")
     (default? : Option String := none) : P String
 
-def option [ArgRead α] (long : String) (short : Option Char := none)
+def option [FromArg α] (long : String) (short : Option Char := none)
     (metavar : String := "ARG") (help : String := "")
     (default? : Option α := none) : P α
 
@@ -106,8 +117,11 @@ arguments in one body*. Divergence between what help says and what the scanner
 accepts is expressible in exactly one file — this one — where it is proven
 away (Layer 6), not policed at call sites.
 
-Typed values come from an `ArgRead α` class (`String → Except String α`) with
-instances for the obvious types; user types opt in with one instance.
+Typed values come from the `FromArg α` class (`String → Except String α`, plus
+a suggested `metavar` and an optional `choices` list) with instances for the
+obvious types; user types opt in with one instance. The builders default their
+`metavar` from the instance and carry `choices` into the item, so completion
+gets enumerations for free.
 
 ### Layer 4 — the command tree (`ArgParse.Cmd`)
 
@@ -157,10 +171,15 @@ The runner — not the application — owns:
   descends the `Cmd` tree along the matched path and renders that node's help
   from its `Doc` / `CmdSpec`.
 - `--version`.
+- `--man`, rendering the same `CmdSpec` in mdoc form.
 - Usage synopsis and error rendering ("unknown option `--frob`; did you mean
   `--from`?"), derived from the same data.
 - Shell completion, derived by walking `Cmd` + `Doc`: complete verb names at
   nodes, item keys at leaves.
+
+Every renderer is a pure function of the render model — `CmdSpec → String`.
+None of them takes parsed values as a side input, so there is no second data
+path into help for the correspondence theorems to miss.
 
 Applications contain zero help code. That is the acceptance criterion for the
 whole design: if an application needs to render its own help, a layer below
