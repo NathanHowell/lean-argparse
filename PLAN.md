@@ -39,7 +39,8 @@ are built, with no `sorry` anywhere and no `partial def` outside `Core`.
   totality and the collector cursor lemma; determinism; sentinel factorization;
   scan/front-of-stream agreement on syntactically canonical argv; `Doc`
   normalization preserving items and being idempotent; the applicative laws for
-  `P` itself, up to normalization.
+  `P` itself, up to normalization; `P.many`'s repetition bound proved slack for
+  parsers that progress, with the flag builder shown to be one.
 - **Tooling**: demo CLI in `Main.lean` (greet/repeat, derived); derived example
   under `Examples/Derived.lean`; unit, integration, and deriving checks;
   docstring/simp lint driver; doc-gen4 setup under `docbuild/`.
@@ -48,23 +49,21 @@ are built, with no `sorry` anywhere and no `partial def` outside `Core`.
 
 Ordered by value rather than by the sequence they were noticed in.
 
-1. **`P.many` progress** — `many` is bounded by token count and discards a
-   non-advancing step. A progress lemma for the builders would let the bound be
-   stated rather than assumed.
-2. **Scan agreement for flags and bundles** — `Canonical` covers options; the
+1. **Scan agreement for flags and bundles** — `Canonical` covers options; the
    analogous syntactic canonicality story for flag scanning, and for `=`-form
    and concatenated option tokens, is still open. The note that used to sit
-   here -- that `String.startsWith` blocks it -- turned out to be wrong, and
-   item 1 disproved it in passing: `simp` rewrites `startsWith` to a list-prefix
-   claim and ordinary list reasoning finishes. See the design note below.
-3. **Completeness** — the missing half of the story: if argv conforms to a
+   here -- that `String.startsWith` blocks it -- turned out to be wrong, and the
+   option-builder work disproved it in passing: `simp` rewrites `startsWith` to
+   a list-prefix claim and ordinary list reasoning finishes. See the design note
+   below.
+2. **Completeness** — the missing half of the story: if argv conforms to a
    well-formed command tree, parsing succeeds and yields the expected bindings.
-4. **`unknownLong?` soundness** — it should never flag a lexeme the command
+3. **`unknownLong?` soundness** — it should never flag a lexeme the command
    actually accepts, since a spurious "unrecognised `--foo`" is a user-facing
    bug. Provable against `Doc.pathItems`.
-5. **Bundle-splitting edge cases** — inline bundles like `-n5v` with
+4. **Bundle-splitting edge cases** — inline bundles like `-n5v` with
    non-`String` payloads.
-6. **Real completion scripts** — `--generate-completions` lists candidates.
+5. **Real completion scripts** — `--generate-completions` lists candidates.
    Emitting bash/zsh/fish scripts that call back into it is not done. The only
    feature on this list; everything above is a theorem.
 
@@ -109,6 +108,13 @@ already pin the behaviour.
   `simp` succeeds -- the `ForwardPattern` instance argument does not match
   syntactically -- so unfold the surrounding `if` first and rewrite into a goal
   that still mentions `Core.longLexeme` unexpanded.
+- The repetition bound in `P.many` counts characters, not tokens, because a
+  bundled short flag advances the cursor without shortening the stream: `-vvv`
+  becomes `-vv`. A token-count bound stops one iteration early there, and
+  silently, since exhausting the fuel is indistinguishable from the parser
+  declining. `State.budget` charges per token *and* per character;
+  `Proofs/Many.lean` proves the result no longer depends on the bound at all,
+  for any parser that spends budget when it advances.
 - `Doc.normalize` has no caller outside its own recursion: the renderers all
   read `Doc.items`, which is insensitive to nesting, so none of them needs it.
   It earns its place as the equivalence the applicative laws are stated up to

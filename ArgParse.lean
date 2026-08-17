@@ -20,6 +20,7 @@ import ArgParse.Doc.Completion
 import ArgParse.Proofs.Laws
 import ArgParse.Proofs.Doc
 import ArgParse.Proofs.PLaws
+import ArgParse.Proofs.Many
 import ArgParse.Proofs.Sentinel
 import ArgParse.Proofs.Totality
 import ArgParse.Proofs.Determinism
