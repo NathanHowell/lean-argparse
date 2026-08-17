@@ -6,6 +6,11 @@ design of record.
 
 ## Current state (2026-08-17)
 
+All ten roadmap items are closed. Two were bugs rather than missing theorems:
+`P.many` truncated bundled flags, and `entryRow` let a wide label abut its
+description. One roadmap note was wrong -- `String.startsWith` does not block
+proofs -- and is corrected below.
+
 The paired-applicative migration is complete: all seven layers of `DESIGN.md`
 are built, with no `sorry` anywhere and no `partial def` outside `Core`.
 
@@ -44,17 +49,25 @@ are built, with no `sorry` anywhere and no `partial def` outside `Core`.
   concatenated token forms; `Doc`
   normalization preserving items and being idempotent; the applicative laws for
   `P` itself, up to normalization; `P.many`'s repetition bound proved slack for
-  parsers that progress, with the flag builder shown to be one.
+  parsers that progress, with the flag builder shown to be one; completeness --
+  how success travels through the applicative, what each builder needs, and a
+  closed end-to-end parse through normalization, globals, dispatch, an option,
+  and a positional.
 - **Tooling**: demo CLI in `Main.lean` (greet/repeat, derived); derived example
   under `Examples/Derived.lean`; unit, integration, and deriving checks;
   docstring/simp lint driver; doc-gen4 setup under `docbuild/`.
 
 ## Roadmap
 
-One item left.
+The ten-item roadmap is closed. What follows is what that work turned up, not
+what it left undone.
 
-1. **Completeness** — the missing half of the story: if argv conforms to a
-   well-formed command tree, parsing succeeds and yields the expected bindings.
+1. **Bundles are order-dependent** — `-n5v` parses, `-vn5` does not. Found while
+   pinning the bundle-splitting edge cases; described in the design notes below,
+   with why swapping the scan order does not fix it. The fix is a
+   bundle-expanding pre-pass at Layer 4, where the command's short forms are
+   known. Worth doing only if someone actually types `-vn5`; `getopt` accepts it,
+   so someone will.
 
 Deliberately not on the list: `usageLine`, `renderCommandHelp`, `renderMan`,
 `editDistance`, and `nearest?` have no theorems and should not get any. They are

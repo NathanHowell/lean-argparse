@@ -261,12 +261,12 @@ theorem optParts_long? (α : Type) [FromArg α] (long : String) (short : Option 
 
 /-- The front-of-stream step claims its own long lexeme and the token after it. -/
 theorem takeOptionStep?_detached_long {α : Type} [FromArg α] (spec : OptSpec α)
-    (long v : String) (value : α) (st : State)
+    (long v : String) (value : α) (st : State) (rest : List String)
     (hlong : spec.long? = some long)
-    (hpre : st.pre = ("--" ++ long) :: v :: [])
+    (hpre : st.pre = ("--" ++ long) :: v :: rest)
     (hrun : FromArg.run v = .ok value) :
     Core.takeOptionStep? spec st
-      = .ok (Core.CollectStep.ofPre st [] 2 (some value) (some v)) := by
+      = .ok (Core.CollectStep.ofPre st rest 2 (some value) (some v)) := by
   simp only [Core.takeOptionStep?, hpre, hlong, Core.takeOptionLongToken?]
   by_cases heq : spec.eqVal? = true
   · rw [if_pos heq, Core.longLexeme,
@@ -275,21 +275,26 @@ theorem takeOptionStep?_detached_long {α : Type} [FromArg α] (spec : OptSpec �
   · rw [if_neg heq, Core.longLexeme]
     simp [Core.takeOptionDetachedValue?, hrun]
 
-/-- The scanning collector reads exactly one value off `--name value`. -/
+/-- The scanning collector reads exactly one value off `--name value`, leaving
+a tail that claims nothing where it found it. -/
 theorem collectOptionScanValues_detached_long {α : Type} [FromArg α]
-    (spec : OptSpec α) (long v : String) (value : α) (st : State)
+    (spec : OptSpec α) (long v : String) (value : α) (st : State) (rest : List String)
     (hlong : spec.long? = some long)
-    (hpre : st.pre = ("--" ++ long) :: v :: [])
-    (hrun : FromArg.run v = .ok value) :
+    (hpre : st.pre = ("--" ++ long) :: v :: rest)
+    (hrun : FromArg.run v = .ok value)
+    (hrest : ∀ tok ∈ rest, Core.optionToken? spec tok = false) :
     Core.collectOptionScanValues spec st
-      = .ok ([value], [v], Core.State.withPre st [] 2) := by
-  have hstep := takeOptionStep?_detached_long spec long v value st hlong hpre hrun
+      = .ok ([value], [v], Core.State.withPre st rest 2) := by
+  have hstep := takeOptionStep?_detached_long spec long v value st rest hlong hpre hrun
   have hscan := Proofs.Scan.takeOptionScanStep?_eq_of_head hstep
     (by simp [Core.CollectStep.ofPre])
-  have hnil : (Core.CollectStep.ofPre st [] 2 (some value) (some v)
-      : Core.CollectStep α).state.pre = [] := by
-    simp [Core.CollectStep.ofPre, Core.State.withPre]
-  have hstay := takeOptionScanStep?_stay_nil spec _ hnil
+  have hstay : Core.takeOptionScanStep? spec
+      (Core.CollectStep.ofPre st rest 2 (some value) (some v) : Core.CollectStep α).state
+      = .ok (Core.CollectStep.stay
+          (Core.CollectStep.ofPre st rest 2 (some value) (some v)
+            : Core.CollectStep α).state) := by
+    refine Proofs.Scan.takeOptionScanStep?_stay_of_no_match ?_
+    simpa [Core.CollectStep.ofPre, Core.State.withPre] using hrest
   simp only [Core.collectOptionScanValues, Core.collectOptionScanSteps]
   rw [collectStepsLoop_single _ _ (by simp [hpre]; omega) st _ value v hscan
     (by simp [Core.CollectStep.ofPre]) (by simp [Core.CollectStep.ofPre]) hstay]
@@ -298,13 +303,14 @@ theorem collectOptionScanValues_detached_long {α : Type} [FromArg α]
 /-- **The shared option core accepts its detached long form.** Every option
 builder is a reading of this list. -/
 theorem optionValues_accepts_detached_long {α : Type} [FromArg α]
-    (spec : OptSpec α) (long v : String) (value : α) (st : State)
+    (spec : OptSpec α) (long v : String) (value : α) (st : State) (rest : List String)
     (hlong : spec.long? = some long)
-    (hpre : st.pre = ("--" ++ long) :: v :: [])
-    (hrun : FromArg.run v = .ok value) :
-    optionValues spec st = .ok [value] (Core.State.withPre st [] 2) := by
+    (hpre : st.pre = ("--" ++ long) :: v :: rest)
+    (hrun : FromArg.run v = .ok value)
+    (hrest : ∀ tok ∈ rest, Core.optionToken? spec tok = false) :
+    optionValues spec st = .ok [value] (Core.State.withPre st rest 2) := by
   simp [optionValues,
-    collectOptionScanValues_detached_long spec long v value st hlong hpre hrun]
+    collectOptionScanValues_detached_long spec long v value st rest hlong hpre hrun hrest]
 
 /-- A stream with no token the option claims collects nothing and moves nothing.
 
@@ -336,8 +342,8 @@ theorem option_accepts_detached_long (α : Type) [FromArg α]
         (Core.normalize ["--" ++ long, v])
       = .ok value (Core.State.withPre (Core.normalize ["--" ++ long, v]) [] 2) := by
   have hpre := normalize_pre_pair (long_lexeme_ne_sentinel hlong) hv
-  have h := optionValues_accepts_detached_long _ long v value _
-    (optParts_long? α long short metavar help none .one true hidden) hpre hrun
+  have h := optionValues_accepts_detached_long _ long v value _ []
+    (optParts_long? α long short metavar help none .one true hidden) hpre hrun (by simp)
   simp [Builder.option, h]
 
 /-- An optional option accepts `--name value`. -/
@@ -350,8 +356,8 @@ theorem optionOpt_accepts_detached_long (α : Type) [FromArg α]
       = .ok (some value)
           (Core.State.withPre (Core.normalize ["--" ++ long, v]) [] 2) := by
   have hpre := normalize_pre_pair (long_lexeme_ne_sentinel hlong) hv
-  have h := optionValues_accepts_detached_long _ long v value _
-    (optParts_long? α long short metavar help none .one false hidden) hpre hrun
+  have h := optionValues_accepts_detached_long _ long v value _ []
+    (optParts_long? α long short metavar help none .one false hidden) hpre hrun (by simp)
   simp [Builder.optionOpt, h]
 
 /-- A defaulted option accepts `--name value`, and the supplied value wins. -/
@@ -363,9 +369,9 @@ theorem optionD_accepts_detached_long {α : Type} [FromArg α] [ToString α]
         (Core.normalize ["--" ++ long, v])
       = .ok value (Core.State.withPre (Core.normalize ["--" ++ long, v]) [] 2) := by
   have hpre := normalize_pre_pair (long_lexeme_ne_sentinel hlong) hv
-  have h := optionValues_accepts_detached_long _ long v value _
+  have h := optionValues_accepts_detached_long _ long v value _ []
     (optParts_long? α long short metavar help (some (toString default)) .one false hidden)
-    hpre hrun
+    hpre hrun (by simp)
   simp [Builder.optionD, h]
 
 /-- A repeatable option accepts `--name value`, collecting a one-element list. -/
@@ -377,8 +383,8 @@ theorem options_accepts_detached_long (α : Type) [FromArg α]
         (Core.normalize ["--" ++ long, v])
       = .ok [value] (Core.State.withPre (Core.normalize ["--" ++ long, v]) [] 2) := by
   have hpre := normalize_pre_pair (long_lexeme_ne_sentinel hlong) hv
-  have h := optionValues_accepts_detached_long _ long v value _
-    (optParts_long? α long short metavar help none .many false hidden) hpre hrun
+  have h := optionValues_accepts_detached_long _ long v value _ []
+    (optParts_long? α long short metavar help none .many false hidden) hpre hrun (by simp)
   simp [Builder.options, h]
 
 /-- An optional option is `none` when the stream claims nothing for it. -/

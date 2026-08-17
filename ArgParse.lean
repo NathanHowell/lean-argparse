@@ -25,6 +25,7 @@ import ArgParse.Proofs.Sentinel
 import ArgParse.Proofs.Totality
 import ArgParse.Proofs.Determinism
 import ArgParse.Proofs.Scan
+import ArgParse.Proofs.Completeness
 
 /-!
 Aggregated ArgParse module. Importing every subsystem brings along the
