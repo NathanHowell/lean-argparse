@@ -190,7 +190,8 @@ theorem globals_pass :
       s0 = .ok id s0 := by
   simp [Core.scopedPre, Core.splitAtFirst, s0, pure_run, Parser.pure,
     Core.prepare, Core.expandBundles, Core.shortsOfKind, Core.hoistPositionals,
-    Spec.valueLexemes, Core.partitionClaimed]
+    Core.fuseValues, Core.fuseDetachedValues, Spec.valueLexemes,
+    Core.partitionClaimed]
 
 /-- The only lexeme the leaf's non-positional items answer to. -/
 theorem greet_switch_lexemes :
@@ -206,7 +207,12 @@ theorem greet_value_lexemes :
 positional already sits ahead of the option that would have displaced it. -/
 theorem greet_prepare_id : Core.prepare (greetP.items) s1 = s1 := by
   have hb := Core.expandBundles_nil_shorts (greetP.items) s1 rfl rfl
-  rw [Core.prepare, hb, Core.hoistPositionals]
+  rw [Core.prepare, hb]
+  have hf : Core.fuseValues (greetP.items) s1 = s1 := by
+    simp only [Core.fuseValues, greet_switch_lexemes, greet_value_lexemes, s1]
+    simp [Core.fuseDetachedValues, Core.lexemeClaims]
+    decide
+  rw [hf, Core.hoistPositionals]
   simp only [greet_switch_lexemes, greet_value_lexemes, s1, Core.partitionClaimed,
     Core.lexemeClaims, List.any_cons, List.any_nil]
   repeat' split

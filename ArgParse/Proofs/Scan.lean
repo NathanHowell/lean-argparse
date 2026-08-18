@@ -464,7 +464,11 @@ value ends depends on the payload type — `findConcatSplit?` takes the longest
 prefix of the tail that decodes — so what needs guaranteeing is not *where* the
 cut falls but that cutting neither loses nor invents characters. The residue is
 re-dashed and pushed back on the stream, and a residue that was wrong would
-become a token the user never typed. -/
+become a token the user never typed.
+
+The pre-pass now makes the same cut up front for a value type that states its
+shape, which is what makes `-n5v` independent of sequencing;
+`Core.digitValueSplit_concat` is that guarantee for the new path. -/
 
 /-- Taking and dropping at the same index recovers the string. -/
 theorem stringTake_append_stringDrop (s : String) (n : Nat) :

@@ -213,9 +213,11 @@ private def checkHelpMentionsItems : Except String Unit :=
 
 /-! ### Bundles packing an option
 
-`-vn5` is a flag, then an option, then its value, in one token. Which of these
-parse depends on where the split has to happen, so all four combinations are
-pinned -- including the one that does not work, so it cannot change silently. -/
+`-vn5` is a flag, then an option, then its value, in one token, and `-n5v` is
+the same three the other way round. Both split in the pre-pass now, so both
+parse whichever order the parser sequences its items in -- all four combinations
+are pinned, together with the guard that keeps the pass from inventing tokens
+the user never typed. -/
 
 /-- Payload for the bundle fixtures. -/
 private structure Bundled where
@@ -248,27 +250,49 @@ private def checkBundleFlagsThenOption : Except String Unit := do
   expectBundled "option first" optFirstApp ["-vn5"] { count := 5, verbose := true }
   expectBundled "flag first" flagFirstApp ["-vn5"] { count := 5, verbose := true }
 
-/-- A bundle that *leads* with the option splits during the option's own scan,
-which pushes the residue back onto the stream. Only parsers that reach the flag
-afterwards can see it. -/
+/-- A bundle that *leads* with the option splits up front too, so the residue
+is a token of its own before any scan runs.
+
+This used to depend on sequencing: the split happened during the option's own
+scan, which pushed `-v` back onto the stream where a flag that had already run
+could not see it. `ItemSpec.concatFit` is what closed it -- `Nat` states that
+its values are a digit run, which is exactly the boundary `findConcatSplit?`
+would have found. -/
 private def checkBundleOptionThenFlag : Except String Unit := do
   expectBundled "option first" optFirstApp ["-n5v"] { count := 5, verbose := true }
-
-/-- The unfixed half, pinned. With the flag sequenced first, the residue `-v`
-appears after that flag has already run, and is reported as leftover.
-
-This is a consequence of scanning each item once in applicative order, not an
-oversight: splitting `-n5v` up front would need the value's decoder, and the
-item list the expansion pass reads is type-erased. `-n5 -v` and `--count=5 -v`
-work in either order. -/
-private def checkBundleOptionThenFlagLimitation : Except String Unit := do
-  match Exec.exec flagFirstApp ["-n5v"] with
-  | .error text =>
-      expectTrue ((text.splitOn "-v").length ≥ 2)
-        s!"expected the residue reported as leftover, got: {text}"
-  | other => .error s!"expected the documented failure, got {repr other}"
+  expectBundled "flag first" flagFirstApp ["-n5v"] { count := 5, verbose := true }
   expectBundled "detached still works" flagFirstApp ["-n5", "-v"]
     { count := 5, verbose := true }
+
+/-- Multi-digit values keep their digits, and the residue may itself be a
+bundle. -/
+private def checkBundleOptionThenFlags : Except String Unit := do
+  expectBundled "two digits" flagFirstApp ["-n12v"] { count := 12, verbose := true }
+  expectBundled "flags either side" flagFirstApp ["-vn5"] { count := 5, verbose := true }
+
+/-- Payload for the greedy-value fixture: a `String` option and a flag whose
+short is a character the value contains. -/
+private structure Greedy where
+  message : String
+  other : Bool
+  deriving Repr, DecidableEq
+
+/-- The flag is sequenced first, so an eager split would have to be right. -/
+private def greedyApp : Cmd Greedy :=
+  .leaf "say" { name := "say" }
+    ((fun o m => Greedy.mk m o)
+      <$> flag "other" (short := 'o') <*> option String "message" (short := 'm'))
+
+/-- A value type that takes any string is never split up front, because the
+whole tail really is the value: `-mfoo` is the message `foo`, not `fo` followed
+by a `-o` flag. This is what `concatFit` defaulting to `anything` protects, and
+the case that made an eager split unsound before the decoders declared a shape. -/
+private def checkGreedyValueNotSplit : Except String Unit := do
+  match Exec.exec greedyApp ["-mfoo"] with
+  | .ok value =>
+      expectTrue (value == { message := "foo", other := false })
+        s!"expected the whole tail as the value, got {repr value}"
+  | other => .error s!"expected a parse, got {repr other}"
 
 /-- A short the command does not accept leaves its token untouched, so the
 expansion pass cannot invent tokens the user never typed. -/
@@ -445,6 +469,64 @@ private def checkManyThroughBundle : Except String Unit := do
       expectTrue (st.pre.isEmpty) s!"expected the bundle consumed, got {repr st.pre}"
   | other => .error s!"expected ok result, got {repr other}"
 
+/-! ### Detached values that lex as flags
+
+`--message -v` used to give `-v` to the flag and leave `--message` with nothing.
+The pre-pass now fuses the pair into the `=` spelling before anything scans, so
+the option takes it -- and does so whichever order the two are sequenced in. -/
+
+/-- Payload for the detached-value fixtures. -/
+private structure Detached where
+  message : String
+  verbose : Bool
+  deriving Repr, DecidableEq
+
+/-- The option is sequenced before the flag. -/
+private def messageFirstApp : Cmd Detached :=
+  .leaf "say" { name := "say" }
+    ((fun m v => Detached.mk m v)
+      <$> option String "message" (short := 'm') <*> flag "verbose" (short := 'v'))
+
+/-- The flag is sequenced before the option. -/
+private def verboseFirstApp : Cmd Detached :=
+  .leaf "say" { name := "say" }
+    ((fun v m => Detached.mk m v)
+      <$> flag "verbose" (short := 'v') <*> option String "message" (short := 'm'))
+
+private def expectDetached (label : String) (app : Cmd Detached) (argv : List String)
+    (want : Detached) : Except String Unit :=
+  match Exec.exec app argv with
+  | .ok value => expectTrue (value == want) s!"{label}: got {repr value}, want {repr want}"
+  | other => .error s!"{label}: expected a parse, got {repr other}"
+
+/-- A detached value that lexes as one of this command's flags goes to the
+option, not the flag, in both spellings and both sequencings. -/
+private def checkDetachedValueLexingAsFlag : Except String Unit := do
+  expectDetached "long, option first" messageFirstApp ["--message", "-v"]
+    { message := "-v", verbose := false }
+  expectDetached "long, flag first" verboseFirstApp ["--message", "-v"]
+    { message := "-v", verbose := false }
+  expectDetached "short, option first" messageFirstApp ["-m", "-v"]
+    { message := "-v", verbose := false }
+  expectDetached "short, flag first" verboseFirstApp ["-m", "-v"]
+    { message := "-v", verbose := false }
+
+/-- The explicit spelling was always unambiguous and still means the same thing,
+which is what makes the fuse a rewrite rather than a new rule. -/
+private def checkDetachedValueExplicitForm : Except String Unit := do
+  expectDetached "eq form" messageFirstApp ["--message=-v"]
+    { message := "-v", verbose := false }
+
+/-- An ordinary value is left exactly as the user typed it, and the flag still
+works alongside it in either position. -/
+private def checkOrdinaryValueUntouched : Except String Unit := do
+  expectDetached "value then flag" messageFirstApp ["--message", "hello", "-v"]
+    { message := "hello", verbose := true }
+  expectDetached "flag then value" messageFirstApp ["-v", "--message", "hello"]
+    { message := "hello", verbose := true }
+  expectDetached "unknown-looking value" messageFirstApp ["--message", "-x", "-v"]
+    { message := "-x", verbose := true }
+
 /-! ### Usage synopses over alternations
 
 `(-a | -b)` is the one thing a flat item list cannot say, which is why the
@@ -561,8 +643,12 @@ def execChecks : List (String × Except String Unit) :=
   , ("wide labels keep their separator", checkWideLabelSeparated)
   , ("bundle leading with flags", checkBundleFlagsThenOption)
   , ("bundle leading with an option", checkBundleOptionThenFlag)
-  , ("bundle residue needs a later flag", checkBundleOptionThenFlagLimitation)
+  , ("bundle residue splits up front", checkBundleOptionThenFlags)
+  , ("a greedy value keeps its whole tail", checkGreedyValueNotSplit)
   , ("unknown short leaves its token alone", checkBundleUnknownShortUntouched)
+  , ("detached value that lexes as a flag", checkDetachedValueLexingAsFlag)
+  , ("explicit value spelling unchanged", checkDetachedValueExplicitForm)
+  , ("ordinary values untouched", checkOrdinaryValueUntouched)
   , ("alternation renders as a choice", checkChoiceSynopsis)
   , ("optional choice is bracketed", checkOptionalChoiceSynopsis)
   , ("choice branches keep their items", checkChoiceBranchItems)

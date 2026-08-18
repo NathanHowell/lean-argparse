@@ -85,7 +85,11 @@ about which items exist.
 `ItemSpec` here is *payload-free*: a flat record of name, short/long forms,
 arity, metavar, choices, help, and default, with the value type erased. That
 erasure is what keeps `Doc` — and therefore `P α` — in `Type`, with no universe
-bump. The typed `FlagSpec`/`OptSpec α`/`PosSpec α` records stay where they are,
+bump. It stays a record of data rather than of behaviour: the one thing about
+decoding that has to survive is `concatFit`, and that is a statement of the
+*shape* of a type's values (`-n5v` cuts after the digits; a `String` keeps the
+whole tail), not the decoder itself. A pre-pass that runs before any decoder is
+in reach can act on it; nothing needs to call back into the value type. The typed `FlagSpec`/`OptSpec α`/`PosSpec α` records stay where they are,
 as the inputs Layer 1's combinators already consume; Layer 3 builds both from
 the same arguments. `ItemSpec` is also the leaf of the render model
 (`CmdSpec.args`), so help and correspondence read one item type.

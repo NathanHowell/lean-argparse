@@ -15,11 +15,12 @@ post-sentinel tokens stay positional. `scopedPre` additionally limits a scan to
 the tokens before the first subcommand name, keeping parent items out of a
 child's argument segment.
 
-One ambiguity is inherent to searching rather than consuming: a detached option
-value that lexes as a flag this command accepts is claimed by the flag.
-`--message -v` gives `-v` to the flag, not to `--message`. There is no way to
-resolve it from the token stream alone -- both readings are legal -- so the
-`--message=-v` form is the one that forces the value reading.
+Searching rather than consuming creates one ambiguity: a detached option value
+that lexes as a flag this command accepts could go to either. `--message -v` is
+resolved the way every mainstream parser resolves it -- the option takes it --
+by fusing the pair into `--message=-v` in the pre-pass, before any scan runs.
+The `=` form was always the unambiguous spelling; the pre-pass just stops the
+user from having to reach for it.
 -/
 
 namespace ArgParse.Core
@@ -179,22 +180,60 @@ def optionToken? {α : Type} [ArgParse.FromArg α]
 
 /-! ### Bundle expansion
 
-`-n5v` parses and `-vn5` does not, because the option scan runs first and
-`-vn5` does not begin with `-n`. Swapping the two scans only moves the problem:
-then `-n5v` breaks instead. Neither pass can fix it alone, because deciding
-where a bundle ends needs to know which characters are flags and which take
-values — and that is exactly what a command's item list says.
+Which of `-vn5` and `-n5v` a scan can read depends on which scan runs first, and
+that is the caller's applicative order rather than anything the library chooses.
+Neither scan can fix it alone, because deciding where a bundle ends needs to know
+which characters are flags and which take values — and that is exactly what a
+command's item list says.
 
 So the split happens before either scan, driven by the items. It is deliberately
-conservative: every character has to name a short this command accepts, and the
-walk stops at the first one that takes a value, which keeps the rest of the
-token as that value. Anything else is left byte-for-byte alone, so `-n5v` still
-reaches the concatenation path and an unknown short can never be turned into
-tokens the user did not type. -/
+conservative: every character has to name a short this command accepts, and an
+unknown one leaves the token byte-for-byte alone, so the pass can never invent a
+token the user did not type.
+
+Where the walk reaches an option short, how much of the rest is its value is a
+question only that value's decoder can answer -- `5v` is `5` and a flag for a
+`Nat`, and the whole tail for a `String`. `ItemSpec.concatFit` is the part of
+that answer the decoder can state as data, which is what lets this pass split
+`-n5v` as well as `-vn5`. An item that says `anything` keeps the whole tail, and
+the token reaches the concatenation path in the option's own scan exactly as it
+used to. -/
 
 /-- Short forms of the items presenting a given surface syntax. -/
 def shortsOfKind (kind : ItemKind) (items : List ItemSpec) : List Char :=
   items.filterMap (fun i => if i.kind = kind then i.short? else none)
+
+/-- Option shorts of this command paired with how far their values reach. -/
+def optionShortFits (items : List ItemSpec) : List (Char × ConcatFit) :=
+  items.filterMap fun i =>
+    if i.kind = .option then i.short?.map (fun c => (c, i.concatFit)) else Option.none
+
+/-- Split a concatenated tail into the value and what follows it, for an option
+whose values are a digit run. `none` means there is nothing to split: no leading
+digit, or nothing left over once the digits are taken.
+
+This agrees with what `findConcatSplit?` would decide at scan time, which is
+what makes splitting up front a rewrite rather than a second opinion: the
+longest decodable prefix of a `Nat` tail is exactly its leading digits.
+
+The residue is returned already split into its first character and the rest,
+because there is no split to speak of without one. -/
+def digitValueSplit (tail : List Char) : Option (List Char × Char × List Char) :=
+  match tail.takeWhile Char.isDigit, tail.dropWhile Char.isDigit with
+  | [], _ => Option.none
+  | _, [] => Option.none
+  | value, r :: rs => Option.some (value, r, rs)
+
+/-- The split reassembles: the value and the residue are exactly the tail, in
+order. This is what keeps the pass from inventing characters -- the two tokens
+it emits are the one the user typed, cut in half and re-dashed. The scan-time
+split has the same guarantee in `findConcatSplit?_split`. -/
+theorem digitValueSplit_concat {tail value : List Char} {r : Char} {rs : List Char}
+    (h : digitValueSplit tail = Option.some (value, r, rs)) :
+    value ++ r :: rs = tail := by
+  unfold digitValueSplit at h
+  have hsplit := tail.takeWhile_append_dropWhile (p := Char.isDigit)
+  split at h <;> simp_all
 
 /-- Walk a bundle's characters, emitting one token per flag short until an
 option short is reached, which takes the rest of the token with it.
@@ -213,27 +252,57 @@ def splitBundle (flagShorts optShorts : List Char) :
       else
         Option.none
 
+/-- Split a token that *leads* with an option short whose value shape is known,
+into that option with its value and whatever follows.
+
+`none` leaves the decision to the caller: either the leading short is not such
+an option, or there is no value-and-residue to separate, or the residue is not
+something this command's shorts account for. -/
+def splitLeadingOption (flagShorts optShorts : List Char)
+    (fits : List (Char × ConcatFit)) (c : Char) (rest : List Char) :
+    Option (List String) :=
+  match fits.find? (fun p => p.fst = c) with
+  | Option.some (_, .digits) =>
+      match digitValueSplit rest with
+      | Option.some (value, r, rs) =>
+          match splitBundle flagShorts optShorts [] (r :: rs) with
+          | Option.some out => Option.some (String.ofList ('-' :: c :: value) :: out)
+          | Option.none => Option.none
+      | Option.none => Option.none
+  | _ => Option.none
+
 /-- Split one token, or leave it exactly as it was.
 
 A single-token result means nothing was gained -- the token was already one
 short -- so the original is returned rather than a re-spelled copy. -/
-def expandBundleToken (flagShorts optShorts : List Char) (token : String) : List String :=
+def expandBundleToken (flagShorts optShorts : List Char)
+    (fits : List (Char × ConcatFit)) (token : String) : List String :=
   match token.toList with
   | '-' :: c :: rest =>
       if c = '-' then [token]
       else
-        match splitBundle flagShorts optShorts [] (c :: rest) with
-        | Option.some out => if out.length ≥ 2 then out else [token]
-        | Option.none => [token]
+        match splitLeadingOption flagShorts optShorts fits c rest with
+        | Option.some out => out
+        | Option.none =>
+            match splitBundle flagShorts optShorts [] (c :: rest) with
+            | Option.some out => if out.length ≥ 2 then out else [token]
+            | Option.none => [token]
   | _ => [token]
 
 /-- Expand short bundles in the `pre` stream using the items legal here.
+
+The pass runs twice. One sweep splits a bundle that leads with flags, handing
+the trailing option short the rest of the token; a second lets that piece be
+split in turn, so `-vn5f` reaches `-v -n5 -f`. Expansion is idempotent, so a
+third sweep would do nothing.
 
 `post` is untouched: past the `--` sentinel nothing is an option. -/
 def expandBundles (items : List ItemSpec) (st : State) : State :=
   let flagShorts := shortsOfKind .flag items
   let optShorts := shortsOfKind .option items
-  { st with pre := st.pre.flatMap (expandBundleToken flagShorts optShorts) }
+  let fits := optionShortFits items
+  let step (tokens : List String) := tokens.flatMap (expandBundleToken flagShorts optShorts fits)
+  { st with pre := step (step st.pre) }
 
 /-- A command with no short forms cannot bundle, so expansion is the identity. -/
 @[simp] theorem expandBundles_nil_shorts (items : List ItemSpec) (st : State)
@@ -241,22 +310,31 @@ def expandBundles (items : List ItemSpec) (st : State) : State :=
     (hopt : shortsOfKind .option items = []) :
     expandBundles items st = st := by
   simp only [expandBundles, hflag, hopt]
-  have hid : ∀ tokens : List String,
-      tokens.flatMap (expandBundleToken [] []) = tokens := by
-    intro tokens
+  have hlead : ∀ (fits : List (Char × ConcatFit)) (c : Char) (rest : List Char),
+      splitLeadingOption [] [] fits c rest = Option.none := by
+    intro fits c rest
+    unfold splitLeadingOption
+    split
+    · split
+      · simp [splitBundle]
+      · rfl
+    · rfl
+  have hid : ∀ (fits : List (Char × ConcatFit)) (tokens : List String),
+      tokens.flatMap (expandBundleToken [] [] fits) = tokens := by
+    intro fits tokens
     induction tokens with
     | nil => rfl
     | cons t rest ih =>
         simp only [List.flatMap_cons, ih]
-        have : expandBundleToken [] [] t = [t] := by
-          simp only [expandBundleToken]
+        have : expandBundleToken [] [] fits t = [t] := by
+          simp only [expandBundleToken, hlead]
           split
           · split
             · rfl
             · simp [splitBundle]
           · rfl
         simp [this]
-  rw [hid]
+  rw [hid, hid]
 
 /-! ### Keeping positionals off other items' tokens
 
@@ -301,6 +379,46 @@ def partitionClaimed (lexemes valueLex : List String) :
         let (free, taken) := partitionClaimed lexemes valueLex rest
         (tok :: free, taken)
 
+/-! ### Detached values that look like flags
+
+A value that lexes as one of this command's own flags is claimed by whichever
+scan reaches it first, and the scans run in the caller's applicative order. So
+`--message -v` parsed as a `-v` flag and a `--message` with nothing to take,
+unless the user reached for `--message=-v`.
+
+`partitionClaimed` already takes the other side of that question: it keeps a
+detached value adjacent to its lexeme so a positional cannot pick it up. The
+scans just never asked. Fusing the pair into the `=` spelling before anything
+scans settles it once, in the direction the rest of the library already assumes
+and every mainstream parser takes -- an option that takes a value takes the
+token after it.
+
+The pass fires only where the ambiguity is real: the second token has to be one
+this command's own items would claim. An ordinary value is left as the user
+typed it. -/
+
+/-- Write a detached pair as the unambiguous concatenated spelling. -/
+def fuseValueToken (lex value : String) : String :=
+  if lex.startsWith "--" then lex ++ "=" ++ value else lex ++ value
+
+/-- Fuse each detached value onto the lexeme that takes it, where leaving them
+apart would let another item claim the value first. -/
+def fuseDetachedValues (lexemes valueLex : List String) :
+    List String → List String
+  | [] => []
+  | [tok] => [tok]
+  | tok :: v :: rest =>
+      if valueLex.contains tok && lexemes.any (lexemeClaims · v) then
+        fuseValueToken tok v :: fuseDetachedValues lexemes valueLex rest
+      else
+        tok :: fuseDetachedValues lexemes valueLex (v :: rest)
+
+/-- Run the fuse over a command's own segment, using its own items. -/
+def fuseValues (items : List ItemSpec) (st : State) : State :=
+  let switches := items.filter (fun i => i.kind != .positional)
+  let lexemes := switches.flatMap (·.lexemes)
+  { st with pre := fuseDetachedValues lexemes (valueLexemes switches) st.pre }
+
 /-- Move the tokens this command's flags and options would claim behind the rest,
 so its positionals see only what nothing else wanted.
 
@@ -315,9 +433,14 @@ def hoistPositionals (items : List ItemSpec) (st : State) : State :=
   { st with pre := free ++ taken }
 
 /-- The whole pre-pass a command runs over the segment it owns: split bundles,
-then keep positionals off the tokens its other items want. -/
+fuse detached values onto the lexemes that take them, then keep positionals off
+the tokens its other items want.
+
+Order matters. Bundles are split first so `-vn5` has become `-v -n5` before
+anything looks for a detached value; hoisting runs last so it sees the fused
+tokens as the single claimed tokens they now are. -/
 def prepare (items : List ItemSpec) (st : State) : State :=
-  hoistPositionals items (expandBundles items st)
+  hoistPositionals items (fuseValues items (expandBundles items st))
 
 /-- A command with no flags or options leaves the stream alone. -/
 @[simp] theorem hoistPositionals_no_switches (items : List ItemSpec) (st : State)

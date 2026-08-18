@@ -186,11 +186,14 @@ changes what the binary answers, not what the user has installed. `zsh` and
   with no stringly recovery step
 - A proof suite with no `sorry`, no extra axioms, and a lint-clean build
 
-Two documented ambiguities. A detached option value that lexes as a defined flag
-(`--message -v`) is claimed by the flag scan first; write `--message=-v` to force
-the value reading. And a bundle that *leads* with an option, like `-n5v`, is
-split during that option's own scan, so the trailing `-v` is only picked up by
-flags sequenced after it — `-n5 -v` works either way.
+Two ambiguities the pre-pass settles before any scan runs, so neither depends on
+the order a parser sequences its items in. A detached option value that lexes as
+a defined flag (`--message -v`) goes to the option, by being rewritten to the
+`--message=-v` spelling that always meant that. And a bundle that *leads* with an
+option (`-n5v`) is split into `-n5 -v`, using `FromArg.concatFit` — the part of a
+decoder that can be stated as data — to find where the value ends. A value type
+that accepts any string says so and keeps its whole tail: `-mfoo` is the message
+`foo`, never `fo` and a `-o` flag.
 
 ## Comparison with lean4-cli
 

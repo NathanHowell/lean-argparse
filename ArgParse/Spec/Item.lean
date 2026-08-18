@@ -10,8 +10,8 @@ are the inputs Layer 1's combinators consume. They are typed: `OptSpec α`
 carries the `FromArg α` instance used to decode a token.
 
 **`ItemSpec`** is the leaf of the render model: one flag, option, or positional,
-payload-free — the value type erased down to a metavar string and an optional
-choice list. That erasure is load bearing: it keeps `Doc` (and therefore `P α`)
+payload-free — the value type erased down to a metavar string, an optional
+choice list, and the shape its concatenated values take. That erasure is load bearing: it keeps `Doc` (and therefore `P α`)
 in `Type` with no universe bump, and it means one item type serves both the
 renderers and the correspondence theorems.
 
@@ -158,6 +158,13 @@ structure ItemSpec where
   required  : Bool := true
   /-- Whether the item is omitted from generated documentation. -/
   hidden    : Bool := false
+  /-- How far this item's value reaches when concatenated onto its short form.
+
+  The one thing about decoding that has to survive erasure: the bundle pre-pass
+  runs before any decoder is in reach, and `-n5v` cannot be split without
+  knowing whether `5v` is a value or a value and a flag. It is a statement of
+  shape rather than a decoder, so `ItemSpec` stays plain data. -/
+  concatFit : ConcatFit := .anything
 deriving Repr, DecidableEq, Inhabited
 
 namespace ItemSpec

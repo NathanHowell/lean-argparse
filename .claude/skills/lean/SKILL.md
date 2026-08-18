@@ -120,8 +120,9 @@ fails; write `((text.splitOn s).length == 2)`.
 **`expectTrue (a = b)` type errors in `Bool` position.** `=` is `Prop`. Use `==`
 where a `Bool` is wanted.
 
-**`String.startsWith` does not reduce, but it is not a proof obstacle.** It
-routes through `String.Slice.Pattern`, so `decide` and `rfl` get nowhere. `simp`
+**`String.startsWith` is awkward, but not a proof obstacle.** It routes through
+`String.Slice.Pattern`. On closed literals `decide`, `rfl`, and `simp` all close
+it. With a variable in either argument it does not reduce -- there `simp`
 rewrites it to a `List.IsPrefix` claim about `toList`, and ordinary list
 reasoning finishes the job.
 

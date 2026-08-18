@@ -114,7 +114,8 @@ def optParts (α : Type) [FromArg α]
     , choices? := FromArg.choices (α := α)
     , default? := defaultText?
     , required := required
-    , hidden := hidden }
+    , hidden := hidden
+    , concatFit := FromArg.concatFit (α := α) }
   (spec, item)
 
 /-- Read every value supplied for an option, in order.

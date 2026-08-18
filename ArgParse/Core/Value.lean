@@ -10,6 +10,24 @@ namespace ArgParse
 
 universe u
 
+/-- How far a value reaches when it is concatenated onto its short form, as
+much of the decoder as can be said without running it.
+
+`-n5v` is `5` then a `-v` flag for a `Nat` and the whole tail for a `String`,
+and only the decoder knows which. The bundle pre-pass runs before any decoder is
+in reach -- the items it reads are payload-free -- so each decoder states the
+shape of its own values here instead, in data the pre-pass can act on.
+
+`anything` is the safe answer and the default: a type that says it takes any
+string is never split up front, which leaves the token for the option's own
+scan, exactly as before this existed. -/
+inductive ConcatFit where
+  /-- The decoder accepts any string, so the whole tail is the value. -/
+  | anything
+  /-- The decoder accepts exactly a non-empty run of ASCII digits. -/
+  | digits
+deriving Repr, DecidableEq, Inhabited
+
 /-- Convert a single token to a typed value for option/positional parsing. -/
 class FromArg (α : Type u) where
   /-- Attempt to parse the token; failures are reported via a diagnostic string. -/
@@ -18,6 +36,9 @@ class FromArg (α : Type u) where
   metavar : String := "VALUE"
   /-- Optional finite set of admissible values (for completions/docs). -/
   choices : Option (List String) := none
+  /-- How far a value reaches when concatenated onto a short form. Overriding
+  this is only sound when the decoder accepts exactly the stated shape. -/
+  concatFit : ConcatFit := .anything
 
 namespace FromArg
 
@@ -66,6 +87,9 @@ private def natError (input : String) : String := s!"expected a natural number, 
 instance instFromArgNat : FromArg Nat where
   parse s := FromArg.ofOption (natError s) s.toNat?
   metavar := "NAT"
+  -- `String.toNat?` accepts exactly a non-empty digit run, so the longest
+  -- decodable prefix of a tail is exactly its leading digits.
+  concatFit := .digits
 
 private def intError (input : String) : String := s!"expected an integer, found '{input}'"
 
