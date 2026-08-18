@@ -14,6 +14,12 @@ Scanning never crosses the `--` sentinel: only `pre` is searched, so
 post-sentinel tokens stay positional. `scopedPre` additionally limits a scan to
 the tokens before the first subcommand name, keeping parent items out of a
 child's argument segment.
+
+One ambiguity is inherent to searching rather than consuming: a detached option
+value that lexes as a flag this command accepts is claimed by the flag.
+`--message -v` gives `-v` to the flag, not to `--message`. There is no way to
+resolve it from the token stream alone -- both readings are legal -- so the
+`--message=-v` form is the one that forces the value reading.
 -/
 
 namespace ArgParse.Core

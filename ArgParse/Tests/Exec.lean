@@ -445,6 +445,101 @@ private def checkManyThroughBundle : Except String Unit := do
       expectTrue (st.pre.isEmpty) s!"expected the bundle consumed, got {repr st.pre}"
   | other => .error s!"expected ok result, got {repr other}"
 
+/-! ### Usage synopses over alternations
+
+`(-a | -b)` is the one thing a flat item list cannot say, which is why the
+synopsis reads `CmdSpec.doc`. These pin both directions: an alternation becomes
+a choice, and the optionality spelling -- `alt [d, none]`, one real branch --
+does not. -/
+
+/-- The synopsis of a one-command spec built from `p`. -/
+private def synopsisOf {α : Type} (p : P α) : String :=
+  Doc.usageLine ["tool"] ((Cmd.leaf "tool" { name := "tool" } p).toCmdSpec)
+
+/-- Two flags joined by `<|>` render as a choice, not as two independent
+optional flags. -/
+private def checkChoiceSynopsis : Except String Unit := do
+  let line := synopsisOf (Builder.flag "fast" (short := 'f') <|> Builder.flag "slow" (short := 's'))
+  expectTrue (line == "  tool (--fast | --slow)")
+    s!"expected a parenthesised choice, got {repr line}"
+
+/-- An optional choice is bracketed rather than parenthesised: `optional`
+contributes the `none` branch that makes the whole group omissible. -/
+private def checkOptionalChoiceSynopsis : Except String Unit := do
+  let line := synopsisOf (P.optional (Builder.flag "fast" <|> Builder.flag "slow"))
+  expectTrue (line == "  tool [--fast | --slow]")
+    s!"expected a bracketed choice, got {repr line}"
+
+/-- Each branch may hold more than one item, and they stay in order within it. -/
+private def checkChoiceBranchItems : Except String Unit := do
+  let line := synopsisOf
+    (((·, ·) <$> Builder.flag "a" <*> Builder.flag "b")
+      <|> ((·, ·) <$> Builder.flag "c" <*> Builder.flag "d"))
+  expectTrue (line == "  tool (--a --b | --c --d)")
+    s!"expected branches to keep their items, got {repr line}"
+
+/-- A repeated choice keeps the ellipsis the group -- not any single item --
+earns, and `P.many` says the group may be skipped entirely. -/
+private def checkRepeatedChoiceSynopsis : Except String Unit := do
+  let line := synopsisOf (P.many (Builder.flag "fast" <|> Builder.flag "slow"))
+  expectTrue (line == "  tool [(--fast | --slow)...]")
+    s!"expected a zero-or-more choice, got {repr line}"
+
+/-- `P.some` is the same group without the bracket: it must appear at least
+once, which is the whole reason `Doc.many` records which one it came from. -/
+private def checkSomeChoiceSynopsis : Except String Unit := do
+  let line := synopsisOf (P.some (Builder.flag "fast" <|> Builder.flag "slow"))
+  expectTrue (line == "  tool (--fast | --slow)...")
+    s!"expected a one-or-more choice, got {repr line}"
+
+/-- A `many` above a single item overrides that item's own arity, which is what
+used to go missing: `P.many` over a required option used to render as though
+exactly one were mandatory. -/
+private def checkManyOverridesItemArity : Except String Unit := do
+  let line := synopsisOf (P.many (Builder.option String "inc"))
+  expectTrue (line == "  tool [--inc STRING...]")
+    s!"expected a repeated optional item, got {repr line}"
+
+/-- And `P.some` over the same option keeps it mandatory. -/
+private def checkSomeOverridesItemArity : Except String Unit := do
+  let line := synopsisOf (P.some (Builder.option String "inc"))
+  expectTrue (line == "  tool --inc STRING...")
+    s!"expected a repeated mandatory item, got {repr line}"
+
+/-- The repeating builders are unaffected: their repetition already travelled on
+`ItemSpec.arity`, and a `many` node above it does not double the ellipsis. -/
+private def checkRepeatingBuildersUnchanged : Except String Unit := do
+  let optionsLine := synopsisOf (Builder.options String "inc")
+  expectTrue (optionsLine == "  tool [--inc STRING...]")
+    s!"expected the repeatable option unchanged, got {repr optionsLine}"
+  let argsLine := synopsisOf (Builder.args String "file")
+  expectTrue (argsLine == "  tool [file...]")
+    s!"expected the repeatable positional unchanged, got {repr argsLine}"
+
+/-- An optional option is *not* a choice. Its document is `alt [item, none]`,
+one real branch, and it keeps the bracketing it always had. -/
+private def checkOptionalIsNotAChoice : Except String Unit := do
+  let line := synopsisOf (Builder.optionOpt Nat "count" (short := 'n'))
+  expectTrue (line == "  tool [--count NAT]")
+    s!"expected the optionality spelling to render as before, got {repr line}"
+
+/-- A choice whose branches are all hidden renders as nothing, the same way a
+hidden item does. -/
+private def checkHiddenChoiceOmitted : Except String Unit := do
+  let line := synopsisOf
+    (Builder.flag "a" (hidden := true) <|> Builder.flag "b" (hidden := true))
+  expectTrue (line == "  tool")
+    s!"expected a hidden choice to disappear, got {repr line}"
+
+/-- Items outside the choice keep their old treatment, choice and all: loose
+switches first, then choices, then positionals. -/
+private def checkChoiceAmongLooseItems : Except String Unit := do
+  let line := synopsisOf
+    ((·, ·, ·) <$> (Builder.flag "x" <|> Builder.flag "y")
+      <*> Builder.option String "who" <*> Builder.arg String "name")
+  expectTrue (line == "  tool --who STRING (--x | --y) name")
+    s!"expected loose items around the choice, got {repr line}"
+
 /-- Integration checks executed by `lake test`. -/
 def execChecks : List (String × Except String Unit) :=
   [ ("nested dispatch", checkNested)
@@ -468,6 +563,17 @@ def execChecks : List (String × Except String Unit) :=
   , ("bundle leading with an option", checkBundleOptionThenFlag)
   , ("bundle residue needs a later flag", checkBundleOptionThenFlagLimitation)
   , ("unknown short leaves its token alone", checkBundleUnknownShortUntouched)
+  , ("alternation renders as a choice", checkChoiceSynopsis)
+  , ("optional choice is bracketed", checkOptionalChoiceSynopsis)
+  , ("choice branches keep their items", checkChoiceBranchItems)
+  , ("repeated choice keeps its ellipsis", checkRepeatedChoiceSynopsis)
+  , ("one-or-more choice is not bracketed", checkSomeChoiceSynopsis)
+  , ("many overrides an item's arity", checkManyOverridesItemArity)
+  , ("some overrides an item's arity", checkSomeOverridesItemArity)
+  , ("repeating builders unchanged", checkRepeatingBuildersUnchanged)
+  , ("optionality is not a choice", checkOptionalIsNotAChoice)
+  , ("hidden choice disappears", checkHiddenChoiceOmitted)
+  , ("choice among loose items", checkChoiceAmongLooseItems)
   , ("bundled builtin is found", checkBundledBuiltin)
   , ("unknown short names itself", checkUnknownShortNamed)
   , ("negative numbers are values", checkNegativeNumberNotDiagnosed)

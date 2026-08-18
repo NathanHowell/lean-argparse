@@ -129,7 +129,7 @@ theorem node_yields {α : Type} (n : String) (m : Meta) (globals : P (α → α)
     (subs : List (Cmd α)) (c : Cmd α)
     {st stG stC : State} {f : α → α} {a : α} {token : String} {rest : List String}
     (hglob : Core.scopedPre (subs.map Cmd.name)
-      (fun st' => globals.run (Core.prepare (Doc.items globals.doc) st')) st
+      (fun st' => globals.run (Core.prepare (globals.items) st')) st
         = .ok f stG)
     (hpre : stG.pre = token :: rest)
     (hfind : subs.find? (fun s => s.name == token) = some c)
@@ -186,7 +186,7 @@ verb, so they consume nothing and change nothing. -/
 theorem globals_pass :
     Core.scopedPre ["greet"]
       (fun st' => (Pure.pure id : P (Greeting → Greeting)).run
-        (Core.prepare (Doc.items (Pure.pure id : P (Greeting → Greeting)).doc) st'))
+        (Core.prepare ((Pure.pure id : P (Greeting → Greeting)).items) st'))
       s0 = .ok id s0 := by
   simp [Core.scopedPre, Core.splitAtFirst, s0, pure_run, Parser.pure,
     Core.prepare, Core.expandBundles, Core.shortsOfKind, Core.hoistPositionals,
@@ -194,18 +194,18 @@ theorem globals_pass :
 
 /-- The only lexeme the leaf's non-positional items answer to. -/
 theorem greet_switch_lexemes :
-    ((Doc.items greetP.doc).filter (fun i => i.kind != .positional)).flatMap (·.lexemes)
+    ((greetP.items).filter (fun i => i.kind != .positional)).flatMap (·.lexemes)
       = ["--who"] := rfl
 
 /-- And it takes a value. -/
 theorem greet_value_lexemes :
-    Spec.valueLexemes ((Doc.items greetP.doc).filter (fun i => i.kind != .positional))
+    Spec.valueLexemes ((greetP.items).filter (fun i => i.kind != .positional))
       = ["--who"] := rfl
 
 /-- Preparation leaves this segment alone: no short forms to split, and the
 positional already sits ahead of the option that would have displaced it. -/
-theorem greet_prepare_id : Core.prepare (Doc.items greetP.doc) s1 = s1 := by
-  have hb := Core.expandBundles_nil_shorts (Doc.items greetP.doc) s1 rfl rfl
+theorem greet_prepare_id : Core.prepare (greetP.items) s1 = s1 := by
+  have hb := Core.expandBundles_nil_shorts (greetP.items) s1 rfl rfl
   rw [Core.prepare, hb, Core.hoistPositionals]
   simp only [greet_switch_lexemes, greet_value_lexemes, s1, Core.partitionClaimed,
     Core.lexemeClaims, List.any_cons, List.any_nil]
@@ -231,7 +231,7 @@ theorem demo_yields :
     (Cmd.leaf "greet" { name := "greet" } greetP)
     (token := "greet") (rest := ["Alice", "--who", "world"])
     (by simpa [Cmd.name] using globals_pass) rfl (by simp [Cmd.name]) ?_
-  show greetP.run (Core.prepare (Doc.items greetP.doc) s1) = _
+  show greetP.run (Core.prepare (greetP.items) s1) = _
   rw [greet_prepare_id]
   have harg : Yields (Builder.arg String "name") s1 "Alice"
       { pre := ["--who", "world"], post := [], cursor := 2 } := by

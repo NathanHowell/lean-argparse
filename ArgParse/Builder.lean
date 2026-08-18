@@ -140,7 +140,7 @@ def optionOpt (α : Type) [FromArg α] (long : String) (short : Option Char := n
     (metavar : Option String := none) (help : String := "")
     (hidden : Bool := false) : P (Option α) :=
   let (spec, item) := optParts α long short metavar help none .one false hidden
-  { doc := .alt [.item item, .none]
+  { doc := .optionalItem item
   , run := fun st =>
       match optionValues spec st with
       | .ok values st' => .ok values.getLast? st'
@@ -153,7 +153,7 @@ def optionD {α : Type} [FromArg α] [ToString α] (long : String) (default : α
     (short : Option Char := none) (metavar : Option String := none)
     (help : String := "") (hidden : Bool := false) : P α :=
   let (spec, item) := optParts α long short metavar help (some (toString default)) .one false hidden
-  { doc := .alt [.item item, .none]
+  { doc := .optionalItem item
   , run := fun st =>
       match optionValues spec st with
       | .ok values st' => .ok (values.getLast?.getD default) st'
@@ -179,7 +179,7 @@ def options (α : Type) [FromArg α] (long : String) (short : Option Char := non
     (metavar : Option String := none) (help : String := "")
     (hidden : Bool := false) : P (List α) :=
   let (spec, item) := optParts α long short metavar help none .many false hidden
-  { doc := .many (.item item), run := optionValues spec }
+  { doc := .repeatedItem item false, run := optionValues spec }
 
 /-- A required `String` option. -/
 @[inline] def strOption (long : String) (short : Option Char := none)
@@ -227,7 +227,7 @@ def arg (α : Type) [FromArg α] (name : String) (metavar : Option String := non
 def argOpt (α : Type) [FromArg α] (name : String) (metavar : Option String := none)
     (help : String := "") (hidden : Bool := false) : P (Option α) :=
   let (spec, item) := posParts α name metavar help .one false hidden
-  { doc := .alt [.item item, .none]
+  { doc := .optionalItem item
   , run := fun st =>
       match Core.takePositionalValue? spec st with
       | .ok (value?, st') => .ok (value?.map Prod.fst) st'
@@ -237,7 +237,7 @@ def argOpt (α : Type) [FromArg α] (name : String) (metavar : Option String := 
 def args (α : Type) [FromArg α] (name : String) (metavar : Option String := none)
     (help : String := "") (hidden : Bool := false) : P (List α) :=
   let (spec, item) := posParts α name metavar help .many false hidden
-  { doc := .many (.item item)
+  { doc := .repeatedItem item false
   , run := fun st =>
       match Core.collectPositionalValues spec st with
       | .ok (values, _, st') => .ok values st'

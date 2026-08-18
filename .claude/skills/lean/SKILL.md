@@ -120,6 +120,20 @@ fails; write `((text.splitOn s).length == 2)`.
 **`expectTrue (a = b)` type errors in `Bool` position.** `=` is `Prop`. Use `==`
 where a `Bool` is wanted.
 
+**`String.startsWith` does not reduce, but it is not a proof obstacle.** It
+routes through `String.Slice.Pattern`, so `decide` and `rfl` get nowhere. `simp`
+rewrites it to a `List.IsPrefix` claim about `toList`, and ordinary list
+reasoning finishes the job.
+
+**`rw` with a `startsWith` lemma fails where `simp` succeeds.** The
+`ForwardPattern` instance is indexed by the pattern, and stops matching once the
+surrounding definitions are unfolded. Two consequences:
+
+- Prefer `split` over `rw [if_pos …]` on a `startsWith` guard, and close the
+  impossible branch with `absurd`.
+- When you do need the rewrite, unfold the surrounding `if` first and rewrite
+  into a goal that still mentions the lexeme function unexpanded.
+
 ## Before committing
 
 ```sh

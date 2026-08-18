@@ -23,9 +23,9 @@ mutual
 Matches on the constructor rather than projecting `.subs`, which is what lets
 Lean see the recursion through `List CmdSpec` as structural. -/
 def manCommand (path : List String) : CmdSpec → List String
-  | .mk name info args subs =>
-      let cmd := CmdSpec.mk name info args subs
-      let visible := visibleItems args
+  | .mk name info doc subs =>
+      let cmd := CmdSpec.mk name info doc subs
+      let visible := visibleItems (Doc.items doc)
       let heading := s!".Sh {String.intercalate " " (path.map String.toUpper)}"
       let synopsis := s!".Nm {String.intercalate " " path}\n{usageLine path cmd}"
       let descr := info.help?.toList.map (fun line => s!".Pp {line}")

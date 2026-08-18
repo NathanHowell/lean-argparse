@@ -269,7 +269,9 @@ option outranks any unknown-option finding.
 
 The token must not start with `-`: dispatch also fails when an option appears
 where a verb belongs (`ci --tier pr`), and there the option is genuinely the
-thing to report. -/
+thing to report.
+
+Reported downstream as nsnd-irq0. -/
 def isUnknownVerb (err : Error) : Bool :=
   err.expect.any (fun e => match e with | .subcommand _ => true | _ => false)
     && (match err.context.head? with

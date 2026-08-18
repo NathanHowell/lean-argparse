@@ -53,8 +53,8 @@ the options table but are not part of any application's parser.
 be documenting less than the parser accepts. They get their own section rather
 than being mixed in, because where they may appear differs: before the verb. -/
 def renderCommandHelp (path : List String) (cmd : CmdSpec)
-    (extra : List ItemSpec := []) (about? : Option String := none)
-    (epilog? : Option String := none) (globals : List ItemSpec := []) : String :=
+    (extra : List ItemSpec := []) (about? : Option String := Option.none)
+    (epilog? : Option String := Option.none) (globals : List ItemSpec := []) : String :=
   let visible := visibleItems cmd.args
   let positionals := visible.filter (fun i => i.kind == .positional)
   let switches := visible.filter (fun i => i.kind != .positional)

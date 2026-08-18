@@ -19,14 +19,16 @@ pair travels through one `Applicative` in lockstep:
 
 ```lean
 structure P (α : Type) where
-  doc : Doc        -- what help, usage, and completion read
-  run : Parser α   -- State → Result α
+  doc : Doc.Normalized  -- what help, usage, and completion read
+  run : Parser α        -- State → Result α
 ```
 
 `Doc` is the static skeleton of a free applicative with the payloads deleted —
 which is everything a renderer ever reads. That buys library-owned help without
-a universe bump, an interpreter, or restating the proof suite. `DESIGN.md` has
-the full argument.
+a universe bump, an interpreter, or restating the proof suite. It is stored in
+normal form, carrying the proof that it is: the constructors normalize, so `P`
+is a lawful applicative rather than a lawful-up-to-a-relation one. `DESIGN.md`
+has the full argument.
 
 ## Quick start
 
@@ -160,9 +162,9 @@ changes what the binary answers, not what the user has installed. `zsh` and
 
 ## Features
 
-- Applicative `P` with proved `LawfulFunctor`/`LawfulApplicative` instances on
-  the underlying `Parser`, and the same laws for `P` itself up to `Doc`
-  normalization
+- Applicative `P` with proved `LawfulFunctor`/`LawfulApplicative` instances,
+  both for the underlying `Parser` and for `P` itself — the latter because the
+  description half is kept in normal form by the type
 - Flags with short-name bundling; options with `--name value`, `--name=value`,
   and `-n5` concatenation plus `.one`/`.many`/`.some` arities; mixed bundles
   like `-vn5`, split against the items legal at that command; positionals;
@@ -177,6 +179,9 @@ changes what the binary answers, not what the user has installed. `zsh` and
 - `--help` at every level, `--version`, mdoc man pages, position-aware
   completion candidates, and installable bash/zsh/fish completion scripts —
   all owned by the runner
+- Usage synopses that show structure, not just a list of items: `p <|> q`
+  renders as `(-a | -b)`, `optional (p <|> q)` as `[-a | -b]`, `P.many p` as
+  `[-p...]` and `P.some p` as `-p...` — all read off the description tree
 - Typed verbs: a `Cmd AppCommand` maps leaves straight into your own inductive,
   with no stringly recovery step
 - A proof suite with no `sorry`, no extra axioms, and a lint-clean build
@@ -247,7 +252,9 @@ is no stringly layer between what you declared and what you get back.
 | | |
 |---|---|
 | `ArgParse.Core` | `Parser = State → Result α`, scanning combinators, normalization |
-| `ArgParse.P` | the paired applicative: `Doc` + `Parser` |
+| `ArgParse.Spec` | the render model: `ItemSpec` leaves and the `CmdSpec` tree |
+| `ArgParse.Doc` | the description skeleton and its normal form |
+| `ArgParse.P` | the paired applicative: `Doc.Normalized` + `Parser` |
 | `ArgParse.Builder` | the only place `doc` and `run` are zipped together |
 | `ArgParse.Cmd` | the command tree, with `toParser` and `toCmdSpec` |
 | `ArgParse.Exec` | the runner: builtins, usage, errors, completion |
@@ -259,8 +266,15 @@ is no stringly layer between what you declared and what you get back.
 All theorems live under `ArgParse/Proofs/` and `ArgParse/Correspondence.lean`,
 and build with zero warnings:
 
-- **Laws** (`Proofs/Laws.lean`) — `LawfulFunctor` and `LawfulApplicative` for
-  `Parser`, by case analysis on results.
+- **Laws** (`Proofs/Laws.lean`, `Proofs/PLaws.lean`) — `LawfulFunctor` and
+  `LawfulApplicative` for `Parser`, by case analysis on results, and for `P`,
+  by pairing each of those with the corresponding law on descriptions:
+  normalized documents are a monoid under `seq`.
+- **Normalization** (`Proofs/Doc.lean`) — normalizing a description preserves
+  its items exactly, order included (`items_normalize`), so composing two
+  parsers documents both (`items_seq`). This is what stands between a parser
+  gaining an option and its help mentioning it, now that every composition
+  normalizes.
 - **Totality/progress** (`Proofs/Totality.lean`) — flag parsers always succeed
   with explicit witnesses (`flag_result_ok`, `flagScan_result_ok`); the generic
   collector loop advances the cursor by exactly the tokens it consumes
@@ -279,7 +293,9 @@ and build with zero warnings:
   advertises are the same lexemes, per builder. Behavioural acceptance: a flag
   accepts each form it advertises and ignores what it does not. Verb agreement:
   `toCmdSpec` lists exactly the names `toParser` dispatches on, at every depth.
-  Help coverage: every visible item reaches the page.
+  Help coverage: every visible item reaches the page. Synopsis coverage: the
+  split the usage line makes between loose items and choices accounts for every
+  item, so an alternation cannot quietly swallow one.
 
 Several correspondence proofs are `rfl`. That is the result, not a shortcut:
 the two halves are the same data, so nothing is left to check. Against a
@@ -304,5 +320,6 @@ cd docbuild
 DOCGEN_SRC=file lake build ArgParse:docs
 ```
 
-`DESIGN.md` is the design of record. `PLAN.md` tracks current state and what is
-next.
+`DESIGN.md` is the design of record; the decisions behind individual pieces are
+recorded in the docstrings of the code that makes them, and the play-by-play is
+in git history.

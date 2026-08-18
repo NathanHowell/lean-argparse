@@ -69,9 +69,9 @@ mutual
 
 /-- Describe an entire command, including child subcommands. -/
 def describeCommand : CmdSpec → List DocEntry
-  | .mk _ info args subs =>
+  | .mk _ info doc subs =>
       entryOfMeta info .command
-        :: ((visibleItems args).map describeItem ++ describeCommands subs)
+        :: ((visibleItems (Doc.items doc)).map describeItem ++ describeCommands subs)
 
 /-- Describe each command in a list, in order. -/
 def describeCommands : List CmdSpec → List DocEntry

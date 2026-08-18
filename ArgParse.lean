@@ -4,8 +4,10 @@ import ArgParse.Core.Normalize
 import ArgParse.Core.Parser
 import ArgParse.Core.Combinators
 import ArgParse.Core.Scan
+import ArgParse.Spec.Item
 import ArgParse.Spec.AST
 import ArgParse.Spec.Describe
+import ArgParse.Doc
 import ArgParse.P
 import ArgParse.Builder
 import ArgParse.Cmd

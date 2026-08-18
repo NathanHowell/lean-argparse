@@ -88,7 +88,8 @@ theorem option_required (α : Type) [FromArg α] (long : String) (short : Option
     (metavar : Option String) (help : String) (hidden : Bool) :
     ∀ item ∈ (Builder.option α long short metavar help hidden).items, item.required := by
   intro item h
-  simp [P.items, Builder.option, Doc.items] at h
+  simp [P.items, Doc.Normalized.items, Doc.Normalized.item, Builder.option,
+    Doc.items] at h
   subst h
   rfl
 
@@ -100,7 +101,8 @@ theorem optionD_not_required (α : Type) [FromArg α] [ToString α] (long : Stri
     ∀ item ∈ (Builder.optionD long default short metavar help hidden).items,
       item.required = false := by
   intro item h
-  simp [P.items, Builder.optionD, Doc.items, Doc.itemsList] at h
+  simp [P.items, Doc.Normalized.items, Doc.Normalized.optionalItem, Builder.optionD,
+    Doc.items, Doc.itemsList] at h
   subst h
   rfl
 
@@ -111,7 +113,8 @@ theorem optionD_default_rendered (α : Type) [FromArg α] [ToString α] (long : 
     ∀ item ∈ (Builder.optionD long default short metavar help hidden).items,
       item.default? = some (toString default) := by
   intro item h
-  simp [P.items, Builder.optionD, Doc.items, Doc.itemsList] at h
+  simp [P.items, Doc.Normalized.items, Doc.Normalized.optionalItem, Builder.optionD,
+    Doc.items, Doc.itemsList] at h
   subst h
   rfl
 
@@ -624,6 +627,109 @@ theorem verb_agreement_deep (c : Cmd α) (tokens : List String) :
 with. -/
 theorem toCmdSpec_args (c : Cmd α) : (c.toCmdSpec).args = c.items := by
   cases c <;> rfl
+
+/-! ### Synopsis coverage
+
+The options table renders one row per item, so completeness there is a fact
+about `List.map`. The usage synopsis is the one renderer that does not walk the
+item list: it splits the description into the items it renders on their own and
+the alternations it renders as choices. That split is where an item could go
+missing without anything failing -- a `looseItems` case that forgot to recurse
+would drop a flag from the synopsis silently, exactly as a `flattenSeq` that
+dropped a child would drop it from help.
+
+So the split is proved lossless: every item the parser was paired with is
+either rendered on its own or inside a choice. -/
+
+/-- Membership in `itemsList` is membership in some child's items. -/
+theorem mem_itemsList {item : ItemSpec} {ds : List Doc} :
+    item ∈ Doc.itemsList ds ↔ ∃ d ∈ ds, item ∈ Doc.items d := by
+  induction ds with
+  | nil => simp [Doc.itemsList]
+  | cons d rest ih => simp [Doc.itemsList, ih]
+
+/-- A `none` child documents nothing, which is why dropping it from an
+alternation's branches loses nothing. -/
+theorem items_eq_nil_of_isNone {d : Doc} (h : d.isNone = true) : Doc.items d = [] := by
+  cases d with
+  | none => simp [Doc.items]
+  | item _ => simp [Doc.isNone] at h
+  | seq _ => simp [Doc.isNone] at h
+  | alt _ => simp [Doc.isNone] at h
+  | many _ => simp [Doc.isNone] at h
+
+/-- Restricting an alternation to the branches that document something keeps
+every item. -/
+theorem mem_itemsList_realBranches {item : ItemSpec} {ds : List Doc}
+    (h : item ∈ Doc.itemsList ds) : item ∈ Doc.itemsList (Doc.realBranches ds) := by
+  obtain ⟨d, hd, hi⟩ := mem_itemsList.mp h
+  refine mem_itemsList.mpr ⟨d, ?_, hi⟩
+  have hne : d.isNone = false := by
+    cases hc : d.isNone with
+    | false => rfl
+    | true => simp [items_eq_nil_of_isNone hc] at hi
+  exact List.mem_filter.mpr ⟨hd, by simp [hne]⟩
+
+mutual
+
+/-- **Synopsis coverage.** Every item a description mentions is one the
+synopsis renders: either on its own, or as part of a choice. -/
+theorem synopsis_covers (rep : Doc.Repetition) (d : Doc) {item : ItemSpec}
+    (h : item ∈ Doc.items d) :
+    (∃ l ∈ Doc.looseFrom rep d, l.item = item) ∨
+      ∃ c ∈ Doc.choicesFrom rep d, ∃ b ∈ c.branches, item ∈ b := by
+  match d with
+  | .item i =>
+      left
+      have hi : item = i := by simpa [Doc.items] using h
+      exact ⟨{ item := i, repetition := rep }, by simp [Doc.looseFrom], hi.symm⟩
+  | .none => simp [Doc.items] at h
+  | .many d atLeastOne =>
+      have ih := synopsis_covers (rep.under atLeastOne) d (by simpa [Doc.items] using h)
+      simpa [Doc.looseFrom, Doc.choicesFrom] using ih
+  | .seq ds =>
+      have ih := synopsis_coversList rep ds (by simpa [Doc.items] using h)
+      simpa [Doc.looseFrom, Doc.choicesFrom] using ih
+  | .alt ds =>
+      by_cases hlen : (Doc.realBranches ds).length < 2
+      · have ih := synopsis_coversList rep ds (by simpa [Doc.items] using h)
+        simpa [Doc.looseFrom, Doc.choicesFrom, hlen] using ih
+      · right
+        refine ⟨{ omissible := (Doc.realBranches ds).length != ds.length
+                , repetition := rep
+                , branches := (Doc.realBranches ds).map Doc.items }
+              , by simp [Doc.choicesFrom, hlen], ?_⟩
+        have hmem := mem_itemsList_realBranches (ds := ds) (by simpa [Doc.items] using h)
+        obtain ⟨b, hb, hib⟩ := mem_itemsList.mp hmem
+        exact ⟨Doc.items b, List.mem_map_of_mem hb, hib⟩
+
+/-- `synopsis_covers` over a list of documents. -/
+theorem synopsis_coversList (rep : Doc.Repetition) (ds : List Doc) {item : ItemSpec}
+    (h : item ∈ Doc.itemsList ds) :
+    (∃ l ∈ Doc.looseListFrom rep ds, l.item = item) ∨
+      ∃ c ∈ Doc.choicesListFrom rep ds, ∃ b ∈ c.branches, item ∈ b := by
+  match ds with
+  | [] => simp [Doc.itemsList] at h
+  | d :: rest =>
+      rw [Doc.itemsList] at h
+      rcases List.mem_append.mp h with hd | hrest
+      · rcases synopsis_covers rep d hd with ⟨l, hl, hli⟩ | ⟨c, hc, hb⟩
+        · exact Or.inl ⟨l, by simp [Doc.looseListFrom, List.mem_append, hl], hli⟩
+        · exact Or.inr ⟨c, by simp [Doc.choicesListFrom, List.mem_append, hc], hb⟩
+      · rcases synopsis_coversList rep rest hrest with ⟨l, hl, hli⟩ | ⟨c, hc, hb⟩
+        · exact Or.inl ⟨l, by simp [Doc.looseListFrom, List.mem_append, hl], hli⟩
+        · exact Or.inr ⟨c, by simp [Doc.choicesListFrom, List.mem_append, hc], hb⟩
+
+end
+
+/-- The same statement about a rendered command: every item the parser accepts
+is accounted for by the synopsis of the page it appears on. -/
+theorem synopsis_covers_cmd {item : ItemSpec} {c : Cmd α} (h : item ∈ c.items) :
+    (∃ l ∈ Doc.loose (c.toCmdSpec).doc, l.item = item) ∨
+      ∃ ch ∈ Doc.choices (c.toCmdSpec).doc, ∃ b ∈ ch.branches, item ∈ b := by
+  refine synopsis_covers .once _ ?_
+  cases c <;>
+    simpa [Cmd.toCmdSpec, Cmd.items, P.items, Doc.Normalized.items, CmdSpec.doc] using h
 
 /-! ### Help coverage
 

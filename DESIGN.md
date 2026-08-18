@@ -52,7 +52,7 @@ than ported.
 `Core.Subcommand` and `Core.subcommand` remain the dispatch primitive that
 `Cmd.toParser` (Layer 4) is built from.
 
-### Layer 2 — the paired applicative (`ArgParse.P`)
+### Layer 2 — the skeleton and the paired applicative (`ArgParse.Doc`, `ArgParse.P`)
 
 The heart of the library, and the only carrier applications touch for items:
 
@@ -61,13 +61,26 @@ inductive Doc where
   | item (i : ItemSpec)   -- one flag / option / positional
   | seq  (ds : List Doc)  -- applicative composition
   | alt  (ds : List Doc)  -- <|> ; renders as (-a | -b)
-  | many (d : Doc)        -- repetition
+  | many (d : Doc) (atLeastOne : Bool)  -- repetition; P.some vs P.many
   | none                  -- pure — contributes nothing to help
 
+structure Doc.Normalized where
+  val    : Doc
+  normal : Doc.Normal val
+
 structure P (α : Type) where
-  doc : Doc
+  doc : Doc.Normalized
   run : Parser α
+
+inductive CmdSpec where
+  | mk (name : String) (meta : Meta) (doc : Doc) (subs : List CmdSpec)
 ```
+
+`CmdSpec` carries the tree, not a flat item list; `CmdSpec.args` computes the
+list. Most renderers want the list, but the usage synopsis wants the tree —
+`(-a | -b)` is a fact about how two items compose, and flattening is what throws
+it away. Deriving the list from the tree is what keeps the two from disagreeing
+about which items exist.
 
 `ItemSpec` here is *payload-free*: a flat record of name, short/long forms,
 arity, metavar, choices, help, and default, with the value type erased. That
@@ -82,8 +95,9 @@ Instances are one line each and total:
 - `Functor`: maps `run`, leaves `doc` untouched.
 - `Applicative`: composes `run`; `Doc.seq`s the docs.
 - `Alternative`: alternates `run`; `Doc.alt`s the docs.
-- `P.many`: wraps `run` in a fuel-bounded repetition of the scanner and `doc`
-  in `Doc.many`.
+- `P.many`/`P.some`: wrap `run` in a fuel-bounded repetition of the scanner and
+  `doc` in `Doc.many`, which records which of the two it was. A synopsis has to
+  know: one is satisfied by nothing and the other is not.
 - `P.optional`: `(some <$> p) <|> pure none`, whose doc is `Doc.alt [d, .none]`
   — the alternative-with-nothing that renderers already print as `[…]`. No
   sixth constructor is needed.
@@ -93,7 +107,21 @@ which is everything the renderers ever read. `P` is introspectable to exactly
 the depth help needs and opaque below that.
 
 `Doc` normalization (flattening nested `seq`s, dropping `none`) is a function
-on `Doc` alone, so rendering quality never touches parsing.
+on `Doc` alone, so rendering quality never touches parsing. `P` stores the
+normal form rather than the tree as written: `Doc.Normalized` pairs a document
+with the proof that it is already flattened, and every constructor above
+normalizes what it builds. That turns "the descriptions Layer 3 assembles are
+normal" from a convention into a fact of the type — and it is what makes `P`
+lawfully applicative. `pure f <*> x` and `f <$> x` assemble different trees but
+the same normalized document, and `Doc.Normalized.seq` is a monoid with
+`Doc.Normalized.empty` as its unit, which is the descriptive half of all three
+sequencing laws. `Proofs/Doc.lean` supplies the other guarantee normalizing at
+every composition needs: it cannot lose an item, so help gains an entry exactly
+when the parser gains one.
+
+The cost is re-normalizing at each construction, quadratic in the size of the
+description. At the scale of a command line — tens of items — it is not
+measurable, and it buys an invariant that no builder can violate.
 
 ### Layer 3 — builders (`ArgParse.Builder`)
 
@@ -182,7 +210,14 @@ The runner — not the application — owns:
 - `--version`.
 - `--man`, rendering the same `CmdSpec` in mdoc form.
 - Usage synopsis and error rendering ("unknown option `--frob`; did you mean
-  `--from`?"), derived from the same data.
+  `--from`?"), derived from the same data. The synopsis reads the description
+  tree: an alternation with two or more documenting branches renders as
+  `(-a | -b)`, bracketed instead when a `none` branch makes the whole group
+  omissible. A `many` above anything — a single item or a whole group — decides
+  both its ellipsis and its bracketing, overriding the item's own arity, because
+  it is the stronger statement: `[X...]` for `P.many`, `X...` for `P.some`. An
+  alternation with one documenting branch is the optionality spelling —
+  `alt [d, none]` — and renders as the `[…]` it always did.
 - Shell completion, derived by walking `Cmd` + `Doc`: complete verb names at
   nodes, item keys at leaves.
 
@@ -203,6 +238,10 @@ over `Doc` and `Cmd`:
 - **Item agreement.** Every key the scanner of `p.run` accepts appears as an
   item in `p.doc`, and every non-hidden item in `p.doc` is accepted — proven
   once per builder in Layer 3, preserved by the `P` instances.
+- **Synopsis coverage.** The split the usage line makes — items rendered on
+  their own, alternations rendered as choices — accounts for every item in the
+  description. Formatting gets no theorems; the decomposition it formats does,
+  because a missed recursion there would drop an item in silence.
 - **Verb agreement.** `(Cmd.toCmdSpec c)` lists exactly the names on which
   `(Cmd.toParser c)` dispatches, at every depth.
 - **Help totality.** Rendering is total on every constructible `Cmd`/`Doc`.
@@ -285,6 +324,14 @@ generating a parser that cannot produce its own default.
 - **A monadic layer.** `P` is applicative-only. Structure hidden behind
   functions cannot be documented; the library refuses to offer the
   constructor that would create the blind spot.
+- **Theorems about formatting.** `usageLine`, `renderCommandHelp`, `renderMan`,
+  `editDistance`, and `nearest?` have none and should get none: they turn data
+  into strings, where a proof costs a great deal and pins little that a test
+  does not. The line is drawn at the data. `usageLine` splits a description into
+  loose items and choices *before* formatting either, and that split is proved
+  lossless — a missed recursion there would drop a flag from the synopsis in
+  silence, which no test would necessarily catch. How the result is punctuated
+  is not a theorem; what goes into it is.
 
 ## What an application looks like
 

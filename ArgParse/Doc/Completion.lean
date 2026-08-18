@@ -31,14 +31,14 @@ over a value shrinks it by two. No one structural measure covers all three. -/
 def specAtFuel : Nat → CmdSpec → List String → CmdSpec
   | 0, cmd, _ => cmd
   | _, cmd, [] => cmd
-  | fuel + 1, .mk name info args subs, token :: rest =>
+  | fuel + 1, .mk name info doc subs, token :: rest =>
       match findSpec subs token with
       | Option.some child => specAtFuel fuel child rest
       | Option.none =>
-          if (valueLexemes args).contains token then
-            specAtFuel fuel (.mk name info args subs) (rest.drop 1)
+          if (valueLexemes (Doc.items doc)).contains token then
+            specAtFuel fuel (.mk name info doc subs) (rest.drop 1)
           else
-            specAtFuel fuel (.mk name info args subs) rest
+            specAtFuel fuel (.mk name info doc subs) rest
 
 /-- The command these tokens name. -/
 @[inline] def specAt (cmd : CmdSpec) (tokens : List String) : CmdSpec :=
@@ -53,14 +53,14 @@ shrinks the tree, skipping a token shrinks the input. -/
 def pathItemsFuel : Nat → CmdSpec → List String → List ItemSpec
   | 0, cmd, _ => cmd.args
   | _, cmd, [] => cmd.args
-  | fuel + 1, .mk name info args subs, token :: rest =>
+  | fuel + 1, .mk name info doc subs, token :: rest =>
       match findSpec subs token with
-      | Option.some child => args ++ pathItemsFuel fuel child rest
+      | Option.some child => Doc.items doc ++ pathItemsFuel fuel child rest
       | Option.none =>
-          if (valueLexemes args).contains token then
-            pathItemsFuel fuel (.mk name info args subs) (rest.drop 1)
+          if (valueLexemes (Doc.items doc)).contains token then
+            pathItemsFuel fuel (.mk name info doc subs) (rest.drop 1)
           else
-            pathItemsFuel fuel (.mk name info args subs) rest
+            pathItemsFuel fuel (.mk name info doc subs) rest
 
 /-- Items legal at the command these tokens name, ancestors included. -/
 @[inline] def pathItems (cmd : CmdSpec) (tokens : List String) : List ItemSpec :=

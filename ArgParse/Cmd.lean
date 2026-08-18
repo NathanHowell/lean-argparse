@@ -62,10 +62,10 @@ splits into `-v -n5` only if you know `v` is a flag here and `n` takes a value
 here, and the same list is what lets a positional step past tokens the flags and
 options will claim. Both are properties of this command and no other. -/
 def toParser : Cmd α → Parser α
-  | .leaf _ _ p => fun st => p.run (Core.prepare (Doc.items p.doc) st)
+  | .leaf _ _ p => fun st => p.run (Core.prepare (p.items) st)
   | .node _ _ globals subs =>
       let names := subs.map Cmd.name
-      let items := Doc.items globals.doc
+      let items := globals.items
       let dispatch := Core.subcommand (toSubcommands subs)
       fun st =>
         match Core.scopedPre names
@@ -90,8 +90,8 @@ mutual
 /-- Erase the payload type, handing the renderers the recursive `CmdSpec` they
 consume. The item list is read off the same `Doc` the parser was paired with. -/
 def toCmdSpec : Cmd α → CmdSpec
-  | .leaf n m p => .mk n m (Doc.items p.doc) []
-  | .node n m globals subs => .mk n m (Doc.items globals.doc) (toCmdSpecs subs)
+  | .leaf n m p => .mk n m p.doc.val []
+  | .node n m globals subs => .mk n m globals.doc.val (toCmdSpecs subs)
 
 /-- `toCmdSpec` over a list of sibling commands. -/
 def toCmdSpecs : List (Cmd α) → List CmdSpec
@@ -145,7 +145,7 @@ def descendFuel : Nat → Cmd α → List String → List String × Cmd α
               let (path, deepest) := descendFuel fuel child rest
               (n :: path, deepest)
           | Option.none =>
-              if (Spec.valueLexemes (Doc.items g.doc)).contains token then
+              if (Spec.valueLexemes (g.items)).contains token then
                 descendFuel fuel (.node n m g subs) (rest.drop 1)
               else
                 descendFuel fuel (.node n m g subs) rest
@@ -168,8 +168,8 @@ def subNames : Cmd α → List String
 
 /-- Items declared directly on this command. -/
 def items : Cmd α → List ItemSpec
-  | .leaf _ _ p => Doc.items p.doc
-  | .node _ _ globals _ => Doc.items globals.doc
+  | .leaf _ _ p => p.items
+  | .node _ _ globals _ => globals.items
 
 end Cmd
 
