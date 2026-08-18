@@ -31,8 +31,9 @@ are built, with no `sorry` anywhere and no `partial def` outside `Core`.
   zipped. Named arguments replace the `Mod` monoid.
 - **Layer 4 — `Cmd`** (`Cmd.lean`): the command tree, with `toParser` and
   `toCmdSpec` walking the same `subs` list, per-node globals, and a
-  bundle-expanding pre-pass that splits `-vn5` using the items legal at that
-  command.
+  `Core.prepare` pre-pass over each command's own segment -- splitting `-vn5`
+  and keeping positionals off the tokens the flags and options will claim, both
+  driven by the items legal at that command.
 - **Layer 5 — runner** (`Exec.lean`): `--help` at every level, `--version`,
   `--man`, completion candidates, installable bash/zsh/fish completion scripts,
   usage synopses, and error rendering with nearest-match suggestions.
