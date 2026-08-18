@@ -6,13 +6,19 @@ design of record.
 
 ## Current state (2026-08-17)
 
-All ten roadmap items are closed. Three were bugs rather than missing theorems:
-`P.many` truncated bundled flags, `entryRow` let a wide label abut its
-description, and `-vn5` did not parse. Fixing the last of those unblocked three
-more: `-vh` is now a help request, an unrecognised short names itself instead of
-letting a positional swallow it, and an option value that spells a verb no
-longer misroutes help. One roadmap note was wrong --
-`String.startsWith` does not block proofs -- and is corrected below.
+All ten roadmap items are closed, and the bug hunt that followed them found
+seven more. Three came straight out of the roadmap work: `P.many` truncated
+bundled flags, `entryRow` let a wide label abut its description, and `-vn5` did
+not parse. Fixing `-vn5` gave `Cmd.toParser` an item list to reason with, which
+unblocked four more: `-vh` is now a help request, an unrecognised short names
+itself instead of letting a positional swallow it, an option value that spells a
+verb no longer misroutes help, and a positional sequenced before a flag no
+longer eats it -- which had left the shipped `clean` example unable to parse
+`clean -p out`. Separately, `--name=` now means an empty value rather than a
+missing one, matching what `-n ""` has always meant.
+
+One roadmap note was wrong -- `String.startsWith` does not block proofs -- and
+is corrected below.
 
 The paired-applicative migration is complete: all seven layers of `DESIGN.md`
 are built, with no `sorry` anywhere and no `partial def` outside `Core`.
@@ -65,10 +71,11 @@ are built, with no `sorry` anywhere and no `partial def` outside `Core`.
 
 ## Roadmap
 
-Empty. The ten items are closed, and the bug that closing them turned up --
-`-vn5` failing to parse -- is fixed as far as the layering allows; the residue
-is recorded as a design note rather than a to-do, with the price of removing it
-written down.
+Empty. The ten items are closed and the bugs the work turned up are fixed. Two
+residues are recorded as design notes rather than to-dos, each with the price of
+removing it written down: a bundle that *leads* with an option (`-n5v`) still
+needs its flags sequenced after, and a detached option value that lexes as a
+flag (`--message -v`) is still claimed by the flag.
 
 Deliberately not on the list: `usageLine`, `renderCommandHelp`, `renderMan`,
 `editDistance`, and `nearest?` have no theorems and should not get any. They are
