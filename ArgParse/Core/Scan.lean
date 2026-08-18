@@ -252,6 +252,82 @@ def expandBundles (items : List ItemSpec) (st : State) : State :=
         simp [this]
   rw [hid]
 
+/-! ### Keeping positionals off other items' tokens
+
+Scanning is order-insensitive; positionals are not. A positional takes the front
+of `pre`, so it takes whatever is there — including a flag, or another option's
+value — if it happens to run before the scan that wanted it. `clean -p out` used
+to fail for exactly that reason: the positional was sequenced first and ate `-p`.
+
+Sequencing positionals last fixes it, but that is a rule the library cannot
+enforce: the applicative order is the caller's, and `P` is opaque. What the
+library *can* do is make the rule unnecessary, by moving the tokens this
+command's flags and options would claim behind the ones they would not. Scanning
+finds them wherever they are, and a positional now sees only tokens nothing else
+wanted. -/
+
+/-- Whether a non-positional lexeme would claim this token, in any of its
+spellings: exact, `--name=value`, or `-nvalue`. -/
+def lexemeClaims (lex : String) (token : String) : Bool :=
+  if lex.startsWith "--" then token == lex || token.startsWith (lex ++ "=")
+  else token == lex || token.startsWith lex
+
+/-- Stable partition of a segment into the tokens left for positionals and the
+tokens this command's flags and options would claim.
+
+A detached value travels with the lexeme that takes it, so the two stay adjacent
+and a positional cannot pick up the value on its own. -/
+def partitionClaimed (lexemes valueLex : List String) :
+    List String → List String × List String
+  | [] => ([], [])
+  | tok :: rest =>
+      if lexemes.any (lexemeClaims · tok) then
+        if valueLex.contains tok then
+          match rest with
+          | [] => ([], [tok])
+          | v :: rest' =>
+              let (free, taken) := partitionClaimed lexemes valueLex rest'
+              (free, tok :: v :: taken)
+        else
+          let (free, taken) := partitionClaimed lexemes valueLex rest
+          (free, tok :: taken)
+      else
+        let (free, taken) := partitionClaimed lexemes valueLex rest
+        (tok :: free, taken)
+
+/-- Move the tokens this command's flags and options would claim behind the rest,
+so its positionals see only what nothing else wanted.
+
+Relative order is preserved within each group, so repeated options still
+accumulate in the order they were written and positionals still arrive in the
+order they were typed. -/
+def hoistPositionals (items : List ItemSpec) (st : State) : State :=
+  let switches := items.filter (fun i => i.kind != .positional)
+  let lexemes := switches.flatMap (·.lexemes)
+  let valueLex := valueLexemes switches
+  let (free, taken) := partitionClaimed lexemes valueLex st.pre
+  { st with pre := free ++ taken }
+
+/-- The whole pre-pass a command runs over the segment it owns: split bundles,
+then keep positionals off the tokens its other items want. -/
+def prepare (items : List ItemSpec) (st : State) : State :=
+  hoistPositionals items (expandBundles items st)
+
+/-- A command with no flags or options leaves the stream alone. -/
+@[simp] theorem hoistPositionals_no_switches (items : List ItemSpec) (st : State)
+    (h : items.filter (fun i => i.kind != .positional) = []) :
+    hoistPositionals items st = st := by
+  have hid : ∀ tokens : List String,
+      partitionClaimed [] [] tokens = (tokens, []) := by
+    intro tokens
+    induction tokens with
+    | nil => rfl
+    | cons t rest ih =>
+        rw [partitionClaimed.eq_def]
+        simp [ih]
+  simp only [hoistPositionals, h, List.flatMap_nil, valueLexemes, List.filter_nil, hid]
+  simp
+
 /-- Split a token list at the first occurrence of any of the given names. -/
 def splitAtFirst (names : List String) : List String → List String × List String
   | [] => ([], [])

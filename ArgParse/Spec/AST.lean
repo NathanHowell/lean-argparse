@@ -181,6 +181,14 @@ def displayLexemes (item : ItemSpec) : List String :=
       item.short?.toList.map (fun c => "-" ++ String.singleton c) ++
         item.long?.toList.map (fun name => "--" ++ name)
 
+/-- The default as documentation shows it.
+
+An empty default is quoted, because `default: ` reads as "no default" when it
+means "the empty string" -- and the two are different, since `default?` is an
+`Option`. -/
+def defaultText (item : ItemSpec) : Option String :=
+  item.default?.map (fun d => if d.isEmpty then "\"\"" else d)
+
 /-- Placeholder text for the item's value, falling back to the upper-cased name. -/
 def metavar (item : ItemSpec) : String :=
   item.metavar?.getD item.name.toUpper

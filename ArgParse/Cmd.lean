@@ -56,19 +56,20 @@ on the next token and applies the globals to the child's result. Neither form
 consumes its own name: the parent's `subcommand` already did that, and the root
 is never named in argv.
 
-Each form first expands short bundles in the segment it owns, using its own
+Each form first runs `Core.prepare` over the segment it owns, using its own
 items. That is the one place where the information needed is available: `-vn5`
 splits into `-v -n5` only if you know `v` is a flag here and `n` takes a value
-here, which is a property of this command and no other. -/
+here, and the same list is what lets a positional step past tokens the flags and
+options will claim. Both are properties of this command and no other. -/
 def toParser : Cmd α → Parser α
-  | .leaf _ _ p => fun st => p.run (Core.expandBundles (Doc.items p.doc) st)
+  | .leaf _ _ p => fun st => p.run (Core.prepare (Doc.items p.doc) st)
   | .node _ _ globals subs =>
       let names := subs.map Cmd.name
       let items := Doc.items globals.doc
       let dispatch := Core.subcommand (toSubcommands subs)
       fun st =>
         match Core.scopedPre names
-            (fun st' => globals.run (Core.expandBundles items st')) st with
+            (fun st' => globals.run (Core.prepare items st')) st with
         | .err e => .err e
         | .ok f st' =>
             match dispatch st' with

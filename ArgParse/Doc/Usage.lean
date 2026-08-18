@@ -46,7 +46,7 @@ def itemLabel (item : ItemSpec) : String :=
 /-- Trailing notes for an item: its default and its admissible values. -/
 def itemNotes (item : ItemSpec) : String :=
   let parts :=
-    (item.default?.toList.map fun d => s!"[default: {d}]") ++
+    (item.defaultText.toList.map fun d => s!"[default: {d}]") ++
       (item.choices?.toList.map fun cs => s!"[choices: {String.intercalate "|" cs}]")
   match parts with
   | [] => ""

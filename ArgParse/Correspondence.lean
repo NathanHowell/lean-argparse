@@ -436,41 +436,45 @@ Positionals read the front of the stream rather than scanning it, so these are
 shorter: one lemma for a readable head token, one for an exhausted stream, and
 the three builders read off them. -/
 
-/-- A positional claims the head token when it parses. -/
+/-- A positional claims the head token when it parses, and when the token is not
+one a flag or option was meant to claim. -/
 theorem takePositionalStep?_head {α : Type} [FromArg α] (spec : PosSpec α)
     (st : State) (tok : String) (rest : List String) (value : α)
-    (hpre : st.pre = tok :: rest) (hrun : FromArg.run tok = .ok value) :
+    (hpre : st.pre = tok :: rest) (hopt : Core.optionLike tok = false)
+    (hrun : FromArg.run tok = .ok value) :
     Core.takePositionalStep? spec st
       = .ok { value? := some value, raw? := some tok
             , state := Core.State.withPre st rest 1, consumed := 1 } := by
-  simp [Core.takePositionalStep?, Core.State.consumePre?, hpre, hrun]
+  simp [Core.takePositionalStep?, Core.State.consumePre?, hpre, hopt, hrun]
 
 /-- A positional claims nothing once both streams are exhausted. -/
 theorem takePositionalStep?_stay {α : Type} [FromArg α] (spec : PosSpec α)
     (st : State) (hpre : st.pre = []) (hpost : st.post = []) :
     Core.takePositionalStep? spec st = .ok (Core.CollectStep.stay st) := by
-  simp [Core.takePositionalStep?, Core.State.consumePre?, Core.State.consumePost?,
-    hpre, hpost, Core.CollectStep.stay]
+  simp [Core.takePositionalStep?, Core.takePositionalFromPost, Core.State.consumePre?,
+    Core.State.consumePost?, hpre, hpost, Core.CollectStep.stay]
 
 /-- A required positional takes the head token. -/
 theorem arg_accepts_head (α : Type) [FromArg α]
     (name : String) (metavar : Option String) (help : String) (hidden : Bool)
     (st : State) (tok : String) (rest : List String) (value : α)
-    (hpre : st.pre = tok :: rest) (hrun : FromArg.run tok = .ok value) :
+    (hpre : st.pre = tok :: rest) (hopt : Core.optionLike tok = false)
+    (hrun : FromArg.run tok = .ok value) :
     (Builder.arg α name metavar help hidden).run st
       = .ok value (Core.State.withPre st rest 1) := by
   simp [Builder.arg, Core.takePositionalValue?,
-    takePositionalStep?_head _ st tok rest value hpre hrun]
+    takePositionalStep?_head _ st tok rest value hpre hopt hrun]
 
 /-- An optional positional takes the head token. -/
 theorem argOpt_accepts_head (α : Type) [FromArg α]
     (name : String) (metavar : Option String) (help : String) (hidden : Bool)
     (st : State) (tok : String) (rest : List String) (value : α)
-    (hpre : st.pre = tok :: rest) (hrun : FromArg.run tok = .ok value) :
+    (hpre : st.pre = tok :: rest) (hopt : Core.optionLike tok = false)
+    (hrun : FromArg.run tok = .ok value) :
     (Builder.argOpt α name metavar help hidden).run st
       = .ok (some value) (Core.State.withPre st rest 1) := by
   simp [Builder.argOpt, Core.takePositionalValue?,
-    takePositionalStep?_head _ st tok rest value hpre hrun]
+    takePositionalStep?_head _ st tok rest value hpre hopt hrun]
 
 /-- An optional positional is `none` on an exhausted stream. -/
 theorem argOpt_none_when_exhausted (α : Type) [FromArg α]
@@ -497,11 +501,12 @@ theorem args_collects_head (α : Type) [FromArg α]
     (name : String) (metavar : Option String) (help : String) (hidden : Bool)
     (st : State) (tok : String) (value : α)
     (hpre : st.pre = [tok]) (hpost : st.post = [])
+    (hopt : Core.optionLike tok = false)
     (hrun : FromArg.run tok = .ok value) :
     (Builder.args α name metavar help hidden).run st
       = .ok [value] (Core.State.withPre st [] 1) := by
   have hhead := takePositionalStep?_head
-    (posParts α name metavar help .many false hidden).fst st tok [] value hpre hrun
+    (posParts α name metavar help .many false hidden).fst st tok [] value hpre hopt hrun
   have hnilPre : (Core.State.withPre st [] 1).pre = [] := by simp [Core.State.withPre]
   have hnilPost : (Core.State.withPre st [] 1).post = [] := by
     simp [Core.State.withPre, hpost]

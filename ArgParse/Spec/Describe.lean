@@ -52,7 +52,7 @@ def itemHeading (item : ItemSpec) : String :=
 /-- Supplementary lines describing defaults and enumerated choices. -/
 def itemDetails (item : ItemSpec) : List String :=
   item.help?.toList
-    ++ (item.default?.toList.map fun d => s!"default: {d}")
+    ++ (item.defaultText.toList.map fun d => s!"default: {d}")
     ++ (item.choices?.toList.map fun cs => s!"choices: {String.intercalate ", " cs}")
 
 /-- Describe a single item as one documentation entry. -/

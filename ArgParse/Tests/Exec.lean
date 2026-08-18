@@ -277,6 +277,58 @@ private def checkBundleUnknownShortUntouched : Except String Unit := do
   | .error _ => pure ()
   | other => .error s!"expected an error for an unknown short, got {repr other}"
 
+/-! ### Positionals and other items' tokens
+
+A positional takes the front of the stream; scanning takes tokens from anywhere.
+So a positional sequenced first used to eat whatever was in front of it. These
+pin the two halves of the fix -- hoisting claimed tokens behind the rest, and
+declining an option-looking token outright -- and the escape hatches that must
+survive both. -/
+
+/-- Payload for the positional fixtures. -/
+private structure Cleaned where
+  dir : String
+  purge : Bool
+  deriving Repr, DecidableEq
+
+/-- The positional is sequenced *before* the flag, which used to be a way to
+write a parser that could not work. -/
+private def posFirstApp : Cmd Cleaned :=
+  .leaf "clean" { name := "clean" }
+    ((fun d p => Cleaned.mk (d.getD "") p)
+      <$> argOpt String "dir" <*> flag "purge" (short := 'p'))
+
+private def cleaned (label : String) (argv : List String) (dir : String) (purge : Bool) :
+    Except String Unit :=
+  match Exec.exec posFirstApp argv with
+  | .ok value =>
+      expectTrue (value == { dir := dir, purge := purge })
+        s!"{label}: got {repr value}"
+  | other => .error s!"{label}: expected a parse, got {repr other}"
+
+/-- A flag ahead of the positional's value no longer displaces it. -/
+private def checkPositionalSkipsFlag : Except String Unit := do
+  cleaned "-p out" ["-p", "out"] "out" true
+  cleaned "out -p" ["out", "-p"] "out" true
+
+/-- With no positional value at all, the flag is still a flag -- the positional
+does not fall back to consuming it. -/
+private def checkPositionalDeclinesLoneFlag : Except String Unit :=
+  cleaned "-p alone" ["-p"] "" true
+
+/-- A negative number is a value, not a lexeme, so positionals still take it. -/
+private def checkNegativePositional : Except String Unit := do
+  let app : Cmd (Int × Int) :=
+    .leaf "span" { name := "span" }
+      ((fun a b => (a, b)) <$> arg Int "from" <*> arg Int "to")
+  match Exec.exec app ["-5", "-3"] with
+  | .ok value => expectTrue (value == (-5, -3)) s!"got {repr value}"
+  | other => .error s!"expected a parse, got {repr other}"
+
+/-- `--` remains the way to pass a positional value that starts with a dash. -/
+private def checkSentinelEscapesDash : Except String Unit :=
+  cleaned "-- -weird" ["--", "-weird"] "-weird" false
+
 /-- An option's value is not in verb position, even when it spells a verb.
 
 `--root-mode child` sets the root's mode to the string "child"; the help walk
@@ -421,6 +473,10 @@ def execChecks : List (String × Except String Unit) :=
   , ("negative numbers are values", checkNegativeNumberNotDiagnosed)
   , ("option value spelling a verb", checkOptionValueSpellingAVerb)
   , ("completion skips option values", checkCompletionSkipsOptionValue)
+  , ("positional skips a flag", checkPositionalSkipsFlag)
+  , ("positional declines a lone flag", checkPositionalDeclinesLoneFlag)
+  , ("negative numbers stay positional", checkNegativePositional)
+  , ("sentinel escapes a dash value", checkSentinelEscapesDash)
   ]
 
 end ArgParse.Tests

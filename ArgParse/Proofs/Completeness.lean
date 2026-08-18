@@ -104,13 +104,16 @@ theorem option_yields (α : Type) [FromArg α] (long v : String) (value : α)
     hpre hrun hrest
   simp [Yields, Builder.option, h]
 
-/-- A required positional yields the head token when it decodes. -/
+/-- A required positional yields the head token when it decodes and is not
+something a flag or option was meant to claim. -/
 theorem arg_yields (α : Type) [FromArg α] (name : String) (metavar : Option String)
     (help : String) (hidden : Bool) (st : State) (tok : String) (rest : List String)
-    (value : α) (hpre : st.pre = tok :: rest) (hrun : FromArg.run tok = .ok value) :
+    (value : α) (hpre : st.pre = tok :: rest) (hopt : Core.optionLike tok = false)
+    (hrun : FromArg.run tok = .ok value) :
     Yields (Builder.arg α name metavar help hidden) st value
       (Core.State.withPre st rest 1) :=
-  Correspondence.arg_accepts_head α name metavar help hidden st tok rest value hpre hrun
+  Correspondence.arg_accepts_head α name metavar help hidden st tok rest value
+    hpre hopt hrun
 
 /-! ### Dispatch -/
 
@@ -120,13 +123,13 @@ This is the completeness counterpart of `subcommand_toSubcommands`: that says
 dispatch reaches the right parser, this says the whole node succeeds when the
 globals and that parser do.
 
-The globals hypothesis is stated over the bundle-expanded segment, because that
-is what `toParser` actually runs them on. -/
+The globals hypothesis is stated over the prepared segment -- bundles split and
+positional tokens hoisted -- because that is what `toParser` runs them on. -/
 theorem node_yields {α : Type} (n : String) (m : Meta) (globals : P (α → α))
     (subs : List (Cmd α)) (c : Cmd α)
     {st stG stC : State} {f : α → α} {a : α} {token : String} {rest : List String}
     (hglob : Core.scopedPre (subs.map Cmd.name)
-      (fun st' => globals.run (Core.expandBundles (Doc.items globals.doc) st')) st
+      (fun st' => globals.run (Core.prepare (Doc.items globals.doc) st')) st
         = .ok f stG)
     (hpre : stG.pre = token :: rest)
     (hfind : subs.find? (fun s => s.name == token) = some c)
@@ -138,21 +141,25 @@ theorem node_yields {α : Type} (n : String) (m : Meta) (globals : P (α → α)
 /-! ### End to end
 
 A closed instance: one command tree, one argv, no hypotheses. Everything above
-is used — normalization, a node's globals, dispatch, an option, a positional,
-and `seq_yields` to put the two items together. -/
+is used — normalization, a node's globals, dispatch, a positional, an option,
+and `seq_yields` to put the two items together.
+
+The positional is sequenced *first*, which used to be a way to write a broken
+parser: it would take the front of the stream whatever was there. `Core.prepare`
+is what makes it safe, and this is the shape that exercises it. -/
 
 /-- Payload for the worked example. -/
 structure Greeting where
-  /-- Value of the `--who` option. -/
-  who : String
   /-- The positional argument. -/
   name : String
+  /-- Value of the `--who` option. -/
+  who : String
 deriving Repr, DecidableEq
 
-/-- Two items composed applicatively. -/
+/-- Two items composed applicatively, positional first. -/
 def greetP : P Greeting :=
-  (fun w n => Greeting.mk w n)
-    <$> Builder.option String "who" <*> Builder.arg String "name"
+  (fun n w => Greeting.mk n w)
+    <$> Builder.arg String "name" <*> Builder.option String "who"
 
 /-- One verb under a node whose globals do nothing. -/
 def demoApp : Cmd Greeting :=
@@ -160,68 +167,83 @@ def demoApp : Cmd Greeting :=
     [.leaf "greet" { name := "greet" } greetP]
 
 /-- The normalized argv the example parses. -/
-def s0 : State := { pre := ["greet", "--who", "world", "Alice"], post := [], cursor := 0 }
+def s0 : State := { pre := ["greet", "Alice", "--who", "world"], post := [], cursor := 0 }
+
+/-- The leaf's segment, after dispatch has consumed the verb. -/
+def s1 : State := { pre := ["Alice", "--who", "world"], post := [], cursor := 1 }
 
 /-- No sentinel, so normalization is the identity on the token list. -/
 theorem argv_normalizes :
-    Core.normalize ["greet", "--who", "world", "Alice"] = s0 := by
+    Core.normalize ["greet", "Alice", "--who", "world"] = s0 := by
   simp [s0, Core.normalize,
     Core.split_cons_token (show ("greet" : String) ≠ "--" by decide),
+    Core.split_cons_token (show ("Alice" : String) ≠ "--" by decide),
     Core.split_cons_token (show ("--who" : String) ≠ "--" by decide),
-    Core.split_cons_token (show ("world" : String) ≠ "--" by decide),
-    Core.split_cons_token (show ("Alice" : String) ≠ "--" by decide)]
+    Core.split_cons_token (show ("world" : String) ≠ "--" by decide)]
 
 /-- The node's globals are `pure id`, scoped to the empty segment before the
 verb, so they consume nothing and change nothing. -/
 theorem globals_pass :
     Core.scopedPre ["greet"]
       (fun st' => (Pure.pure id : P (Greeting → Greeting)).run
-        (Core.expandBundles (Doc.items (Pure.pure id : P (Greeting → Greeting)).doc) st'))
+        (Core.prepare (Doc.items (Pure.pure id : P (Greeting → Greeting)).doc) st'))
       s0 = .ok id s0 := by
   simp [Core.scopedPre, Core.splitAtFirst, s0, pure_run, Parser.pure,
-    Core.expandBundles, Core.shortsOfKind]
+    Core.prepare, Core.expandBundles, Core.shortsOfKind, Core.hoistPositionals,
+    Spec.valueLexemes, Core.partitionClaimed]
 
-/-- `greetP` declares no short forms, so expanding its bundles does nothing. -/
-theorem greet_expand_id (st : State) :
-    Core.expandBundles (Doc.items greetP.doc) st = st := by
-  refine Core.expandBundles_nil_shorts _ st ?_ ?_ <;> rfl
+/-- The only lexeme the leaf's non-positional items answer to. -/
+theorem greet_switch_lexemes :
+    ((Doc.items greetP.doc).filter (fun i => i.kind != .positional)).flatMap (·.lexemes)
+      = ["--who"] := rfl
 
-/-- The trailing positional is not something the `--who` option would claim. -/
-theorem alice_unclaimed :
-    Core.optionToken? (optParts String "who" none none "" none .one true false).fst
-      "Alice" = false := by
-  simp only [Core.optionToken?, optParts, Core.optionTokenShort?, Core.longLexeme,
-    mkShort?]
-  decide
+/-- And it takes a value. -/
+theorem greet_value_lexemes :
+    Spec.valueLexemes ((Doc.items greetP.doc).filter (fun i => i.kind != .positional))
+      = ["--who"] := rfl
+
+/-- Preparation leaves this segment alone: no short forms to split, and the
+positional already sits ahead of the option that would have displaced it. -/
+theorem greet_prepare_id : Core.prepare (Doc.items greetP.doc) s1 = s1 := by
+  have hb := Core.expandBundles_nil_shorts (Doc.items greetP.doc) s1 rfl rfl
+  rw [Core.prepare, hb, Core.hoistPositionals]
+  simp only [greet_switch_lexemes, greet_value_lexemes, s1, Core.partitionClaimed,
+    Core.lexemeClaims, List.any_cons, List.any_nil]
+  repeat' split
+  all_goals simp_all
+
+/-- The trailing option is not something the positional would claim. -/
+theorem nothing_after_who :
+    ∀ tok ∈ ([] : List String),
+      Core.optionToken? (Builder.optParts String "who" none none "" none .one true false).fst
+        tok = false := by
+  simp
 
 /-- **Completeness, end to end.** Conforming argv parses, and the bindings are
 the ones the command declares. -/
 theorem demo_yields :
-    Cmd.toParser demoApp (Core.normalize ["greet", "--who", "world", "Alice"])
-      = .ok { who := "world", name := "Alice" }
+    Cmd.toParser demoApp (Core.normalize ["greet", "Alice", "--who", "world"])
+      = .ok { name := "Alice", who := "world" }
           { pre := [], post := [], cursor := 4 } := by
   rw [argv_normalizes]
   refine node_yields "demo" { name := "demo" } (Pure.pure id)
     [Cmd.leaf "greet" { name := "greet" } greetP]
     (Cmd.leaf "greet" { name := "greet" } greetP)
-    (token := "greet") (rest := ["--who", "world", "Alice"])
+    (token := "greet") (rest := ["Alice", "--who", "world"])
     (by simpa [Cmd.name] using globals_pass) rfl (by simp [Cmd.name]) ?_
-  show greetP.run (Core.expandBundles (Doc.items greetP.doc)
-      { pre := ["--who", "world", "Alice"], post := [], cursor := 1 }) = _
-  rw [greet_expand_id]
+  show greetP.run (Core.prepare (Doc.items greetP.doc) s1) = _
+  rw [greet_prepare_id]
+  have harg : Yields (Builder.arg String "name") s1 "Alice"
+      { pre := ["--who", "world"], post := [], cursor := 2 } := by
+    have := arg_yields String "name" none "" false s1 "Alice" ["--who", "world"]
+      "Alice" rfl rfl rfl
+    simpa [s1, Core.State.withPre] using this
   have hopt : Yields (Builder.option String "who")
-      { pre := ["--who", "world", "Alice"], post := [], cursor := 1 } "world"
-      { pre := ["Alice"], post := [], cursor := 3 } := by
-    have := option_yields String "who" "world" "world" none none "" false
-      { pre := ["--who", "world", "Alice"], post := [], cursor := 1 } ["Alice"]
-      rfl rfl (by intro tok htok; simp at htok; subst htok; exact alice_unclaimed)
-    simpa [Core.State.withPre] using this
-  have harg : Yields (Builder.arg String "name")
-      { pre := ["Alice"], post := [], cursor := 3 } "Alice"
+      { pre := ["--who", "world"], post := [], cursor := 2 } "world"
       { pre := [], post := [], cursor := 4 } := by
-    have := arg_yields String "name" none "" false
-      { pre := ["Alice"], post := [], cursor := 3 } "Alice" [] "Alice" rfl rfl
+    have := option_yields String "who" "world" "world" none none "" false
+      { pre := ["--who", "world"], post := [], cursor := 2 } [] rfl rfl nothing_after_who
     simpa [Core.State.withPre] using this
-  exact seq_yields (map_yields (fun w n => Greeting.mk w n) hopt) harg
+  exact seq_yields (map_yields (fun n w => Greeting.mk n w) harg) hopt
 
 end ArgParse.Proofs.Complete

@@ -634,23 +634,71 @@ def option {α : Type} [ArgParse.FromArg α] (spec : OptSpec α) :
           | [] => .err (missingOptionError spec)
           | _ => .ok values st'
 
+/-- Whether a `pre` token looks like something a flag or option should claim,
+rather than a positional's value.
+
+A lone `-` is conventionally stdin and `-5` is a negative number, so neither
+counts; everything else with a leading dash does. Past the `--` sentinel this
+question is not asked at all, which is what makes `--` the escape hatch for a
+positional value that really does start with a dash. -/
+def optionLike (token : String) : Bool :=
+  match token.toList with
+  | '-' :: c :: _ => !c.isDigit
+  | _ => false
+
+/-- Read a positional from the post-sentinel stream. Everything after `--` is a
+positional value, so no token there is ever declined. -/
+@[inline] def takePositionalFromPost
+    {α : Type} [ArgParse.FromArg α] (spec : PosSpec α) (st : State) :
+    Except Error (CollectStep α) :=
+  match State.consumePost? st with
+  | some (token, st') =>
+      match FromArg.run token with
+      | .ok value => .ok { value? := some value, raw? := some token, state := st', consumed := 1 }
+      | .error msg => .error (invalidValueError token msg (expectPositional spec))
+  | none => .ok { value? := none, raw? := none, state := st, consumed := 0 }
+
+/-- Post-sentinel steps advance the cursor by the recorded amount. -/
+theorem takePositionalFromPost_cursor
+    {α : Type} [ArgParse.FromArg α] {spec : PosSpec α} {st : State}
+    {step : CollectStep α}
+    (h : takePositionalFromPost spec st = .ok step) :
+    step.state.cursor = st.cursor + step.consumed := by
+  classical
+  unfold takePositionalFromPost at h
+  cases hPost : State.consumePost? st with
+  | some pair =>
+      rcases pair with ⟨token, st'⟩
+      cases hRun : FromArg.run (α := α) token with
+      | ok value =>
+          simp only [hPost, hRun, Except.ok.injEq] at h
+          cases h
+          simpa using State.consumePost?_cursor (st := st) (tok := token) (st' := st') hPost
+      | error msg =>
+          simp [hPost, hRun] at h
+  | none =>
+      simp only [hPost, Except.ok.injEq] at h
+      cases h
+      simp
+
 /-- Attempt a single positional parsing step, capturing progress metadata. -/
 @[inline] def takePositionalStep?
     {α : Type} [ArgParse.FromArg α] (spec : PosSpec α) (st : State) :
     Except Error (CollectStep α) :=
-  let expect := expectPositional spec
   match State.consumePre? st with
   | some (token, st') =>
-      match FromArg.run token with
-      | .ok value => .ok { value? := some value, raw? := some token, state := st', consumed := 1 }
-      | .error msg => .error (invalidValueError token msg expect)
-  | none =>
-      match State.consumePost? st with
-      | some (token, st') =>
-          match FromArg.run token with
-          | .ok value => .ok { value? := some value, raw? := some token, state := st', consumed := 1 }
-          | .error msg => .error (invalidValueError token msg expect)
-      | none => .ok { value? := none, raw? := none, state := st, consumed := 0 }
+      if optionLike token then
+        -- Something a flag or option was meant to claim. Binding a lexeme as
+        -- this positional's value is never what was meant, and after
+        -- `Core.prepare` these sit at the tail of the segment -- so reaching one
+        -- means the positional values are already used up.
+        takePositionalFromPost spec st
+      else
+        match FromArg.run token with
+        | .ok value => .ok { value? := some value, raw? := some token, state := st', consumed := 1 }
+        | .error msg =>
+            .error (invalidValueError token msg (expectPositional spec))
+  | none => takePositionalFromPost spec st
 
 /-- Successful positional steps advance the cursor by the recorded amount. -/
 @[simp] theorem takePositionalStep?_cursor
@@ -661,33 +709,23 @@ def option {α : Type} [ArgParse.FromArg α] (spec : OptSpec α) :
   classical
   unfold takePositionalStep? at h
   cases hPre : State.consumePre? st with
+  | none =>
+      simp only [hPre] at h
+      exact takePositionalFromPost_cursor h
   | some prePair =>
       rcases prePair with ⟨token, st'⟩
-      cases hRun : FromArg.run (α := α) token with
-      | ok value =>
-          have hStep := h
-          simp [hPre, hRun] at hStep
-          cases hStep
-          simpa using State.consumePre?_cursor (st := st) (tok := token) (st' := st') hPre
-      | error msg =>
-          simp [hPre, hRun] at h
-  | none =>
-      cases hPost : State.consumePost? st with
-      | some postPair =>
-          rcases postPair with ⟨token, st'⟩
-          cases hRun : FromArg.run (α := α) token with
-          | ok value =>
-              have hStep := h
-              simp [hPre, hPost, hRun] at hStep
-              cases hStep
-              simpa using State.consumePost?_cursor (st := st) (tok := token) (st' := st') hPost
-          | error msg =>
-              simp [hPre, hPost, hRun] at h
-      | none =>
-          have hStep := h
-          simp [hPre, hPost] at hStep
-          cases hStep
-          simp
+      simp only [hPre] at h
+      by_cases hOpt : optionLike token = true
+      · rw [if_pos hOpt] at h
+        exact takePositionalFromPost_cursor h
+      · rw [if_neg hOpt] at h
+        cases hRun : FromArg.run (α := α) token with
+        | ok value =>
+            simp only [hRun, Except.ok.injEq] at h
+            cases h
+            simpa using State.consumePre?_cursor (st := st) (tok := token) (st' := st') hPre
+        | error msg =>
+            simp [hRun] at h
 
 /-- Extract only the value/state pair from `takePositionalStep?`. -/
 @[inline] def takePositionalValue?
