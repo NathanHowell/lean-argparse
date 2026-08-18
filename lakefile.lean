@@ -2,7 +2,7 @@ import Lake
 open Lake DSL System
 
 package «argparse» where
-  version := v!"0.1.0"
+  version := v!"0.2.0"
 
 lean_lib ArgParse
 
