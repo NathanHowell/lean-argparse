@@ -210,8 +210,9 @@ theorem greet_prepare_id : Core.prepare (greetP.items) s1 = s1 := by
   rw [Core.prepare, hb]
   have hf : Core.fuseValues (greetP.items) s1 = s1 := by
     simp only [Core.fuseValues, greet_switch_lexemes, greet_value_lexemes, s1]
+    -- No `decide` here: under Lean 4.33.0 the `simp` below closes this goal on
+    -- its own, and a trailing `decide` fails with "no goals to be solved".
     simp [Core.fuseDetachedValues, Core.lexemeClaims]
-    decide
   rw [hf, Core.hoistPositionals]
   simp only [greet_switch_lexemes, greet_value_lexemes, s1, Core.partitionClaimed,
     Core.lexemeClaims, List.any_cons, List.any_nil]

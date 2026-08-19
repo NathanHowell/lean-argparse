@@ -662,13 +662,20 @@ theorem takeOptionStep?_eq_form {α : Type} [FromArg α] (spec : OptSpec α)
     (hpre : st.pre = ("--" ++ name ++ "=" ++ v) :: rest) :
     takeOptionStep? spec st
       = .ok (CollectStep.ofConcat (some (value, v)) (State.withPre st rest 1)) := by
-  simp only [takeOptionStep?, hpre, hlong, takeOptionLongToken?, longLexeme]
+  -- Keep `longLexeme` FOLDED. Lean 4.33.0 gave `String.startsWith` a generic
+  -- pattern carried by a `ForwardPattern` instance indexed by the pattern term
+  -- itself, so unfolding a definition that occurs in the pattern rewrites the
+  -- explicit argument and strands the instance at the old term: the goal stops
+  -- being type-correct at implicit transparency, and `split` then reports no
+  -- `ite` to split at all. `takeOptionStep?_concat_short` below never hit this
+  -- because it leaves `shortLexeme` folded. Fold the hypothesis to match rather
+  -- than unfolding the definition to match the hypothesis.
+  have hpre' : st.pre = (longLexeme name ++ "=" ++ v) :: rest := hpre
+  simp only [takeOptionStep?, hpre', hlong, takeOptionLongToken?]
   rw [if_pos heq]
-  split
-  · rw [drop_append_length]
-    simp [takeOptionConcatPayload?, parseConcatValue, hrun, CollectStep.ofConcat]
-  · rename_i hfalse
-    exact absurd (startsWith_append_left ("--" ++ name ++ "=") v) hfalse
+  rw [if_pos (startsWith_append_left (longLexeme name ++ "=") v)]
+  rw [drop_append_length]
+  simp [takeOptionConcatPayload?, parseConcatValue, hrun, CollectStep.ofConcat]
 
 /-- The front-of-stream step reads `-nvalue` in one token. -/
 theorem takeOptionStep?_concat_short {α : Type} [FromArg α] (spec : OptSpec α)
